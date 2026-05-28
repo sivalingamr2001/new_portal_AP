@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="Domain/CWM.CleanArchitecture.Domain.csproj" />
+    <Project Path="Application/CWM.CleanArchitecture.Application.csproj" />
+    <Project Path="Infrastructure/CWM.CleanArchitecture.Infrastructure.csproj" />
+    <Project Path="Api/CWM.CleanArchitecture.Api.csproj" />
+  </Folder>
+  <Folder Name="/aspire/">
+    <Project Path="AppHost/CWM.CleanArchitecture.AppHost.csproj" />
+    <Project Path="ServiceDefaults/CWM.CleanArchitecture.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="../tests/Architecture.Tests/CWM.CleanArchitecture.Architecture.Tests.csproj" />
+    <Project Path="../tests/Application.UnitTests/CWM.CleanArchitecture.Application.UnitTests.csproj" />
+  </Folder>
+</Solution>
