@@ -19,8 +19,12 @@ export const ApprovalQueuePage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const data = await withLoader(() => accessRequestApi.getItCart())
-      setRequests(data)
+      const result = await withLoader(() => accessRequestApi.getItCart())
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load approval queue:", result.error?.message)
+        return
+      }
+      setRequests(result.value.data)
     } catch (error) {
       console.error("Failed to load approval queue:", error)
     }

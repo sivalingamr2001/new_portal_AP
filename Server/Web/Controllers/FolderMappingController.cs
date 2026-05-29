@@ -48,4 +48,18 @@ public class FolderMappingController : ControllerBase
         var deleted = await _folderMappingService.DeleteAsync(id);
         return deleted ? NoContent() : NotFound();
     }
+
+    [HttpGet("parents")]
+    public async Task<IActionResult> GetParentFolders()
+    {
+        var folders = await _folderMappingService.GetParentFoldersAsync();
+        return Ok(folders);
+    }
+
+    [HttpGet("hierarchy")]
+    public async Task<IActionResult> GetFolderHierarchy()
+    {
+        var hierarchy = await _folderMappingService.GetFolderHierarchyAsync();
+        return Ok(hierarchy);
+    }
 }

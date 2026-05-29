@@ -9,7 +9,7 @@ import type {
 } from "ag-grid-community"
 import type { DataGridProps, DataGridState, UseDataGridReturn } from "./types"
 
-export function useDataGrid<TData extends Record<string, unknown>>(
+export function useDataGrid<TData extends object>(
   props: DataGridProps<TData>
 ): UseDataGridReturn<TData> {
   const gridApiRef = useRef<GridApi<TData> | null>(null)

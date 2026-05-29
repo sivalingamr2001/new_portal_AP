@@ -24,6 +24,7 @@ public sealed record ApprovalActionRequestDto(
 
 public sealed record ResubmitAccessRequestDto(
     int UserId,
+    string? FolderPath,
     AccessTypes? AccessType,
     AccessTypes? ConfirmAccessType,
     string Reason

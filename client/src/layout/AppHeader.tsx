@@ -19,7 +19,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import Logo from "@/lib/constants"
+import { useAuth } from "@/context/AuthContext"
+import { useNavigate } from "react-router-dom"
 
 const useUserSession = () => {
   return {
@@ -29,11 +30,13 @@ const useUserSession = () => {
 }
 
 export function AppHeader() {
-  const { name, email } = useUserSession()
+  const {currentUser, logout} = useAuth()
+  const navigate = useNavigate()
 
   // Handler logic placeholder for logouts
   const handleLogout = () => {
-    console.log("Logging out...")
+    logout()
+    navigate("/login")
   }
 
   return (
@@ -93,10 +96,10 @@ export function AppHeader() {
 
               <div className="hidden flex-col text-left md:flex">
                 <span className="text-sm leading-none font-semibold text-foreground">
-                  {name}
+                  {currentUser?.cmplUser?.cmplUserName || "User Name"}
                 </span>
                 <span className="mt-1 text-xs leading-none font-normal text-muted-foreground">
-                  {email}
+                  {currentUser?.cmplUser?.mailId || "N/A"}
                 </span>
               </div>
             </Button>
@@ -105,9 +108,9 @@ export function AppHeader() {
           <DropdownMenuContent align="end" className="mt-1 w-56">
             <DropdownMenuLabel className="font-normal md:hidden">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm leading-none font-medium">{name}</p>
+                <p className="text-sm leading-none font-medium">{currentUser?.name || "User Name"}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {email}
+                  {currentUser?.email || "user@example.com"}
                 </p>
               </div>
             </DropdownMenuLabel>

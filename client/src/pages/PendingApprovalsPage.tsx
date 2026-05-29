@@ -22,10 +22,14 @@ export const PendingApprovalsPage = () => {
   const fetchRequests = useCallback(async () => {
     if (!currentUser?.userId) return
     try {
-      const data = await withLoader(() =>
+      const result = await withLoader(() =>
         accessRequestApi.getHodCart(currentUser.userId)
       )
-      setRequests(data)
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load pending approvals:", result.error?.message)
+        return
+      }
+      setRequests(result.value.data)
     } catch (error) {
       console.error("Failed to load pending approvals:", error)
     }

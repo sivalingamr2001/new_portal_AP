@@ -120,6 +120,12 @@ export interface FolderMappingDto {
   secondaryHodEmail?: string | null
 }
 
+export interface FolderResponseDto {
+  DriveName: string
+  Name: string
+  Children?: FolderResponseDto[]
+}
+
 export interface UpsertFolderMappingRequest {
   folderPath: string
   primaryHodId?: string | null
@@ -180,6 +186,7 @@ export interface ApprovalActionRequestDto {
 
 export interface ResubmitAccessRequestDto {
   userId: number
+  folderPath?: string | null
   accessType?: AccessType | null
   confirmAccessType?: AccessType | null
   reason: string

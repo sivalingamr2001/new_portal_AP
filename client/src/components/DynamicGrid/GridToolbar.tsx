@@ -11,6 +11,7 @@ export const GridToolbar = memo(
     showSearch,
     showRefresh,
     showClearFilters,
+    onQuickFilterChange,
     onRefresh,
     onClearFilters,
     customActions = [],
@@ -39,7 +40,9 @@ export const GridToolbar = memo(
                 placeholder="Quick search..."
                 className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:outline-none"
                 onChange={(e) =>
-                  gridApi?.setGridOption("quickFilterText", e.target.value)
+                  onQuickFilterChange(
+                    e.target.value
+                  )
                 }
               />
             )}

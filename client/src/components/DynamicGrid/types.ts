@@ -9,7 +9,6 @@ import type {
   PaginationChangedEvent,
 } from "ag-grid-community"
 import type { ReactNode } from "react"
-import type { PagedResult } from "@/api/types"
 
 export interface ActionButtonProps {
   label: string
@@ -31,15 +30,18 @@ export interface DetailSectionConfig {
   hiddenFields?: string[]
 }
 
-export interface VirtualScrollProps<T> {
+export interface VirtualScrollProps {
   enabled?: boolean
-  onLoadMore?: (page: number) => Promise<PagedResult<T>>
+  onLoadMore?: (page: number) => Promise<unknown>
   pageSize?: number
   bufferSize?: number
+  currentPage?: number
+  totalPages?: number
+  hasMore?: boolean
 }
 
 export interface DataGridProps<
-  TData extends Record<string, unknown> = Record<string, unknown>,
+  TData extends object = object,
 > {
   rowData: TData[]
   columnDefs: (Omit<ColDef<TData>, "field"> & { field?: string })[]
@@ -75,7 +77,7 @@ export interface DataGridProps<
   detailSections?: DetailSectionConfig[]
 
   // Virtual scrolling configuration
-  virtualScroll?: VirtualScrollProps<TData>
+  virtualScroll?: VirtualScrollProps
 }
 
 export interface DataGridState {
@@ -89,7 +91,7 @@ export interface DataGridState {
   isRefreshing: boolean
 }
 
-export interface UseDataGridReturn<TData extends Record<string, unknown>> {
+export interface UseDataGridReturn<TData extends object> {
   gridApiRef: React.RefObject<GridApi<TData> | null>
   state: DataGridState
   handlers: {
@@ -111,6 +113,7 @@ export interface GridToolbarProps {
   showSearch: boolean
   showRefresh: boolean
   showClearFilters: boolean
+  onQuickFilterChange: (value: string) => void
   onRefresh: () => void
   onClearFilters: () => void
   customActions?: ActionButtonProps[]

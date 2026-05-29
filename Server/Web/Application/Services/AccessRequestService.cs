@@ -81,9 +81,14 @@ public sealed class AccessRequestService : IAccessRequestService
         _db.AccessRequests.Add(requestEntity);
         await _db.SaveChangesAsync();
 
+        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(
+            _db,
+            request.UserId);
+
         var recipientIds = createdItems
             .Select(i => i.HodApproverId)
             .OfType<int>()
+            .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
             .Distinct()
             .ToList();
 
@@ -103,6 +108,33 @@ public sealed class AccessRequestService : IAccessRequestService
             request.UserId);
 
         return (await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestEntity.AccessReqId))!;
+    }
+
+    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetAllPagedAsync(int? userId, int page, int pageSize)
+    {
+        var query = _db.AccessRequests.AsQueryable();
+
+        if (userId is not null)
+            query = query.Where(r => r.UserId == userId.Value);
+
+        var totalCount = await query.CountAsync();
+        var requestIds = await query
+            .OrderByDescending(r => r.RequestedAtUtc)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(r => r.AccessReqId)
+            .ToListAsync();
+
+        var results = new List<AccessRequestDto>(requestIds.Count);
+
+        foreach (var requestId in requestIds)
+        {
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            if (dto is not null)
+                results.Add(dto);
+        }
+
+        return (results, totalCount);
     }
 
     public async Task<IReadOnlyList<AccessRequestDto>> GetAllAsync(int? userId = null)
@@ -132,6 +164,32 @@ public sealed class AccessRequestService : IAccessRequestService
     public Task<AccessRequestDto?> GetByIdAsync(int accessReqId) =>
         RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
 
+    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetPendingHodCartPagedAsync(int approverId, int page, int pageSize)
+    {
+        var query = _db.AccessItems
+            .Where(i => i.Status == RequestStatus.PendingWithHod && i.HodApproverId == approverId)
+            .Select(i => i.AccessReqId)
+            .Distinct();
+
+        var totalCount = await query.CountAsync();
+        var requestIds = await query
+            .OrderBy(id => id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var results = new List<AccessRequestDto>(requestIds.Count);
+
+        foreach (var requestId in requestIds)
+        {
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            if (dto is not null)
+                results.Add(dto);
+        }
+
+        return (results, totalCount);
+    }
+
     public async Task<IReadOnlyList<AccessRequestDto>> GetPendingHodCartAsync(int approverId)
     {
         var requestIds = await _db.AccessItems
@@ -150,6 +208,32 @@ public sealed class AccessRequestService : IAccessRequestService
         }
 
         return results;
+    }
+
+    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetPendingItCartPagedAsync(int page, int pageSize)
+    {
+        var query = _db.AccessItems
+            .Where(i => i.Status == RequestStatus.PendingWithIt)
+            .Select(i => i.AccessReqId)
+            .Distinct();
+
+        var totalCount = await query.CountAsync();
+        var requestIds = await query
+            .OrderBy(id => id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var results = new List<AccessRequestDto>(requestIds.Count);
+
+        foreach (var requestId in requestIds)
+        {
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            if (dto is not null)
+                results.Add(dto);
+        }
+
+        return (results, totalCount);
     }
 
     public async Task<IReadOnlyList<AccessRequestDto>> GetPendingItCartAsync()

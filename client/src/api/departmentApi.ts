@@ -2,7 +2,6 @@ import { apiService, type PaginationParams } from "@/api/axiosClient"
 import type {
   DepartmentResponseDto,
   Result,
-  PagedApiResponse,
   PagedResult,
 } from "@/api/types"
 

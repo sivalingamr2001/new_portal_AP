@@ -19,8 +19,12 @@ export const DepartmentsPage = () => {
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const data = await withLoader(() => departmentApi.getAll())
-      setDepartments(data)
+      const result = await withLoader(() => departmentApi.getAll())
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load departments:", result.error?.message)
+        return
+      }
+      setDepartments(result.value.data)
     } catch (error) {
       console.error("Failed to load departments:", error)
     }

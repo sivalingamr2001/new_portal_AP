@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Server.Shared.Helpers;
 using Web.Application.Interfaces;
 using Web.Application.Services;
 using Web.Infrastructure.Data;
@@ -29,6 +30,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=app.db"));
+
+builder.Services.AddSingleton<FolderService>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IFolderMappingService, FolderMappingService>();

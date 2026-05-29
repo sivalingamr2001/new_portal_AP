@@ -132,6 +132,18 @@ const accessRequestApi = {
     return data
   },
 
+  renew: async (
+    accessReqId: number,
+    accessItemId: number,
+    payload: ResubmitAccessRequestDto
+  ): Promise<Result<AccessRequestDto>> => {
+    const { data } = await apiService.post<Result<AccessRequestDto>>(
+      `/accessrequest/${accessReqId}/items/${accessItemId}/renew`,
+      payload
+    )
+    return data
+  },
+
   revoke: async (
     accessReqId: number,
     accessItemId: number,

@@ -19,8 +19,12 @@ export const FolderMappingPage = () => {
 
   const fetchFolderMappings = useCallback(async () => {
     try {
-      const data = await withLoader(() => folderMappingApi.getAll())
-      setFolderMappings(data)
+      const result = await withLoader(() => folderMappingApi.getAll())
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load folder mappings:", result.error?.message)
+        return
+      }
+      setFolderMappings(result.value.data)
     } catch (error) {
       console.error("Failed to load folder mappings:", error)
     }

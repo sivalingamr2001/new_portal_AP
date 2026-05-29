@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Server.Shared.Helpers;
+using System.Threading;
 using Web.Application.Interfaces;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
@@ -9,10 +11,12 @@ namespace Web.Application.Services;
 public sealed class FolderMappingService : IFolderMappingService
 {
     private readonly AppDbContext _db;
+    private readonly FolderService _folderService;
 
-    public FolderMappingService(AppDbContext db)
+    public FolderMappingService(AppDbContext db, FolderService folderService)
     {
         _db = db;
+        _folderService = folderService;
     }
 
     public async Task<IReadOnlyList<FolderMappingDto>> GetAllAsync()
@@ -86,4 +90,14 @@ public sealed class FolderMappingService : IFolderMappingService
             entity.SecondaryHodName,
             entity.SecondaryHodEmail
         );
+
+    public async Task<List<FolderResponse>> GetParentFoldersAsync()
+    {
+        return await _folderService.GetParentFoldersAsync(CancellationToken.None);
+    }
+
+    public Task<List<FolderResponse>> GetFolderHierarchyAsync()
+    {
+        return Task.FromResult(_folderService.GetStrictFolderHierarchy());
+    }
 }

@@ -24,7 +24,7 @@ public class DepartmentController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
 
         var totalCount = await _db.Departments.CountAsync();
         var skip = (page - 1) * pageSize;
@@ -77,7 +77,7 @@ public class DepartmentController : ControllerBase
         var department = await _db.Departments.FindAsync(deptId);
 
         if (department is null)
-            return NotFound(Result.Failure<DepartmentResponseDto>(new Error("Department not found")));
+            return NotFound(Result.Failure<DepartmentResponseDto>(new Error("NotFound", "Department not found")));
 
         HodMaster? hod = null;
         if (department.HodId is > 0)

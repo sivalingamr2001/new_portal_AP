@@ -33,13 +33,6 @@ const performanceData = [
   { month: "May", efficiency: 95, load: 81 },
 ]
 
-const incidentData = [
-  { name: "Zone A", critical: 2, resolved: 14 },
-  { name: "Zone B", critical: 0, resolved: 22 },
-  { name: "Zone C", critical: 5, resolved: 19 },
-  { name: "Zone D", critical: 1, resolved: 28 },
-]
-
 // Configuration object for shadcn/ui charts component theming
 const chartConfig = {
   efficiency: {
@@ -167,7 +160,7 @@ export const Dashboard = () => {
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} />
                 <ChartTooltip
-                  content={<ChartTooltipContent descriptionKey="efficiency" />}
+                  content={<ChartTooltipContent label="efficiency" />}
                 />
                 <Area
                   type="monotone"

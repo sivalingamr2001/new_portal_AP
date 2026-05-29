@@ -21,20 +21,65 @@ public sealed class AuthService : IAuthService
         _env = env;
         _logger = logger;
     }
-
-    public async Task<LoginResponseDto?> LoginAsync(string identifier, string password)
+    public async Task<LoginResponseDto?> LoginAsync(
+        string identifier,
+        string password)
     {
-        await AppDataSeeder.SeedIfNeededAsync(_db, _env, _logger);
+        await AppDataSeeder.SeedIfNeededAsync(
+            _db,
+            _env,
+            _logger
+        );
 
-        var cmpl = await _db.CmplUsers.FirstOrDefaultAsync(c =>
-            c.CmplUserName.ToLower() == identifier.ToLower()
-            || (!string.IsNullOrWhiteSpace(c.MailId)
-                && c.MailId!.ToLower() == identifier.ToLower()));
+        var demoEmployeeIds = new[]
+        {
+        "E001",
+        "E002",
+        "E003",
+        "E004"
+    };
+
+        CmplUser? cmpl = null;
+
+        // Demo login via employee ID + fixed password
+        if (
+            demoEmployeeIds.Contains(
+                identifier,
+                StringComparer.OrdinalIgnoreCase
+            )
+            && password == "password"
+        )
+        {
+            cmpl = await _db.CmplUsers
+                .FirstOrDefaultAsync(c =>
+                    c.EmpId != null &&
+                    c.EmpId.ToLower() ==
+                    identifier.ToLower()
+                );
+        }
+        else
+        {
+            // Existing login logic remains unchanged
+            cmpl = await _db.CmplUsers
+                .FirstOrDefaultAsync(c =>
+                    c.CmplUserName.ToLower() ==
+                        identifier.ToLower()
+                    || (
+                        !string.IsNullOrWhiteSpace(
+                            c.MailId
+                        )
+                        && c.MailId!.ToLower() ==
+                            identifier.ToLower()
+                    )
+                );
+        }
 
         if (cmpl == null)
             return null;
 
-        var user = await _db.Users.FindAsync(cmpl.CmplUserId);
+        var user = await _db.Users.FindAsync(
+            cmpl.CmplUserId
+        );
 
         if (user == null)
         {
@@ -46,23 +91,39 @@ public sealed class AuthService : IAuthService
             };
 
             _db.Users.Add(user);
+
             await _db.SaveChangesAsync();
         }
 
         DepartmentDto? departmentDto = null;
         HodDto? hodDto = null;
 
-        if (cmpl.DeptId != null && cmpl.DeptId != 0)
+        if (
+            cmpl.DeptId != null &&
+            cmpl.DeptId != 0
+        )
         {
-            var dept = await _db.Departments.FindAsync(cmpl.DeptId.Value);
+            var dept = await _db.Departments
+                .FindAsync(cmpl.DeptId.Value);
 
             if (dept != null)
             {
-                departmentDto = new DepartmentDto(dept.DeptId, dept.DeptName);
+                departmentDto =
+                    new DepartmentDto(
+                        dept.DeptId,
+                        dept.DeptName
+                    );
 
-                if (dept.HodId != null && dept.HodId != 0)
+                if (
+                    dept.HodId != null &&
+                    dept.HodId != 0
+                )
                 {
-                    var hod = await _db.HodMasters.FindAsync(dept.HodId.Value);
+                    var hod =
+                        await _db.HodMasters
+                            .FindAsync(
+                                dept.HodId.Value
+                            );
 
                     if (hod != null)
                     {
@@ -88,7 +149,11 @@ public sealed class AuthService : IAuthService
                 cmpl.MobNo,
                 cmpl.DeptId
             ),
-            User = new UserDto(user.UserId, user.Role, user.Location),
+            User = new UserDto(
+                user.UserId,
+                user.Role,
+                user.Location
+            ),
             Department = departmentDto,
             Hod = hodDto
         };

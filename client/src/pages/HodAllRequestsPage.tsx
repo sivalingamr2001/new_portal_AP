@@ -19,8 +19,12 @@ export const HodAllRequestsPage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const data = await withLoader(() => accessRequestApi.getAll())
-      setRequests(data)
+      const result = await withLoader(() => accessRequestApi.getAll())
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load all requests:", result.error?.message)
+        return
+      }
+      setRequests(result.value.data)
     } catch (error) {
       console.error("Failed to load all requests:", error)
     }

@@ -66,6 +66,26 @@ internal static class RequestWorkflowSupport
         return primary ?? secondary;
     }
 
+    public static async Task<int?> ResolveRequesterDeptHodApproverAsync(
+        AppDbContext db,
+        int requesterUserId)
+    {
+        var requester = await db.CmplUsers.FindAsync(requesterUserId);
+        if (requester?.DeptId is not > 0)
+            return null;
+
+        var department = await db.Departments.FindAsync(requester.DeptId.Value);
+        if (department?.HodId is not > 0)
+            return null;
+
+        var hod = await db.HodMasters.FindAsync(department.HodId.Value);
+        return await ResolveUserIdAsync(
+            db,
+            hod?.Id,
+            hod?.EmailId,
+            hod?.HodName);
+    }
+
     public static async Task<IReadOnlyList<int>> GetItUserIdsAsync(AppDbContext db)
     {
         return await db.Users

@@ -1,6 +1,7 @@
 import { apiService, type PaginationParams } from "@/api/axiosClient"
 import type {
   FolderMappingDto,
+  FolderResponseDto,
   UpsertFolderMappingRequest,
   Result,
   PagedResult,
@@ -11,13 +12,31 @@ const folderMappingApi = {
     params?: PaginationParams
   ): Promise<Result<PagedResult<FolderMappingDto>>> => {
     const { data } = await apiService.get<
-      Result<PagedResult<FolderMappingDto>>
+      Result<PagedResult<FolderMappingDto>> | FolderMappingDto[]
     >("/foldermapping", {
       params: {
         page: params?.page ?? 1,
         pageSize: params?.pageSize ?? 10,
       },
     })
+
+    if (Array.isArray(data)) {
+      return {
+        isSuccess: true,
+        isFailure: false,
+        value: {
+          data,
+          totalCount: data.length,
+          page: params?.page ?? 1,
+          pageSize: params?.pageSize ?? data.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+        error: null,
+      }
+    }
+
     return data
   },
 
@@ -51,6 +70,40 @@ const folderMappingApi = {
 
   delete: async (id: number): Promise<void> => {
     await apiService.delete(`/foldermapping/${id}`)
+  },
+
+  getFolderHierarchy: async (): Promise<Result<FolderResponseDto[]>> => {
+    const { data } = await apiService.get<
+      Result<FolderResponseDto[]> | FolderResponseDto[]
+    >(`/foldermapping/hierarchy`)
+
+    if (Array.isArray(data)) {
+      return {
+        isSuccess: true,
+        isFailure: false,
+        value: data,
+        error: null,
+      }
+    }
+
+    return data
+  },
+
+  getFolderParents: async (): Promise<Result<FolderResponseDto[]>> => {
+    const { data } = await apiService.get<
+      Result<FolderResponseDto[]> | FolderResponseDto[]
+    >(`/foldermapping/parents`)
+
+    if (Array.isArray(data)) {
+      return {
+        isSuccess: true,
+        isFailure: false,
+        value: data,
+        error: null,
+      }
+    }
+
+    return data
   },
 }
 

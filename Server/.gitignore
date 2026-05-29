@@ -66,3 +66,5 @@ docker-compose.override.yml
 TestResults/
 coverage/
 *.trx
+
+ntfs_permissions_audit.csv

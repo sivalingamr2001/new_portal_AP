@@ -24,7 +24,7 @@ public class UserController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
 
         var totalCount = await _db.Users.CountAsync();
         var skip = (page - 1) * pageSize;

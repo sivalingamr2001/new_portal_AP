@@ -3,7 +3,7 @@ import type { DetailSectionConfig } from "@/components/DynamicGrid/types"
 import { Button } from "@/components/ui/button"
 import type { ColDef } from "ag-grid-community"
 import { ChevronUp, TextQuote } from "lucide-react"
-import { useCallback, useMemo, useState, useEffect } from "react" // Fixed missing useEffect dependency import
+import { useCallback, useMemo, useState, useEffect } from "react"
 import type { UserRowPayload } from "./types"
 import {
   Tooltip,
@@ -14,30 +14,131 @@ import userApi from "@/api/userApi"
 import { useLoader } from "@/hooks/useLoader"
 import { useLocation } from "react-router-dom"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
+import { usePaginatedDataGrid } from "@/hooks/usePaginatedDataGrid"
+import type {
+  PagedResult,
+  Result,
+} from "@/api/types"
+
+const USERS_PAGE_CHUNK_SIZE = 20
 
 export const UsersPage = () => {
   const location = useLocation()
   const [expandedRowIds, setExpandedRowIds] = useState<number[]>([])
-  const [users, setUsers] = useState<UserRowPayload[]>([])
-  const { loading, withLoader } = useLoader()
+  const { showLoader, hideLoader } = useLoader()
 
   const { title } = useMemo(
     () => getTitleFromSidebar(location.pathname),
     [location.pathname]
   )
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      const data: any = await withLoader(() => userApi.getAll())
-      setUsers(data)
-    } catch (error) {
-      console.error("Failed to load user records:", error)
+  const handleUsersError = useCallback(
+    (error: Error) => {
+      console.error(
+        "Failed to load user records:",
+        error
+      )
+      hideLoader()
+    },
+    [hideLoader]
+  )
+
+  const fetchUsersPage = useCallback(
+    async (page: number, pageSize: number) => {
+      const result = await userApi.getAll({
+        page,
+        pageSize,
+      })
+
+      if (
+        !result.isSuccess ||
+        !result.value
+      ) {
+        return {
+          isSuccess: result.isSuccess,
+          isFailure: result.isFailure,
+          error: result.error,
+          value: undefined,
+        } as Result<
+          PagedResult<UserRowPayload>
+        >
+      }
+
+      const normalizedResult: Result<
+        PagedResult<UserRowPayload>
+      > = {
+        ...result,
+        value: {
+          ...result.value,
+          data: result.value.data.map(
+            (item) => ({
+              cmplUser: {
+                cmplUserId:
+                  item.cmplUser.cmplUserId,
+                cmplUserName:
+                  item.cmplUser.cmplUserName,
+                empId:
+                  item.cmplUser.empId ??
+                  null,
+                mailId:
+                  item.cmplUser.mailId ??
+                  "",
+                mobNo:
+                  item.cmplUser.mobNo ??
+                  "",
+                deptId:
+                  item.cmplUser.deptId ?? 0,
+              },
+              user: {
+                userId: item.user.userId,
+                role: item.user.role,
+                location:
+                  item.user.location,
+              },
+              department: {
+                deptId:
+                  item.department?.deptId ??
+                  0,
+                deptName:
+                  item.department?.deptName ??
+                  null,
+              },
+              hod: item.hod
+                ? {
+                    hodId:
+                      item.hod.idRow ?? 0,
+                    name: item.hod.hodName,
+                  }
+                : null,
+            })
+          ),
+        },
+      }
+
+      return normalizedResult
+    },
+    []
+  )
+
+  const {
+    rowData: users,
+    totalPages,
+    currentPage,
+    loading,
+    loadData,
+    loadMore,
+  } = usePaginatedDataGrid<UserRowPayload>(
+    fetchUsersPage,
+    {
+      pageSize: USERS_PAGE_CHUNK_SIZE,
+      onError: handleUsersError,
     }
-  }, [withLoader])
+  )
 
   useEffect(() => {
-    fetchUsers()
-  }, [])
+    showLoader()
+    loadData(1).finally(hideLoader)
+  }, [hideLoader, loadData, showLoader])
 
   const toggleRowExpansion = useCallback((id: number) => {
     setExpandedRowIds((prev) =>
@@ -155,18 +256,36 @@ export const UsersPage = () => {
         rowData={computedRowData} // FIX 3: Changed from static 'users' list straight to 'computedRowData'
         columnDefs={columns}
         gridId="compliance_users_free_v35"
-        pageSize={10}
-        pageSizeOptions={[10, 20, 50]}
+        pageSize={USERS_PAGE_CHUNK_SIZE}
+        pageSizeOptions={[20, 50, 100]}
         loading={loading}
         showSearch={true}
         showRefreshButton={true}
         showClearFiltersButton={true}
         customActions={globalCustomActions}
-        onRefresh={fetchUsers} // FIX 4: Linked network API handler to dynamic toolbar refresh emitter hook
+        onRefresh={async () => {
+          showLoader()
+          try {
+            await loadData(1)
+          } finally {
+            hideLoader()
+          }
+        }}
         theme="system"
         masterDetail={false}
         detailSections={dynamicSectionsConfig}
         gridHeight="550px"
+        virtualScroll={{
+          enabled: true,
+          pageSize: USERS_PAGE_CHUNK_SIZE,
+          bufferSize: 3,
+          currentPage,
+          totalPages,
+          hasMore: currentPage < totalPages,
+          onLoadMore: async (nextPage: number) => {
+            await loadMore(nextPage)
+          },
+        }}
       />
     </div>
   )

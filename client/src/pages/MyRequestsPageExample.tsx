@@ -1,8 +1,3 @@
-/**
- * EXAMPLE: MyRequestsPage with Virtual Scrolling
- * Shows how to integrate paginated API with DataGrid virtual scroll
- */
-
 import { useEffect } from "react"
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
@@ -12,20 +7,26 @@ import type { AccessRequestDto } from "@/api/types"
 import { useLoader } from "@/hooks/useLoader"
 
 export function MyRequestsPageExample() {
-  const userId = 1 // Get from auth context
+  const userId = 1
   const { showLoader, hideLoader } = useLoader()
 
-  const { rowData, totalCount, totalPages, loading, loadData, loadMore } =
-    usePaginatedDataGrid<AccessRequestDto>(
-      (page, pageSize) => accessRequestApi.getAll(userId, { page, pageSize }),
-      {
-        pageSize: 20,
-        onError: (error) => {
-          console.error("Failed to load requests:", error)
-          hideLoader()
-        },
-      }
-    )
+  const {
+    rowData,
+    totalPages,
+    currentPage,
+    loading,
+    loadData,
+    loadMore,
+  } = usePaginatedDataGrid<AccessRequestDto>(
+    (page, pageSize) => accessRequestApi.getAll(userId, { page, pageSize }),
+    {
+      pageSize: 20,
+      onError: (error: unknown) => {
+        console.error("Failed to load requests:", error)
+        hideLoader()
+      },
+    }
+  )
 
   // Load initial data
   useEffect(() => {
@@ -75,15 +76,16 @@ export function MyRequestsPageExample() {
         loading={loading}
         pageSize={20}
         pageSizeOptions={[20, 50, 100]}
-        // VIRTUAL SCROLL CONFIGURATION
         virtualScroll={{
           enabled: true,
           pageSize: 20,
           bufferSize: 3,
-          onLoadMore: async (nextPage) => {
+          currentPage,
+          totalPages,
+          hasMore: currentPage < totalPages,
+          onLoadMore: async (nextPage: number) => {
             try {
-              const result = await loadMore(nextPage)
-              return result
+              await loadMore(nextPage)
             } catch (error) {
               console.error("Error loading more data:", error)
               throw error

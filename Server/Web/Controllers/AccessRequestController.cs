@@ -30,10 +30,10 @@ public class AccessRequestController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
 
         var (items, totalCount) = await _accessRequestService.GetAllPagedAsync(userId, page, pageSize);
-        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items.ToList(), totalCount, page, pageSize)));
     }
 
     [HttpGet("cart/hod/{approverId:int}")]
@@ -43,10 +43,10 @@ public class AccessRequestController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
 
         var (items, totalCount) = await _accessRequestService.GetPendingHodCartPagedAsync(approverId, page, pageSize);
-        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items.ToList(), totalCount, page, pageSize)));
     }
 
     [HttpGet("cart/it")]
@@ -55,10 +55,10 @@ public class AccessRequestController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
 
         var (items, totalCount) = await _accessRequestService.GetPendingItCartPagedAsync(page, pageSize);
-        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items.ToList(), totalCount, page, pageSize)));
     }
 
     [HttpGet("{accessReqId:int}")]
@@ -66,19 +66,21 @@ public class AccessRequestController : ControllerBase
     {
         var request = await _accessRequestService.GetByIdAsync(accessReqId);
         return request is null
-            ? NotFound(Result.Failure<AccessRequestDto>(new Error("Access request not found")))
+            ? NotFound(Result.Failure<AccessRequestDto>(new Error("NotFound", "Access request not found")))
             : Ok(Result.Success(request));
     }
+
+    [HttpPost]
     public async Task<IActionResult> Submit([FromBody] SubmitAccessRequestDto request)
     {
         try
         {
             var result = await _accessRequestService.SubmitAsync(request);
-            return CreatedAtAction(nameof(GetById), new { accessReqId = result.AccessReqId }, result);
+            return CreatedAtAction(nameof(GetById), new { accessReqId = result.AccessReqId }, Result.Success(result));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(Result.Failure(new Error("InvalidRequest", ex.Message)));
         }
     }
 
@@ -102,6 +104,10 @@ public class AccessRequestController : ControllerBase
     public Task<IActionResult> Resubmit(int accessReqId, int accessItemId, [FromBody] ResubmitAccessRequestDto request) =>
         ExecuteApproval(() => _approvalService.ResubmitAsync(accessReqId, accessItemId, request));
 
+    [HttpPost("{accessReqId:int}/items/{accessItemId:int}/renew")]
+    public Task<IActionResult> Renew(int accessReqId, int accessItemId, [FromBody] ResubmitAccessRequestDto request) =>
+        ExecuteApproval(() => _approvalService.RenewAsync(accessReqId, accessItemId, request));
+
     [HttpPost("{accessReqId:int}/items/{accessItemId:int}/revoke")]
     public Task<IActionResult> Revoke(int accessReqId, int accessItemId, [FromBody] ApprovalActionRequestDto request) =>
         ExecuteApproval(() => _approvalService.RevokeAsync(accessReqId, accessItemId, request));
@@ -124,11 +130,13 @@ public class AccessRequestController : ControllerBase
         try
         {
             var result = await operation();
-            return result is null ? NotFound() : Ok(result);
+            return result is null
+                ? NotFound(Result.Failure<AccessRequestDto>(new Error("NotFound", "Access request item not found")))
+                : Ok(Result.Success(result));
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(Result.Failure(new Error("InvalidRequest", ex.Message)));
         }
     }
 }

@@ -1,6 +1,6 @@
 import { themeQuartz, type ColDef, type GridOptions } from "ag-grid-community"
 import { AgGridReact } from "ag-grid-react"
-import { useMemo, useCallback, useEffect, useState } from "react"
+import { useMemo, useCallback } from "react"
 import { useDataGrid } from "./useDataGrid"
 import { useVirtualScroll } from "./useVirtualScroll"
 import { GridToolbar } from "./GridToolbar"
@@ -20,7 +20,7 @@ const BASE_COL_DEF: ColDef = {
   minWidth: 100,
 }
 
-export function DataGrid<TData extends Record<string, unknown>>(
+export function DataGrid<TData extends object>(
   props: DataGridProps<TData>
 ) {
   const {
@@ -52,28 +52,34 @@ export function DataGrid<TData extends Record<string, unknown>>(
       pageSize: virtualScroll?.pageSize ?? pageSize,
       bufferSize: virtualScroll?.bufferSize ?? 2,
       onLoadMore: virtualScroll?.onLoadMore,
+      currentPage: virtualScroll?.currentPage ?? 1,
+      totalPages: virtualScroll?.totalPages ?? 1,
+      hasMore: virtualScroll?.hasMore ?? false,
     })
 
-  const [allRowData, setAllRowData] = useState<TData[]>(rowData || [])
+  const getRowIdentity = useCallback((row: TData) => {
+    const candidate = row as any
 
-  // Merge row data as virtual scroll loads more
-  useEffect(() => {
-    if (virtualScroll?.enabled) {
-      setAllRowData((prev) => {
-        if (prev.length === 0) return rowData || []
-        // Avoid duplicates on data refresh
-        const existingIds = new Set(
-          prev.map((r) => (r as any).id || (r as any).accessReqId)
-        )
-        const newItems = (rowData || []).filter(
-          (r) => !existingIds.has((r as any).id || (r as any).accessReqId)
-        )
-        return [...prev, ...newItems]
-      })
-    } else {
-      setAllRowData(rowData || [])
+    if (candidate?.__isDetailRow) {
+      return `detail-${
+        candidate?.__parentData?.cmplUser?.cmplUserId ??
+        candidate?.__parentData?.user?.userId ??
+        candidate?.__parentData?.accessReqId ??
+        candidate?.__parentData?.id ??
+        JSON.stringify(candidate?.__parentData)
+      }`
     }
-  }, [rowData, virtualScroll?.enabled])
+
+    return (
+      candidate?.id ??
+      candidate?.accessReqId ??
+      candidate?.user?.userId ??
+      candidate?.cmplUser?.cmplUserId ??
+      candidate?.department?.deptId ??
+      candidate?.ticketNumber ??
+      JSON.stringify(candidate)
+    )
+  }, [])
 
   const gridTheme = useMemo(() => {
     const isDark = theme === "dark"
@@ -126,6 +132,7 @@ export function DataGrid<TData extends Record<string, unknown>>(
       noRowsOverlayComponent: () => (
         <div className="no-rows-overlay-msg">{noRowsMessage}</div>
       ),
+      suppressScrollOnNewData: !!virtualScroll?.enabled,
       isFullWidthRow: (params) => params.rowNode.data?.__isDetailRow === true,
       fullWidthCellRenderer: customFullWidthCellRenderer,
       getRowHeight: (params) => {
@@ -225,6 +232,7 @@ export function DataGrid<TData extends Record<string, unknown>>(
         showSearch={showSearch}
         showRefresh={showRefreshButton}
         showClearFilters={showClearFiltersButton}
+        onQuickFilterChange={handlers.onQuickFilterChange}
         onRefresh={handlers.onRefresh}
         gridApi={gridApiRef.current}
         customActions={customActions}
@@ -246,14 +254,19 @@ export function DataGrid<TData extends Record<string, unknown>>(
 
         <div
           className="datagrid-scroll-inner"
-          style={{ height: "600px", marginTop: "8px", width: "100%" }}
+          style={{
+            height: "720px",
+            marginTop: "8px",
+            width: "100%",
+          }}
         >
           <AgGridReact<any>
-            rowData={virtualScroll?.enabled ? allRowData : rowData}
+            rowData={rowData}
             columnDefs={cleanGridColumnDefs}
             theme={gridTheme}
             loading={loading}
             defaultColDef={resolvedDefaultColDef}
+            getRowId={(params) => getRowIdentity(params.data)}
             onGridReady={onGridReady}
             onSelectionChanged={handlers.onSelectionChanged}
             onFilterChanged={handlers.onFilterChanged}

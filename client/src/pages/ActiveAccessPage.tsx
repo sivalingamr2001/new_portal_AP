@@ -19,8 +19,12 @@ export const ActiveAccessPage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const data = await withLoader(() => accessRequestApi.getAll())
-      setRequests(data)
+      const result = await withLoader(() => accessRequestApi.getAll())
+      if (!result.isSuccess || !result.value) {
+        console.error("Failed to load active access:", result.error?.message)
+        return
+      }
+      setRequests(result.value.data)
     } catch (error) {
       console.error("Failed to load active access:", error)
     }

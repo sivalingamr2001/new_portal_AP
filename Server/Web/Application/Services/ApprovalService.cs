@@ -198,14 +198,19 @@ public sealed class ApprovalService : IApprovalService
         if (context.Item.Status != RequestStatus.HodRejected && context.Item.Status != RequestStatus.ItRejected)
             throw new InvalidOperationException("Only rejected requests can be resubmitted.");
 
+        var folderPath = string.IsNullOrWhiteSpace(request.FolderPath)
+            ? context.Item.FolderPath
+            : RequestWorkflowSupport.NormalizeFolderPath(request.FolderPath);
+
         var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
             _db,
             request.UserId,
-            context.Item.FolderPath);
+            folderPath);
 
         if (hodApproverId is null)
-            throw new InvalidOperationException($"No HOD mapping found for folder path '{context.Item.FolderPath}'.");
+            throw new InvalidOperationException($"No HOD mapping found for folder path '{folderPath}'.");
 
+        context.Item.FolderPath = folderPath;
         context.Item.AccessType = request.AccessType ?? context.Item.AccessType;
         context.Item.ConfirmAccessType = request.ConfirmAccessType ?? context.Item.ConfirmAccessType;
         context.Item.Reason = request.Reason.Trim();
@@ -220,12 +225,76 @@ public sealed class ApprovalService : IApprovalService
         await RequestWorkflowSupport.UpdateRequestAggregateAsync(_db, context.Request);
         await _db.SaveChangesAsync();
 
+        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, request.UserId);
+        var recipients = new[] { request.UserId, hodApproverId.Value }
+            .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
+            .Distinct()
+            .ToList();
+
         await _notificationService.SendStageNotificationAsync(
             accessReqId,
             accessItemId,
             "Resubmitted",
             $"Ticket {context.Item.TicketNumber} has been resubmitted and moved to HOD cart.",
-            new[] { request.UserId, hodApproverId.Value },
+            recipients,
+            request.UserId);
+
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+    }
+
+    public async Task<AccessRequestDto?> RenewAsync(int accessReqId, int accessItemId, ResubmitAccessRequestDto request)
+    {
+        var loaded = await LoadContextAsync(accessReqId, accessItemId);
+        if (loaded is null)
+            return null;
+        var context = loaded.Value;
+
+        if (context.Request.UserId != request.UserId)
+            throw new InvalidOperationException("Only the request owner can renew.");
+
+        if (context.Item.Status != RequestStatus.Revoked && context.Item.Status != RequestStatus.Expired)
+            throw new InvalidOperationException("Only revoked or expired requests can be renewed.");
+
+        var folderPath = string.IsNullOrWhiteSpace(request.FolderPath)
+            ? context.Item.FolderPath
+            : RequestWorkflowSupport.NormalizeFolderPath(request.FolderPath);
+
+        var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
+            _db,
+            request.UserId,
+            folderPath);
+
+        if (hodApproverId is null)
+            throw new InvalidOperationException($"No HOD mapping found for folder path '{folderPath}'.");
+
+        context.Item.FolderPath = folderPath;
+        context.Item.AccessType = request.AccessType ?? context.Item.AccessType;
+        context.Item.ConfirmAccessType = request.ConfirmAccessType ?? context.Item.ConfirmAccessType;
+        context.Item.Reason = request.Reason.Trim();
+        context.Item.RejectionReason = null;
+        context.Item.Status = RequestStatus.PendingWithHod;
+        context.Item.HodApproverId = hodApproverId;
+        context.Item.ItApproverId = null;
+        context.Item.ApprovedAtUtc = null;
+        context.Item.ExpiresAtUtc = null;
+        context.Item.RequestedAtUtc = DateTime.UtcNow;
+        context.Item.LastActionAtUtc = DateTime.UtcNow;
+
+        await RequestWorkflowSupport.UpdateRequestAggregateAsync(_db, context.Request);
+        await _db.SaveChangesAsync();
+
+        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, request.UserId);
+        var recipients = new[] { request.UserId, hodApproverId.Value }
+            .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
+            .Distinct()
+            .ToList();
+
+        await _notificationService.SendStageNotificationAsync(
+            accessReqId,
+            accessItemId,
+            "Renewed",
+            $"Ticket {context.Item.TicketNumber} has been renewed and moved to HOD cart.",
+            recipients,
             request.UserId);
 
         return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);

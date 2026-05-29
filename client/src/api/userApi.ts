@@ -1,8 +1,10 @@
-import { apiService, type PaginationParams } from "@/api/axiosClient"
+import {
+  apiService,
+  type PaginationParams,
+} from "@/api/axiosClient"
 import type {
   ApiLoginResponseDto,
   Result,
-  PagedApiResponse,
   PagedResult,
 } from "@/api/types"
 
@@ -14,13 +16,15 @@ export interface UpdateUserRequest {
 const userApi = {
   getAll: async (
     params?: PaginationParams
-  ): Promise<Result<PagedResult<ApiLoginResponseDto>>> => {
+  ): Promise<
+    Result<PagedResult<ApiLoginResponseDto>>
+  > => {
     const { data } = await apiService.get<
       Result<PagedResult<ApiLoginResponseDto>>
     >("/user", {
       params: {
         page: params?.page ?? 1,
-        pageSize: params?.pageSize ?? 10,
+        pageSize: params?.pageSize ?? 20,
       },
     })
     return data
