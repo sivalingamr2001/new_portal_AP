@@ -1,0 +1,59 @@
+using Microsoft.EntityFrameworkCore;
+using Web.Application.Interfaces;
+using Web.Application.Services;
+using Web.Infrastructure.Data;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Services
+builder.Services.AddControllers();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=app.db"));
+
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IFolderMappingService, FolderMappingService>();
+builder.Services.AddScoped<IAccessRequestService, AccessRequestService>();
+builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHostedService<ExpiryBackgroundService>();
+
+builder.Services.AddProblemDetails();
+
+var app = builder.Build();
+
+// Ensure DB exists
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var env = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("AppDataSeeder");
+
+    await WorkflowSchemaInitializer.EnsureCreatedAsync(db);
+    await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+}
+
+// Middleware
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Web API v1");
+        c.RoutePrefix = string.Empty;
+    });
+}
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.UseHttpsRedirection();
+
+app.MapControllers();
+
+app.Run();
