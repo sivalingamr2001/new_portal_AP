@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
@@ -18,10 +19,20 @@ public class UserController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<ActionResult<Result<PagedResult<LoginResponseDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+
+        var totalCount = await _db.Users.CountAsync();
+        var skip = (page - 1) * pageSize;
+
         var users = await _db.Users
             .OrderBy(u => u.UserId)
+            .Skip(skip)
+            .Take(pageSize)
             .ToListAsync();
 
         var userIds = users.Select(u => u.UserId).ToList();
@@ -54,16 +65,16 @@ public class UserController : ControllerBase
             .Select(user => BuildUserResponse(user, cmplUsers, departments, hods))
             .ToList();
 
-        return Ok(response);
+        return Ok(Result.Success(new PagedResult<LoginResponseDto>(response, totalCount, page, pageSize)));
     }
 
     [HttpGet("{userId:int}")]
-    public async Task<IActionResult> GetById(int userId)
+    public async Task<ActionResult<Result<LoginResponseDto>>> GetById(int userId)
     {
         var user = await _db.Users.FindAsync(userId);
 
         if (user is null)
-            return NotFound();
+            return NotFound(Result.Failure<LoginResponseDto>(new Error("204", "User not found")));
 
         var cmplUser = await _db.CmplUsers.FindAsync(userId);
         Department? department = null;
@@ -77,11 +88,12 @@ public class UserController : ControllerBase
                 hod = await _db.HodMasters.FindAsync(department.HodId.Value);
         }
 
-        return Ok(BuildUserResponse(user, cmplUser, department, hod));
+        var response = BuildUserResponse(user, cmplUser, department, hod);
+        return Ok(Result.Success(response));
     }
 
     [HttpPut("{userId}")]
-    public async Task<IActionResult> UpdateUser(int userId, [FromBody] UpdateUserRequest request)
+    public async Task<ActionResult<Result<LoginResponseDto>>> UpdateUser(int userId, [FromBody] UpdateUserRequest request)
     {
         var user = await _db.Users.FindAsync(userId);
         if (user is null)
@@ -102,7 +114,9 @@ public class UserController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        return Ok(new UserDto(user.UserId, user.Role, user.Location));
+        var cmplUser = await _db.CmplUsers.FindAsync(userId);
+        var response = BuildUserResponse(user, cmplUser, null, null);
+        return Ok(Result.Success(response));
     }
 
     private static LoginResponseDto BuildUserResponse(

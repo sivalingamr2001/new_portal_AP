@@ -5,7 +5,7 @@ import { sidebarItems } from "./config/sidebar-config"
  */
 export function getTitleFromSidebar(route: string) {
   for (const group of sidebarItems) {
-    const item = group.items.find(item => item.to === route)
+    const item = group.items.find((item) => item.to === route)
     if (item) {
       return {
         title: item.label,

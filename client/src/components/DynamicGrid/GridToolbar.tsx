@@ -1,82 +1,94 @@
-import { memo } from "react";
-import { Input } from "../ui/input";
-import { Button } from "../ui/button";
-import type { GridToolbarProps } from "./types";
+import { memo } from "react"
+import { Input } from "../ui/input"
+import { Button } from "../ui/button"
+import type { GridToolbarProps } from "./types"
 
-export const GridToolbar = memo(({
-  title,
-  description = "Test description for the grid toolbar component, can be customized via props.",
-  state,
-  showSearch,
-  showRefresh,
-  showClearFilters,
-  onRefresh,
-  onClearFilters,
-  customActions = [],
-  gridApi
-}: GridToolbarProps) => {
-  return (
-    <div className="flex flex-col gap-4 pb-2 bg-white">
-      {/* Top Row: Title and Description */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold text-slate-900 leading-6">{title}</h1>
-        {description && <span className="text-xs text-slate-500">{description}</span>}
-      </div>
-
-      {/* Bottom Row: Left Search, Right Actions */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-        {/* Left Side: Search Bar */}
-        <div className="w-full sm:max-w-xs">
-          {showSearch && (
-            <Input
-              type="text"
-              value={state.quickFilter}
-              placeholder="Quick search..."
-              className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-400"
-              onChange={(e) => gridApi?.setGridOption("quickFilterText", e.target.value)}
-            />
+export const GridToolbar = memo(
+  ({
+    title,
+    description = "Test description for the grid toolbar component, can be customized via props.",
+    state,
+    showSearch,
+    showRefresh,
+    showClearFilters,
+    onRefresh,
+    onClearFilters,
+    customActions = [],
+    gridApi,
+  }: GridToolbarProps) => {
+    return (
+      <div className="flex flex-col gap-4 bg-white pb-2">
+        {/* Top Row: Title and Description */}
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl leading-6 font-semibold text-slate-900">
+            {title}
+          </h1>
+          {description && (
+            <span className="text-xs text-slate-500">{description}</span>
           )}
         </div>
 
-        {/* Right Side: Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
-          {showClearFilters && state.activeFiltersCount > 0 && (
-            <Button
-              variant="ghost"
-              onClick={onClearFilters}
-              className="h-9 px-3 text-sm text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-            >
-              Clear Filters ({state.activeFiltersCount})
-            </Button>
-          )}
+        {/* Bottom Row: Left Search, Right Actions */}
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left Side: Search Bar */}
+          <div className="w-full sm:max-w-xs">
+            {showSearch && (
+              <Input
+                type="text"
+                value={state.quickFilter}
+                placeholder="Quick search..."
+                className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:outline-none"
+                onChange={(e) =>
+                  gridApi?.setGridOption("quickFilterText", e.target.value)
+                }
+              />
+            )}
+          </div>
 
-          {customActions.map((action, idx) => (
-            <Button
-              key={idx}
-              variant={action.variant || "default"}
-              onClick={() => action.onClick(gridApi)}
-              className="h-9 px-3 text-sm font-medium"
-            >
-              {action.icon && <span className="mr-1.5 flex items-center">{action.icon}</span>}
-              {action.label}
-            </Button>
-          ))}
+          {/* Right Side: Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            {showClearFilters && state.activeFiltersCount > 0 && (
+              <Button
+                variant="ghost"
+                onClick={onClearFilters}
+                className="h-9 px-3 text-sm text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+              >
+                Clear Filters ({state.activeFiltersCount})
+              </Button>
+            )}
 
-          {showRefresh && (
-            <Button
-              variant="default"
-              onClick={onRefresh}
-              disabled={state.isRefreshing}
-              size="sm"
-              className="rounded-[6px]"
-            >
-              Refresh
-            </Button>
-          )}
+            {customActions.map((action, idx) => (
+              <Button
+                key={idx}
+                variant={action.variant || "default"}
+                onClick={() => action.onClick(gridApi)}
+                className="h-9 px-3 text-sm font-medium"
+              >
+                {action.icon && (
+                  <span className="mr-1.5 flex items-center">
+                    {action.icon}
+                  </span>
+                )}
+                {action.label}
+              </Button>
+            ))}
+
+            {showRefresh && (
+              <Button
+                variant="default"
+                onClick={onRefresh}
+                disabled={state.isRefreshing}
+                size="sm"
+                className="rounded-[6px]"
+              >
+                Refresh
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-});
+    )
+  }
+)
 
-GridToolbar.displayName = "GridToolbar";
+GridToolbar.displayName = "GridToolbar"

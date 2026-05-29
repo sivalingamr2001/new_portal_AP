@@ -35,7 +35,7 @@ export const PendingApprovalsPage = () => {
     fetchRequests()
   }, [])
 
-  const columns = useMemo<(Omit<ColDef<any>, 'field'> & { field?: string })[]>(
+  const columns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
     () => [
       {
         headerName: "Request ID",

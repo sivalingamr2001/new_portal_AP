@@ -76,7 +76,9 @@ export const routesConfig: RouteObject[] = [
 
           // --- ADMIN PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.Admin, UserRole.User]} />,
+            element: (
+              <RoleGuard allowedRoles={[UserRole.Admin, UserRole.User]} />
+            ),
             children: [
               {
                 path: "/dashboard",

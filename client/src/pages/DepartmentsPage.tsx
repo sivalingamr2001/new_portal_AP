@@ -30,7 +30,7 @@ export const DepartmentsPage = () => {
     fetchDepartments()
   }, [])
 
-  const columns = useMemo<(Omit<ColDef<any>, 'field'> & { field?: string })[]>(
+  const columns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
     () => [
       {
         headerName: "Department ID",

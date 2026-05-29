@@ -1,3 +1,29 @@
+// Result & Pagination Wrappers
+export interface Error {
+  message: string
+  code?: string
+}
+
+export interface Result<T = void> {
+  value?: T
+  isSuccess: boolean
+  isFailure: boolean
+  error?: Error | null
+}
+
+export interface PagedResult<T> {
+  data: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export type ApiResponse<T> = Result<T>
+export type PagedApiResponse<T> = Result<PagedResult<T>>
+
 export interface CmplUser {
   cmplUserId: number
   cmplUserName: string
@@ -23,14 +49,6 @@ export interface LoginUserData {
   user: User
   department: Department
   hod: any | null
-}
-
-// This represents the entire response envelope
-export interface ApiResponse<T> {
-  value: T
-  isSuccess: boolean
-  isFailure: boolean
-  error: any | null
 }
 
 export type LoginResponse = ApiResponse<LoginUserData>

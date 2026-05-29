@@ -13,7 +13,7 @@ export default function AppLayout() {
           <AppHeader />
 
           <main className="flex-1 overflow-y-auto p-4">
-            <div className="h-[89vh] rounded-4xl bg-sidebar shadow-lg p-6">
+            <div className="h-[89vh] rounded-4xl bg-sidebar p-6 shadow-lg">
               <Outlet />
             </div>
           </main>

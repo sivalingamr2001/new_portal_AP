@@ -11,6 +11,11 @@ export interface ApiError {
   details?: unknown
 }
 
+export interface PaginationParams {
+  page?: number
+  pageSize?: number
+}
+
 function createApiInstance(): AxiosInstance {
   const API_URL = ENV_CONFIG.BASE_API_URL
 

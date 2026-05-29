@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
@@ -18,10 +19,20 @@ public class DepartmentController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<ActionResult<Result<PagedResult<DepartmentResponseDto>>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+
+        var totalCount = await _db.Departments.CountAsync();
+        var skip = (page - 1) * pageSize;
+
         var departments = await _db.Departments
             .OrderBy(d => d.DeptId)
+            .Skip(skip)
+            .Take(pageSize)
             .ToListAsync();
 
         var hodIds = departments
@@ -57,16 +68,16 @@ public class DepartmentController : ControllerBase
             .Select(department => BuildDepartmentResponse(department, hods, usersByDepartment))
             .ToList();
 
-        return Ok(response);
+        return Ok(Result.Success(new PagedResult<DepartmentResponseDto>(response, totalCount, page, pageSize)));
     }
 
     [HttpGet("{deptId:int}")]
-    public async Task<IActionResult> GetById(int deptId)
+    public async Task<ActionResult<Result<DepartmentResponseDto>>> GetById(int deptId)
     {
         var department = await _db.Departments.FindAsync(deptId);
 
         if (department is null)
-            return NotFound();
+            return NotFound(Result.Failure<DepartmentResponseDto>(new Error("Department not found")));
 
         HodMaster? hod = null;
         if (department.HodId is > 0)
@@ -85,11 +96,11 @@ public class DepartmentController : ControllerBase
             ))
             .ToListAsync();
 
-        return Ok(BuildDepartmentResponse(department, hod, users));
+        return Ok(Result.Success(BuildDepartmentResponse(department, hod, users)));
     }
 
     [HttpPut("{deptId}")]
-    public async Task<IActionResult> UpdateDepartment(int deptId, [FromBody] UpdateDepartmentRequest request)
+    public async Task<ActionResult<Result<DepartmentResponseDto>>> UpdateDepartment(int deptId, [FromBody] UpdateDepartmentRequest request)
     {
         var dept = await _db.Departments.FindAsync(deptId);
         if (dept is null)
@@ -123,7 +134,7 @@ public class DepartmentController : ControllerBase
             ))
             .ToListAsync();
 
-        return Ok(BuildDepartmentResponse(dept, hod, users));
+        return Ok(Result.Success(BuildDepartmentResponse(dept, hod, users)));
     }
 
     private static DepartmentResponseDto BuildDepartmentResponse(

@@ -1,5 +1,10 @@
-import { apiService } from "@/api/axiosClient"
-import type { ApiLoginResponseDto } from "@/api/types"
+import { apiService, type PaginationParams } from "@/api/axiosClient"
+import type {
+  ApiLoginResponseDto,
+  Result,
+  PagedApiResponse,
+  PagedResult,
+} from "@/api/types"
 
 export interface UpdateUserRequest {
   role?: string
@@ -7,23 +12,32 @@ export interface UpdateUserRequest {
 }
 
 const userApi = {
-  getAll: async (): Promise<ApiLoginResponseDto[]> => {
-    const { data } = await apiService.get<ApiLoginResponseDto[]>("/user")
-
+  getAll: async (
+    params?: PaginationParams
+  ): Promise<Result<PagedResult<ApiLoginResponseDto>>> => {
+    const { data } = await apiService.get<
+      Result<PagedResult<ApiLoginResponseDto>>
+    >("/user", {
+      params: {
+        page: params?.page ?? 1,
+        pageSize: params?.pageSize ?? 10,
+      },
+    })
     return data
   },
 
-  getById: async (userId: number): Promise<ApiLoginResponseDto> => {
-    const { data } = await apiService.get<ApiLoginResponseDto>(
+  getById: async (userId: number): Promise<Result<ApiLoginResponseDto>> => {
+    const { data } = await apiService.get<Result<ApiLoginResponseDto>>(
       `/user/${userId}`
     )
-
     return data
   },
 
   update: async (userId: number, payload: UpdateUserRequest) => {
-    const { data } = await apiService.put(`/user/${userId}`, payload)
-
+    const { data } = await apiService.put<Result<ApiLoginResponseDto>>(
+      `/user/${userId}`,
+      payload
+    )
     return data
   },
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Web.Application.Interfaces;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 
 namespace Web.Controllers;
@@ -23,31 +24,51 @@ public class AccessRequestController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int? userId)
+    public async Task<ActionResult<Result<PagedResult<AccessRequestDto>>>> GetAll(
+        [FromQuery] int? userId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(await _accessRequestService.GetAllAsync(userId));
-    }
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
 
-    [HttpGet("{accessReqId:int}")]
-    public async Task<IActionResult> GetById(int accessReqId)
-    {
-        var request = await _accessRequestService.GetByIdAsync(accessReqId);
-        return request is null ? NotFound() : Ok(request);
+        var (items, totalCount) = await _accessRequestService.GetAllPagedAsync(userId, page, pageSize);
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
     }
 
     [HttpGet("cart/hod/{approverId:int}")]
-    public async Task<IActionResult> GetHodCart(int approverId)
+    public async Task<ActionResult<Result<PagedResult<AccessRequestDto>>>> GetHodCart(
+        int approverId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(await _accessRequestService.GetPendingHodCartAsync(approverId));
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+
+        var (items, totalCount) = await _accessRequestService.GetPendingHodCartPagedAsync(approverId, page, pageSize);
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
     }
 
     [HttpGet("cart/it")]
-    public async Task<IActionResult> GetItCart()
+    public async Task<ActionResult<Result<PagedResult<AccessRequestDto>>>> GetItCart(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        return Ok(await _accessRequestService.GetPendingItCartAsync());
+        if (page < 1 || pageSize < 1 || pageSize > 100)
+            return BadRequest(Result.Failure(new Error("Invalid pagination parameters")));
+
+        var (items, totalCount) = await _accessRequestService.GetPendingItCartPagedAsync(page, pageSize);
+        return Ok(Result.Success(new PagedResult<AccessRequestDto>(items, totalCount, page, pageSize)));
     }
 
-    [HttpPost]
+    [HttpGet("{accessReqId:int}")]
+    public async Task<ActionResult<Result<AccessRequestDto>>> GetById(int accessReqId)
+    {
+        var request = await _accessRequestService.GetByIdAsync(accessReqId);
+        return request is null
+            ? NotFound(Result.Failure<AccessRequestDto>(new Error("Access request not found")))
+            : Ok(Result.Success(request));
+    }
     public async Task<IActionResult> Submit([FromBody] SubmitAccessRequestDto request)
     {
         try

@@ -8,5 +8,5 @@ export const loginApi = {
   }): Promise<LoginResponse> => {
     const response = await apiService.post<LoginResponse>("/Auth/login", values)
     return response.data
-  }
+  },
 }

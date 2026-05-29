@@ -32,7 +32,7 @@ export const AuditLogsPage = () => {
     fetchAuditLogs()
   }, [])
 
-  const columns = useMemo<(Omit<ColDef<any>, 'field'> & { field?: string })[]>(
+  const columns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
     () => [
       {
         headerName: "Audit ID",
@@ -53,7 +53,7 @@ export const AuditLogsPage = () => {
         headerName: "Is Read",
         field: "isRead",
         width: 100,
-        valueFormatter: (params: any) => params.value ? "Yes" : "No",
+        valueFormatter: (params: any) => (params.value ? "Yes" : "No"),
       },
       {
         headerName: "Created Date",
