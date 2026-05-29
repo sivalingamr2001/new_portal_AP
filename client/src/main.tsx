@@ -7,6 +7,10 @@ import { TooltipProvider } from "./components/ui/tooltip.tsx"
 import { AuthProvider } from "./context/AuthContext.tsx"
 import "./index.css"
 import { SidebarProvider } from "./components/ui/sidebar.tsx"
+import { AllCommunityModule } from "ag-grid-community"
+import { AgGridProvider } from "ag-grid-react"
+
+const modules = [AllCommunityModule]
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -14,7 +18,9 @@ createRoot(document.getElementById("root")!).render(
       <TooltipProvider>
         <SidebarProvider>
           <AuthProvider>
-            <App />
+            <AgGridProvider modules={modules}>
+              <App />
+            </AgGridProvider>
           </AuthProvider>
         </SidebarProvider>
       </TooltipProvider>

@@ -1,145 +1,148 @@
-// @/pages/Users.tsx
-"use client";
-
-import * as React from "react";
-import { RefreshCw, Search } from "lucide-react";
-import userApi from "@/api/userApi";
-import type { ApiLoginResponseDto } from "@/api/types";
-
+import { DataGrid } from "@/components/DynamicGrid/Index";
+import type { DetailSectionConfig } from "@/components/DynamicGrid/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import type { ColDef } from "ag-grid-community";
+import { ChevronUp, TextQuote } from "lucide-react";
+import { useCallback, useMemo, useState, useEffect } from "react"; // Fixed missing useEffect dependency import
+import type { UserRowPayload } from "./types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import userApi from "@/api/userApi";
+import { useLoader } from "@/hooks/useLoader";
 
 export const UsersPage = () => {
-  const [users, setUsers] = React.useState<ApiLoginResponseDto[]>([]);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
+  const [expandedRowIds, setExpandedRowIds] = useState<number[]>([]);
+  const [users, setUsers] = useState<UserRowPayload[]>([]);
+  const { loading, withLoader } = useLoader()
 
-  // Core API Fetch Execution
-  const fetchUsers = React.useCallback(async () => {
-    setIsLoading(true);
+  const fetchUsers = useCallback(async () => {
     try {
-      const data = await userApi.getAll();
+      const data: any = await withLoader(() => userApi.getAll());
       setUsers(data);
     } catch (error) {
       console.error("Failed to load user records:", error);
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
-  // Run on mount
-  React.useEffect(() => {
+  // FIX 1: Cleared out the recursive loop dependency to guarantee a single initial mount data query
+  useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Client-side search matching against user name, email, or employee ID
-  const filteredUsers = React.useMemo(() => {
-    return users.filter((item) => {
-      const name = item.cmplUser?.cmplUserName?.toLowerCase() || "";
-      const email = item.cmplUser?.mailId?.toLowerCase() || "";
-      const empId = item.cmplUser?.empId?.toLowerCase() || "";
-      const query = searchQuery.toLowerCase();
+  const toggleRowExpansion = useCallback((id: number) => {
+    setExpandedRowIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }, []);
 
-      return name.includes(query) || email.includes(query) || empId.includes(query);
+  // FIX 2: Restored the free-tier row interleaving proxy transformer engine
+  const computedRowData = useMemo(() => {
+    const flatList: any[] = [];
+    users.forEach((row) => {
+      flatList.push(row);
+      if (expandedRowIds.includes(row.cmplUser.cmplUserId)) {
+        flatList.push({
+          __isDetailRow: true,
+          __parentData: row,
+          cmplUser: { cmplUserId: `detail_${row.cmplUser.cmplUserId}` }
+        });
+      }
     });
-  }, [users, searchQuery]);
+    return flatList;
+  }, [users, expandedRowIds]);
+
+  const handleEditAction = useCallback((rowData: UserRowPayload) => {
+    alert(`Editing Target Reference for Compliance ID: ${rowData.cmplUser.cmplUserId}`);
+  }, []);
+
+  const dynamicSectionsConfig = useMemo<DetailSectionConfig[]>(() => [
+    { title: "Core User Profile Info", objectKey: "user" },
+    { title: "Compliance Audit Status", objectKey: "cmplUser" },
+    { title: "Corporate Department Details", objectKey: "department" }
+  ], []);
+
+  const columns = useMemo<(Omit<ColDef<any>, 'field'> & { field?: string })[]>(() => [
+    {
+      headerName: "",
+      width: 80,
+      suppressMovable: true,
+      filter: false,
+      sortable: false,
+      cellRenderer: (params: any) => {
+        if (params.data?.__isDetailRow) return null;
+        const isExpanded = expandedRowIds.includes(params.data?.cmplUser?.cmplUserId);
+
+        return (
+          /* FIX: Replaced primitive prop-string structure with declarative layout elements */
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 cursor-pointer font-bold text-slate-500 hover:text-indigo-600 transition"
+                onClick={() => toggleRowExpansion(params.data.cmplUser.cmplUserId)}
+              >
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <TextQuote className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isExpanded ? "Collapse Details" : "Expand Details"}
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+    },
+    { headerName: "Compliance User ID", field: "cmplUser.cmplUserId" },
+    { headerName: "Username", field: "cmplUser.cmplUserName" },
+    { headerName: "Email Address", field: "cmplUser.mailId" },
+    { headerName: "Mobile String", field: "cmplUser.mobNo" },
+    { headerName: "Department ID", field: "department.deptId" },
+    {
+      headerName: "Actions Panel",
+      sortable: false,
+      filter: false,
+      cellRenderer: (params: any) => {
+        if (!params.data || params.data.__isDetailRow) return null;
+        return (
+          <div className="flex items-center h-full gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs px-2"
+              onClick={() => handleEditAction(params.data)}
+            >
+              Edit
+            </Button>
+          </div>
+        );
+      },
+      width: 100,
+    }
+  ], [handleEditAction, expandedRowIds, toggleRowExpansion]);
+
+  const globalCustomActions = useMemo(() => [
+
+  ], []);
 
   return (
-    <div className="space-y-6 p-4">
-      {/* HEADER ROW */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">User</h1>
-      </div>
-
-      {/* FILTER & ACTIONS TOOLBAR BAR */}
-      <div className="flex items-center justify-between gap-4">
-        {/* Search Field */}
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search username, email, or employee ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {/* Refetch Action Button */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={fetchUsers}
-          disabled={isLoading}
-          className="shrink-0"
-          title="Refresh Data"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-        </Button>
-      </div>
-
-      {/* COMPACT DATA TABLE DISPLAY */}
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User ID</TableHead>
-              <TableHead>Username</TableHead>
-              <TableHead>Employee ID</TableHead>
-              <TableHead>Email ID</TableHead>
-              <TableHead>Mobile No</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Location</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  Synchronizing records...
-                </TableCell>
-              </TableRow>
-            ) : filteredUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  No matching user profiles found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredUsers.map((item) => (
-                <TableRow key={item.user?.userId || item.cmplUser?.cmplUserId}>
-                  <TableCell className="font-mono text-xs">
-                    {item.cmplUser?.cmplUserId}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {item.cmplUser?.cmplUserName}
-                  </TableCell>
-                  <TableCell>
-                    {item.cmplUser?.empId || (
-                      <span className="text-xs italic text-muted-foreground">N/A</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{item.cmplUser?.mailId}</TableCell>
-                  <TableCell>{item.cmplUser?.mobNo}</TableCell>
-                  <TableCell>
-                    <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary ring-1 ring-inset ring-primary/20">
-                      {item.user?.role || "User"}
-                    </span>
-                  </TableCell>
-                  <TableCell>{item.user?.location || "Default"}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+    <div className="w-full p-6 space-y-4">
+      <DataGrid
+        title="Security & Compliance User Directory (Community MIT)"
+        rowData={computedRowData} // FIX 3: Changed from static 'users' list straight to 'computedRowData'
+        columnDefs={columns}
+        gridId="compliance_users_free_v35"
+        pageSize={10}
+        pageSizeOptions={[10, 20, 50]}
+        loading={loading}
+        showSearch={true}
+        showRefreshButton={true}
+        showClearFiltersButton={true}
+        customActions={globalCustomActions}
+        onRefresh={fetchUsers} // FIX 4: Linked network API handler to dynamic toolbar refresh emitter hook
+        theme="system"
+        masterDetail={false}
+        detailSections={dynamicSectionsConfig}
+        gridHeight="550px"
+      />
     </div>
   );
-}
+};

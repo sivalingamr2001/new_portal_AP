@@ -1,40 +1,36 @@
-import { useAuth } from "@/context/AuthContext";
-import { UserRole } from "@/lib/constants";
-import React from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext"
+import { UserRole } from "@/lib/constants"
+import { roleStringToNumeric } from "@/lib/roleMapper"
+import React from "react"
+import { Navigate, Outlet } from "react-router-dom"
 
-export type UserRoleType = typeof UserRole[keyof typeof UserRole];
+export type UserRoleType = (typeof UserRole)[keyof typeof UserRole]
 
 interface RoleGuardProps {
-  allowedRoles: UserRoleType[];
-  children?: React.ReactNode;
+  allowedRoles: UserRoleType[]
+  children?: React.ReactNode
 }
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
-  const { isAuthenticated, currentUserRole } = useAuth();
+  const { isAuthenticated, currentUserRole } = useAuth()
 
   // 1. If not authenticated or role is missing, redirect to login instantly
   if (!isAuthenticated || !currentUserRole) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace />
   }
 
-  // 2. Map the string role (e.g., "User") to its numeric enum value (e.g., 4)
-  // We use keyof typeof UserRole to safely look up the key dynamically
-  const roleKey = currentUserRole as keyof typeof UserRole;
-  const activeRole = UserRole[roleKey];
+  // 2. Map the string role (e.g., "User", "Operator") to its numeric enum value
+  const activeRole: any = roleStringToNumeric(currentUserRole)
 
-  // 3. Fallback check if the string coming from the API doesn't match any key in your constants
-  if (activeRole === undefined) {
-    console.error(`Role '${currentUserRole}' matches no valid application boundaries.`);
-    return <Navigate to="/unauthorized" replace />;
-  }
-
-  // 4. Perform type-safe array inclusion validation using the resolved number
+  // 3. Perform type-safe array inclusion validation using the resolved number
   if (!allowedRoles.includes(activeRole)) {
-    return <Navigate to="/unauthorized" replace />;
+    console.warn(
+      `User with role '${currentUserRole}' (${activeRole}) does not have access to allowed roles: ${allowedRoles.join(", ")}`
+    )
+    return <Navigate to="/unauthorized" replace />
   }
 
-  return children ? <>{children}</> : <Outlet />;
+  return children ? <>{children}</> : <Outlet />
 }
 
-export default RoleGuard;
+export default RoleGuard

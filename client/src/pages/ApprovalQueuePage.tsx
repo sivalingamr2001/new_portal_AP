@@ -1,3 +1,3 @@
 export const ApprovalQueuePage = () => {
-    return <div>Approval Queue Page</div>;
+  return <div>Approval Queue Page</div>
 }

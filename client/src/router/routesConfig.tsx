@@ -1,14 +1,14 @@
-import RoleGuard from "@/components/RoleGuard";
-import { UserRole } from "@/lib/constants";
-import { Navigate, type RouteObject } from "react-router-dom";
+import RoleGuard from "@/components/RoleGuard"
+import { UserRole } from "@/lib/constants"
+import { Navigate, type RouteObject } from "react-router-dom"
 
-import AppLayout from "@/layout/AppLayout";
-import { AuthLayout } from "@/layout/AuthLayout";
-import ErrorBountry from "@/pages/ErrorBountry";
-import { ProtectedRoute } from "@/pages/ProtectedRoute";
+import AppLayout from "@/layout/AppLayout"
+import { AuthLayout } from "@/layout/AuthLayout"
+import ErrorBountry from "@/pages/ErrorBountry"
+import { ProtectedRoute } from "@/pages/ProtectedRoute"
 
-import * as Pages from "./pages";
-import { withSuspense } from "./withSuspense";
+import * as Pages from "./pages"
+import { withSuspense } from "./withSuspense"
 
 export const routesConfig: RouteObject[] = [
   {
@@ -20,44 +20,83 @@ export const routesConfig: RouteObject[] = [
         errorElement: <ErrorBountry />,
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
-          { path: "/unauthorized", element: withSuspense(Pages.UnauthorizedPage) },
+          {
+            path: "/unauthorized",
+            element: withSuspense(Pages.UnauthorizedPage),
+          },
 
           // --- USER PATHS ---
           {
             element: <RoleGuard allowedRoles={[UserRole.User]} />,
-            children: [{ path: "/my-requests", element: withSuspense(Pages.MyRequestsPage) }]
+            children: [
+              {
+                path: "/my-requests",
+                element: withSuspense(Pages.MyRequestsPage),
+              },
+            ],
           },
 
           // --- HOD PATHS ---
           {
             element: <RoleGuard allowedRoles={[UserRole.Hod]} />,
             children: [
-              { path: "/hod/pending-approvals", element: withSuspense(Pages.PendingApprovalsPage) },
-              { path: "/hod/all-requests", element: withSuspense(Pages.HodAllRequestsPage) }
-            ]
+              {
+                path: "/hod/pending-approvals",
+                element: withSuspense(Pages.PendingApprovalsPage),
+              },
+              {
+                path: "/hod/all-requests",
+                element: withSuspense(Pages.HodAllRequestsPage),
+              },
+            ],
           },
 
           // --- OPERATOR PATHS ---
           {
             element: <RoleGuard allowedRoles={[UserRole.It]} />,
             children: [
-              { path: "/dashboard", element: withSuspense(Pages.DashboardPage) },
-              { path: "/operator/approval-queue", element: withSuspense(Pages.ApprovalQueuePage) },
-              { path: "/operator/active-access", element: withSuspense(Pages.ActiveAccessPage) },
-              { path: "/operator/all-requests", element: withSuspense(Pages.OperatorAllRequestsPage) }
-            ]
+              {
+                path: "/operator/dashboard",
+                element: withSuspense(Pages.DashboardPage),
+              },
+              {
+                path: "/operator/approval-queue",
+                element: withSuspense(Pages.ApprovalQueuePage),
+              },
+              {
+                path: "/operator/active-access",
+                element: withSuspense(Pages.ActiveAccessPage),
+              },
+              {
+                path: "/operator/all-requests",
+                element: withSuspense(Pages.OperatorAllRequestsPage),
+              },
+            ],
           },
 
           // --- ADMIN PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.Admin]} />,
+            element: <RoleGuard allowedRoles={[UserRole.Admin, UserRole.User]} />,
             children: [
+              {
+                path: "/dashboard",
+                element: withSuspense(Pages.DashboardPage),
+              },
               { path: "/users", element: withSuspense(Pages.UsersPage) },
-              { path: "/departments", element: withSuspense(Pages.DepartmentsPage) },
-              { path: "/folder-mapping", element: withSuspense(Pages.FolderMappingPage) },
-              { path: "/admin/audit-logs", element: withSuspense(Pages.AuditLogsPage) }
-            ]
-          }
+              {
+                path: "/departments",
+                element: withSuspense(Pages.DepartmentsPage),
+              },
+              {
+                path: "/folder-mapping",
+                element: withSuspense(Pages.FolderMappingPage),
+              },
+              {
+                path: "/admin/audit-logs",
+                element: withSuspense(Pages.AuditLogsPage),
+              },
+            ],
+          },
         ],
       },
     ],
@@ -69,4 +108,4 @@ export const routesConfig: RouteObject[] = [
       { path: "/login", element: withSuspense(Pages.LoginPage) },
     ],
   },
-];
+]

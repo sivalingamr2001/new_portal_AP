@@ -1,14 +1,22 @@
 // @/pages/Departments.tsx
-"use client";
+"use client"
 
-import * as React from "react";
-import { RefreshCw, Search, Eye, Edit2, Building2, UserCheck, Users } from "lucide-react";
-import departmentApi from "@/api/departmentApi";
-import type { DepartmentResponseDto } from "@/api/types";
+import * as React from "react"
+import {
+  RefreshCw,
+  Search,
+  Eye,
+  Edit2,
+  Building2,
+  UserCheck,
+  Users,
+} from "lucide-react"
+import departmentApi from "@/api/departmentApi"
+import type { DepartmentResponseDto } from "@/api/types"
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -16,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -24,108 +32,123 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"
 
 export const DepartmentsPage = () => {
-  const [departments, setDepartments] = React.useState<DepartmentResponseDto[]>([]);
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [departments, setDepartments] = React.useState<DepartmentResponseDto[]>(
+    []
+  )
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   // View Modal Hierarchy States
-  const [selectedDept, setSelectedDept] = React.useState<DepartmentResponseDto | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = React.useState(false);
+  const [selectedDept, setSelectedDept] =
+    React.useState<DepartmentResponseDto | null>(null)
+  const [isViewModalOpen, setIsViewModalOpen] = React.useState(false)
 
   // EDIT STATE VARIABLES
-  const [editingDept, setEditingDept] = React.useState<DepartmentResponseDto | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [editingDept, setEditingDept] =
+    React.useState<DepartmentResponseDto | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false)
   const [formData, setFormData] = React.useState({
     deptName: "",
     hodId: "" as string | number,
-  });
+  })
 
   const fetchDepartments = React.useCallback(async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const data = await departmentApi.getAll();
-      setDepartments(data);
+      const data = await departmentApi.getAll()
+      setDepartments(data)
     } catch (error) {
-      console.error("Failed to load department schema:", error);
+      console.error("Failed to load department schema:", error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  }, []);
+  }, [])
 
   React.useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
+    fetchDepartments()
+  }, [fetchDepartments])
 
   const filteredDepartments = React.useMemo(() => {
     return departments.filter((item) => {
-      const name = item.department?.deptName?.toLowerCase() || "";
-      const id = String(item.department?.deptId || "");
-      const query = searchQuery.toLowerCase();
-      return name.includes(query) || id.includes(query);
-    });
-  }, [departments, searchQuery]);
+      const name = item.department?.deptName?.toLowerCase() || ""
+      const id = String(item.department?.deptId || "")
+      const query = searchQuery.toLowerCase()
+      return name.includes(query) || id.includes(query)
+    })
+  }, [departments, searchQuery])
 
   const handleViewDetails = (dept: DepartmentResponseDto) => {
-    setSelectedDept(dept);
-    setIsViewModalOpen(true);
-  };
+    setSelectedDept(dept)
+    setIsViewModalOpen(true)
+  }
 
   // 1. Trigger Edit Mode: Populate state with active data fields
   const handleOpenEdit = (dept: DepartmentResponseDto) => {
-    setEditingDept(dept);
+    setEditingDept(dept)
     setFormData({
       deptName: dept.department?.deptName || "",
       // Fallback placeholder logic for hodId mapping if present in your dto response structure
       hodId: "",
-    });
-    setIsEditModalOpen(true);
-  };
+    })
+    setIsEditModalOpen(true)
+  }
 
   // 2. Submit Put Payload to Backend Api Services
   const handleUpdateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDept?.department?.deptId) return;
+    e.preventDefault()
+    if (!editingDept?.department?.deptId) return
 
-    setIsSubmitting(true);
+    setIsSubmitting(true)
     try {
-      const updatedData = await departmentApi.update(editingDept.department.deptId, {
-        deptName: formData.deptName || null,
-        hodId: formData.hodId ? Number(formData.hodId) : null,
-      });
+      const updatedData = await departmentApi.update(
+        editingDept.department.deptId,
+        {
+          deptName: formData.deptName || null,
+          hodId: formData.hodId ? Number(formData.hodId) : null,
+        }
+      )
 
       // 3. Reactively update local component state arrays without forcing an extra network reload
       setDepartments((prev) =>
         prev.map((item) =>
           item.department?.deptId === editingDept.department?.deptId
-            ? { ...item, department: { ...item.department, deptName: updatedData.department?.deptName } }
+            ? {
+                ...item,
+                department: {
+                  ...item.department,
+                  deptName: updatedData.department?.deptName,
+                },
+              }
             : item
         )
-      );
+      )
 
-      setIsEditModalOpen(false);
-      setEditingDept(null);
+      setIsEditModalOpen(false)
+      setEditingDept(null)
     } catch (error) {
-      console.error("Failed to update target department data context:", error);
+      console.error("Failed to update target department data context:", error)
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <div className="space-y-6 p-4">
       {/* HEADER ROW */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Department</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Department
+        </h1>
       </div>
 
       {/* FILTER & ACTIONS TOOLBAR BAR */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search department ID or name..."
             value={searchQuery}
@@ -158,13 +181,19 @@ export const DepartmentsPage = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={3}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   Synchronizing records...
                 </TableCell>
               </TableRow>
             ) : filteredDepartments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={3}
+                  className="h-24 text-center text-muted-foreground"
+                >
                   No matching department profiles found.
                 </TableCell>
               </TableRow>
@@ -176,7 +205,9 @@ export const DepartmentsPage = () => {
                   </TableCell>
                   <TableCell>
                     {item.department?.deptName || (
-                      <span className="text-xs italic text-muted-foreground">Unassigned Name</span>
+                      <span className="text-xs text-muted-foreground italic">
+                        Unassigned Name
+                      </span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -220,7 +251,11 @@ export const DepartmentsPage = () => {
             <DialogHeader>
               <DialogTitle>Edit Department Profile</DialogTitle>
               <DialogDescription>
-                Modify internal parameters for Department ID: <span className="font-mono font-bold">{editingDept?.department?.deptId}</span>.
+                Modify internal parameters for Department ID:{" "}
+                <span className="font-mono font-bold">
+                  {editingDept?.department?.deptId}
+                </span>
+                .
               </DialogDescription>
             </DialogHeader>
 
@@ -233,7 +268,9 @@ export const DepartmentsPage = () => {
                 <Input
                   id="deptName"
                   value={formData.deptName}
-                  onChange={(e) => setFormData({ ...formData, deptName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, deptName: e.target.value })
+                  }
                   className="col-span-3"
                   placeholder="Enter custom department string"
                 />
@@ -247,8 +284,10 @@ export const DepartmentsPage = () => {
                 <select
                   id="hodId"
                   value={formData.hodId}
-                  onChange={(e) => setFormData({ ...formData, hodId: e.target.value })}
-                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onChange={(e) =>
+                    setFormData({ ...formData, hodId: e.target.value })
+                  }
+                  className="col-span-3 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <option value="">Select an available user node</option>
                   {editingDept?.users?.map((u) => (
@@ -273,5 +312,5 @@ export const DepartmentsPage = () => {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

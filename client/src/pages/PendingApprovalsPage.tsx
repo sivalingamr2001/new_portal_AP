@@ -1,3 +1,3 @@
 export const PendingApprovalsPage = () => {
-    return <div>Pending Approvals Page</div>;
+  return <div>Pending Approvals Page</div>
 }

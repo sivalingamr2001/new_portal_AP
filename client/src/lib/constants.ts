@@ -23,4 +23,4 @@ export const UserRole = {
   It: 2,
   Hod: 3,
   User: 4,
-} as const;
+} as const
