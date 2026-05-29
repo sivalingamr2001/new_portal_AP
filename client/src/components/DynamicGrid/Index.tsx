@@ -160,6 +160,12 @@ export function DataGrid<TData extends Record<string, unknown>>(props: DataGridP
             onSortChanged={handlers.onSortChanged}
             onPaginationChanged={handlers.onPaginationChanged}
             onRowClicked={onRowClicked}
+
+            autoSizeStrategy={{
+              type: 'fitGridWidth',
+              defaultMinWidth: 100
+            }}
+
             {...gridOptions}
           />
         </div>

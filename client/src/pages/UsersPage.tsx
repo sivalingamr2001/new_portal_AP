@@ -8,11 +8,19 @@ import type { UserRowPayload } from "./types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import userApi from "@/api/userApi";
 import { useLoader } from "@/hooks/useLoader";
+import { useLocation } from "react-router-dom";
+import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar";
 
 export const UsersPage = () => {
+  const location = useLocation()
   const [expandedRowIds, setExpandedRowIds] = useState<number[]>([]);
   const [users, setUsers] = useState<UserRowPayload[]>([]);
   const { loading, withLoader } = useLoader()
+
+  const { title } = useMemo(
+    () => getTitleFromSidebar(location.pathname),
+    [location.pathname]
+  )
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -21,12 +29,11 @@ export const UsersPage = () => {
     } catch (error) {
       console.error("Failed to load user records:", error);
     }
-  }, []);
+  }, [withLoader]);
 
-  // FIX 1: Cleared out the recursive loop dependency to guarantee a single initial mount data query
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, []);
 
   const toggleRowExpansion = useCallback((id: number) => {
     setExpandedRowIds((prev) =>
@@ -124,9 +131,9 @@ export const UsersPage = () => {
   ], []);
 
   return (
-    <div className="w-full p-6 space-y-4">
+    <div className="w-full space-y-4">
       <DataGrid
-        title="Security & Compliance User Directory (Community MIT)"
+        title={title}
         rowData={computedRowData} // FIX 3: Changed from static 'users' list straight to 'computedRowData'
         columnDefs={columns}
         gridId="compliance_users_free_v35"
