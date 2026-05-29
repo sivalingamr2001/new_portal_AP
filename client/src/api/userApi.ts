@@ -7,37 +7,22 @@ export interface UpdateUserRequest {
 }
 
 const userApi = {
-  getAll: async (): Promise<
-    ApiLoginResponseDto[]
-  > => {
-    const { data } =
-      await apiService.get<
-        ApiLoginResponseDto[]
-      >("/user")
+  getAll: async (): Promise<ApiLoginResponseDto[]> => {
+    const { data } = await apiService.get<ApiLoginResponseDto[]>("/user")
 
     return data
   },
 
-  getById: async (
-    userId: number
-  ): Promise<ApiLoginResponseDto> => {
-    const { data } =
-      await apiService.get<
-        ApiLoginResponseDto
-      >(`/user/${userId}`)
+  getById: async (userId: number): Promise<ApiLoginResponseDto> => {
+    const { data } = await apiService.get<ApiLoginResponseDto>(
+      `/user/${userId}`
+    )
 
     return data
   },
 
-  update: async (
-    userId: number,
-    payload: UpdateUserRequest
-  ) => {
-    const { data } =
-      await apiService.put(
-        `/user/${userId}`,
-        payload
-      )
+  update: async (userId: number, payload: UpdateUserRequest) => {
+    const { data } = await apiService.put(`/user/${userId}`, payload)
 
     return data
   },

@@ -1,7 +1,5 @@
 import { apiService } from "@/api/axiosClient"
-import type {
-  DepartmentResponseDto,
-} from "@/api/types"
+import type { DepartmentResponseDto } from "@/api/types"
 
 export interface UpdateDepartmentRequest {
   deptName?: string | null
@@ -9,24 +7,17 @@ export interface UpdateDepartmentRequest {
 }
 
 const departmentApi = {
-  getAll: async (): Promise<
-    DepartmentResponseDto[]
-  > => {
+  getAll: async (): Promise<DepartmentResponseDto[]> => {
     const { data } =
-      await apiService.get<
-        DepartmentResponseDto[]
-      >("/department")
+      await apiService.get<DepartmentResponseDto[]>("/department")
 
     return data
   },
 
-  getById: async (
-    deptId: number
-  ): Promise<DepartmentResponseDto> => {
-    const { data } =
-      await apiService.get<
-        DepartmentResponseDto
-      >(`/department/${deptId}`)
+  getById: async (deptId: number): Promise<DepartmentResponseDto> => {
+    const { data } = await apiService.get<DepartmentResponseDto>(
+      `/department/${deptId}`
+    )
 
     return data
   },
@@ -35,14 +26,10 @@ const departmentApi = {
     deptId: number,
     payload: UpdateDepartmentRequest
   ): Promise<DepartmentResponseDto> => {
-    const { data } =
-      await apiService.put<
-        DepartmentResponseDto,
-        UpdateDepartmentRequest
-      >(
-        `/department/${deptId}`,
-        payload
-      )
+    const { data } = await apiService.put<
+      DepartmentResponseDto,
+      UpdateDepartmentRequest
+    >(`/department/${deptId}`, payload)
 
     return data
   },

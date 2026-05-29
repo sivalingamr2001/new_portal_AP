@@ -9,34 +9,22 @@ import {
 
 import useSessionStorage from "@/hooks/useSessionStorage"
 
-const STORAGE_KEY = "user"
+const STORAGE_KEY = "jan_AP_user"
 
 type AuthContextType = {
   currentUser: any | null
   currentUserRole: string | null
   isAuthenticated: boolean
-  login: (
-    user: any,
-    expireInMinutes?: number
-  ) => void
+  login: (user: any, expireInMinutes?: number) => void
   logout: () => void
 }
 
-const AuthContext =
-  createContext<AuthContextType | null>(
-    null
-  )
+const AuthContext = createContext<AuthContextType | null>(null)
 
-export const AuthProvider = ({
-  children,
-}: {
-  children: ReactNode
-}) => {
-  const { get, set, remove } =
-    useSessionStorage()
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const { get, set, remove } = useSessionStorage()
 
-  const [currentUser, setCurrentUser] =
-    useState<any | null>(undefined)
+  const [currentUser, setCurrentUser] = useState<any | null>(undefined)
 
   useEffect(() => {
     const user = get(STORAGE_KEY)
@@ -44,15 +32,8 @@ export const AuthProvider = ({
     setCurrentUser(user)
   }, [get])
 
-  const login = (
-    user: any,
-    expireInMinutes = 30
-  ) => {
-    set(
-      STORAGE_KEY,
-      user,
-      expireInMinutes
-    )
+  const login = (user: any, expireInMinutes = 30) => {
+    set(STORAGE_KEY, user, expireInMinutes)
 
     setCurrentUser(user)
   }
@@ -67,11 +48,9 @@ export const AuthProvider = ({
     () => ({
       currentUser,
 
-      currentUserRole:
-        currentUser?.user?.role ?? null,
+      currentUserRole: currentUser?.user?.role ?? null,
 
-      isAuthenticated:
-        !!currentUser,
+      isAuthenticated: !!currentUser,
 
       login,
 
@@ -80,21 +59,14 @@ export const AuthProvider = ({
     [currentUser]
   )
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => {
-  const context =
-    useContext(AuthContext)
+  const context = useContext(AuthContext)
 
   if (!context) {
-    throw new Error(
-      "useAuth must be used inside AuthProvider"
-    )
+    throw new Error("useAuth must be used inside AuthProvider")
   }
 
   return context

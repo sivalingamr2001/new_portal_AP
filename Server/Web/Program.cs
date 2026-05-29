@@ -5,8 +5,24 @@ using Web.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 1. Define CORS Policy Name
+const string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+
 // Services
 builder.Services.AddControllers();
+
+// 2. Configure CORS service
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: MyAllowSpecificOrigins,
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173") // No trailing slash here
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Allows cookies/auth headers if needed
+        });
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -53,6 +69,9 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseHttpsRedirection();
+
+// 3. Enable CORS middleware (Must be placed before MapControllers)
+app.UseCors(MyAllowSpecificOrigins);
 
 app.MapControllers();
 

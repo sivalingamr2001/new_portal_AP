@@ -6,14 +6,17 @@ import App from "./App.tsx"
 import { TooltipProvider } from "./components/ui/tooltip.tsx"
 import { AuthProvider } from "./context/AuthContext.tsx"
 import "./index.css"
+import { SidebarProvider } from "./components/ui/sidebar.tsx"
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <TooltipProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <SidebarProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </SidebarProvider>
       </TooltipProvider>
     </ThemeProvider>
   </StrictMode>

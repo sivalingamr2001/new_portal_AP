@@ -3,10 +3,7 @@ import { Loader } from "@/components/Loader"
 import { useAuth } from "@/context/AuthContext"
 
 export const ProtectedRoute = () => {
-  const {
-    isAuthenticated,
-    currentUser,
-  } = useAuth()
+  const { isAuthenticated, currentUser } = useAuth()
 
   const location = useLocation()
 

@@ -1,3 +1,40 @@
+export interface CmplUser {
+  cmplUserId: number
+  cmplUserName: string
+  empId: number | null
+  mailId: string | null
+  mobNo: string
+  deptId: number
+}
+
+export interface User {
+  userId: number
+  role: string
+  location: string
+}
+
+export interface Department {
+  deptId: number
+  deptName: string | null
+}
+
+export interface LoginUserData {
+  cmplUser: CmplUser
+  user: User
+  department: Department
+  hod: any | null
+}
+
+// This represents the entire response envelope
+export interface ApiResponse<T> {
+  value: T
+  isSuccess: boolean
+  isFailure: boolean
+  error: any | null
+}
+
+export type LoginResponse = ApiResponse<LoginUserData>
+
 export interface UserDto {
   userId: number
   role: string

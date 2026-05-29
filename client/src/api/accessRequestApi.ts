@@ -9,26 +9,20 @@ import type {
 
 const accessRequestApi = {
   getAll: async (userId?: number) => {
-    const { data } =
-      await apiService.get<
-        AccessRequestDto[]
-      >("/accessrequest", {
-        params:
-          userId === undefined
-            ? undefined
-            : { userId },
-      })
+    const { data } = await apiService.get<AccessRequestDto[]>(
+      "/accessrequest",
+      {
+        params: userId === undefined ? undefined : { userId },
+      }
+    )
 
     return data
   },
 
-  getById: async (
-    accessReqId: number
-  ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.get<
-        AccessRequestDto
-      >(`/accessrequest/${accessReqId}`)
+  getById: async (accessReqId: number): Promise<AccessRequestDto> => {
+    const { data } = await apiService.get<AccessRequestDto>(
+      `/accessrequest/${accessReqId}`
+    )
 
     return data
   },
@@ -36,35 +30,26 @@ const accessRequestApi = {
   submit: async (
     payload: SubmitAccessRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        SubmitAccessRequestDto
-      >("/accessrequest", payload)
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      SubmitAccessRequestDto
+    >("/accessrequest", payload)
 
     return data
   },
 
-  getHodCart: async (
-    approverId: number
-  ): Promise<AccessRequestDto[]> => {
-    const { data } =
-      await apiService.get<
-        AccessRequestDto[]
-      >(
-        `/accessrequest/cart/hod/${approverId}`
-      )
+  getHodCart: async (approverId: number): Promise<AccessRequestDto[]> => {
+    const { data } = await apiService.get<AccessRequestDto[]>(
+      `/accessrequest/cart/hod/${approverId}`
+    )
 
     return data
   },
 
-  getItCart: async (): Promise<
-    AccessRequestDto[]
-  > => {
-    const { data } =
-      await apiService.get<
-        AccessRequestDto[]
-      >("/accessrequest/cart/it")
+  getItCart: async (): Promise<AccessRequestDto[]> => {
+    const { data } = await apiService.get<AccessRequestDto[]>(
+      "/accessrequest/cart/it"
+    )
 
     return data
   },
@@ -74,14 +59,13 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ApprovalActionRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ApprovalActionRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/hod/approve`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ApprovalActionRequestDto
+    >(
+      `/accessrequest/${accessReqId}/items/${accessItemId}/hod/approve`,
+      payload
+    )
 
     return data
   },
@@ -91,14 +75,10 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ApprovalActionRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ApprovalActionRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/hod/reject`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ApprovalActionRequestDto
+    >(`/accessrequest/${accessReqId}/items/${accessItemId}/hod/reject`, payload)
 
     return data
   },
@@ -108,14 +88,10 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ApprovalActionRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ApprovalActionRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/it/approve`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ApprovalActionRequestDto
+    >(`/accessrequest/${accessReqId}/items/${accessItemId}/it/approve`, payload)
 
     return data
   },
@@ -125,14 +101,10 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ApprovalActionRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ApprovalActionRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/it/reject`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ApprovalActionRequestDto
+    >(`/accessrequest/${accessReqId}/items/${accessItemId}/it/reject`, payload)
 
     return data
   },
@@ -142,14 +114,10 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ResubmitAccessRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ResubmitAccessRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/resubmit`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ResubmitAccessRequestDto
+    >(`/accessrequest/${accessReqId}/items/${accessItemId}/resubmit`, payload)
 
     return data
   },
@@ -159,29 +127,20 @@ const accessRequestApi = {
     accessItemId: number,
     payload: ApprovalActionRequestDto
   ): Promise<AccessRequestDto> => {
-    const { data } =
-      await apiService.post<
-        AccessRequestDto,
-        ApprovalActionRequestDto
-      >(
-        `/accessrequest/${accessReqId}/items/${accessItemId}/revoke`,
-        payload
-      )
+    const { data } = await apiService.post<
+      AccessRequestDto,
+      ApprovalActionRequestDto
+    >(`/accessrequest/${accessReqId}/items/${accessItemId}/revoke`, payload)
 
     return data
   },
 
   getNotifications: async (
     userId: number
-  ): Promise<
-    AccessNotificationDto[]
-  > => {
-    const { data } =
-      await apiService.get<
-        AccessNotificationDto[]
-      >(
-        `/accessrequest/notifications/${userId}`
-      )
+  ): Promise<AccessNotificationDto[]> => {
+    const { data } = await apiService.get<AccessNotificationDto[]>(
+      `/accessrequest/notifications/${userId}`
+    )
 
     return data
   },
