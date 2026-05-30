@@ -1,6 +1,8 @@
 import RoleGuard from "@/components/RoleGuard"
 import { UserRole } from "@/lib/constants"
+import { roleStringToNumeric } from "@/lib/roleMapper"
 import { Navigate, type RouteObject } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
 
 import AppLayout from "@/layout/AppLayout"
 import { AuthLayout } from "@/layout/AuthLayout"
@@ -9,6 +11,29 @@ import { ProtectedRoute } from "@/pages/ProtectedRoute"
 
 import * as Pages from "./pages"
 import { withSuspense } from "./withSuspense"
+
+const HomeRedirect = () => {
+  const { currentUserRole, isAuthenticated } = useAuth()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  const userRoleNumeric = roleStringToNumeric(currentUserRole)
+
+  switch (userRoleNumeric) {
+    case UserRole.Admin:
+      return <Navigate to="/dashboard" replace />
+    case UserRole.Operator:
+      return <Navigate to="/operator/dashboard" replace />
+    case UserRole.Hod:
+      return <Navigate to="/hod/pending-approvals" replace />
+    case UserRole.User:
+      return <Navigate to="/my-requests" replace />
+    default:
+      return <Navigate to="/unauthorized" replace />
+  }
+}
 
 export const routesConfig: RouteObject[] = [
   {
@@ -19,7 +44,7 @@ export const routesConfig: RouteObject[] = [
         element: <AppLayout />,
         errorElement: <ErrorBountry />,
         children: [
-          { index: true, element: <Navigate to="/dashboard" replace /> },
+          { index: true, element: <HomeRedirect /> },
           {
             path: "/unauthorized",
             element: withSuspense(Pages.UnauthorizedPage),
@@ -53,7 +78,7 @@ export const routesConfig: RouteObject[] = [
 
           // --- OPERATOR PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.It]} />,
+            element: <RoleGuard allowedRoles={[UserRole.Operator]} />,
             children: [
               {
                 path: "/operator/dashboard",
@@ -76,9 +101,7 @@ export const routesConfig: RouteObject[] = [
 
           // --- ADMIN PATHS ---
           {
-            element: (
-              <RoleGuard allowedRoles={[UserRole.Admin, UserRole.User]} />
-            ),
+            element: <RoleGuard allowedRoles={[UserRole.Admin]} />,
             children: [
               {
                 path: "/dashboard",

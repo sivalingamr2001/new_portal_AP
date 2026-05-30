@@ -1,16 +1,22 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import departmentApi from "@/api/departmentApi"
+import departmentApi, { type UpdateDepartmentRequest } from "@/api/departmentApi"
 import type { DepartmentResponseDto } from "@/api/types"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
+import { Button } from "@/components/ui/button"
+import { EditDepartmentModal } from "@/components/Department/EditDepartmentModal"
 
 export const DepartmentsPage = () => {
   const location = useLocation()
   const [departments, setDepartments] = useState<DepartmentResponseDto[]>([])
   const { loading, withLoader } = useLoader()
+
+  // Modal tracking states
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedDepartment, setSelectedDepartment] = useState<any | null>(null)
 
   const { title } = useMemo(
     () => getTitleFromSidebar(location.pathname),
@@ -33,6 +39,23 @@ export const DepartmentsPage = () => {
   useEffect(() => {
     fetchDepartments()
   }, [])
+
+  const handleSaveDepartment = async (payload: UpdateDepartmentRequest) => {
+    if (!selectedDepartment?.department?.deptId) return;
+    try {
+      const targetId = selectedDepartment.department.deptId;
+      const result = await departmentApi.update(targetId, payload);
+
+      if (result.isSuccess) {
+        setIsEditModalOpen(false);
+        fetchDepartments();
+      } else {
+        console.error("Failed updating department information:", result.error?.message);
+      }
+    } catch (err) {
+      console.error("Save error encountered:", err);
+    }
+  };
 
   const columns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
     () => [
@@ -67,8 +90,28 @@ export const DepartmentsPage = () => {
         width: 120,
         valueGetter: (params: any) => params.data?.users?.length || 0,
       },
+      {
+        headerName: "Actions",
+        width: 100,
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: any) => {
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedDepartment(params.data)
+                setIsEditModalOpen(true)
+              }}
+            >
+              Edit
+            </Button>
+          )
+        },
+      },
     ],
-    []
+    [fetchDepartments]
   )
 
   return (
@@ -84,6 +127,13 @@ export const DepartmentsPage = () => {
         showClearFiltersButton
         noRowsMessage="No departments found"
         pageSize={10}
+      />
+
+      <EditDepartmentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        departmentData={selectedDepartment}
+        onSave={handleSaveDepartment}
       />
     </div>
   )

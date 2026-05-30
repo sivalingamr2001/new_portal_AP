@@ -255,7 +255,7 @@ export function DataGrid<TData extends object>(
         <div
           className="datagrid-scroll-inner"
           style={{
-            height: "720px",
+            height: "610px",
             marginTop: "8px",
             width: "100%",
           }}

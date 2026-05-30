@@ -119,6 +119,15 @@ public class UserController : ControllerBase
         return Ok(Result.Success(response));
     }
 
+    [HttpGet("hods")]
+    public async Task<ActionResult<Result<List<HodDto>>>> GetAllHods()
+    {
+        var hods = await _db.HodMasters
+            .Select(h => new HodDto(h.IdRow, h.HodName, h.Id, h.EmailId, h.MobNo))
+            .ToListAsync();
+        return Ok(Result.Success(hods));
+    }
+
     private static LoginResponseDto BuildUserResponse(
         User user,
         IReadOnlyDictionary<int, CmplUser> cmplUsers,
@@ -163,6 +172,8 @@ public class UserController : ControllerBase
                 : new HodDto(hod.IdRow, hod.HodName, hod.Id, hod.EmailId, hod.MobNo)
         };
     }
+
+
 
     public sealed record UpdateUserRequest(string? Role, string? Location);
 }

@@ -37,10 +37,10 @@ export const LoginPage = () => {
       const data = await withLoader(() => loginApi.login(values))
 
       if (data && data.isSuccess) {
-        // passes user, cmplUser, department data payload
+
         login(data.value, 30)
 
-        navigate("/dashboard", {
+        navigate("/", {
           replace: true,
         })
       }

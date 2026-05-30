@@ -90,31 +90,31 @@ export const sidebarItems: SidebarGroup[] = [
         label: "Dashboard",
         to: "/dashboard",
         icon: LayoutDashboard,
-        roles: [1, 4], // UserRole.Admin
+        roles: [1], // UserRole.Admin
       },
       {
         label: "Users",
         to: "/users",
         icon: Users,
-        roles: [1, 4], // UserRole.Admin
+        roles: [1], // UserRole.Admin
       },
       {
         label: "Departments",
         to: "/departments",
         icon: Building2,
-        roles: [1, 4], // UserRole.Admin
+        roles: [1], // UserRole.Admin
       },
       {
         label: "Folder Mapping",
         to: "/folder-mapping",
         icon: FolderTree,
-        roles: [1, 4], // UserRole.Admin
+        roles: [1], // UserRole.Admin
       },
       {
         label: "Audit Logs",
         to: "/admin/audit-logs",
         icon: FileText,
-        roles: [1, 4], // UserRole.Admin
+        roles: [1], // UserRole.Admin
       },
     ],
   },

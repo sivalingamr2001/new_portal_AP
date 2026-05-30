@@ -8,13 +8,7 @@ interface DynamicDetailCellRendererProps {
 
 export const DynamicDetailCellRenderer = memo(
   ({ data, sections = [] }: DynamicDetailCellRendererProps) => {
-    if (!sections || sections.length === 0) {
-      return (
-        <div className="rounded-md border bg-muted/20 p-4 text-xs text-muted-foreground italic">
-          No dynamic sub-sections are configured for this resource block view.
-        </div>
-      )
-    }
+   
 
     return (
       <div className="space-y-4 border-y bg-slate-50/60 p-5 text-sm select-text dark:bg-slate-900/40">
@@ -33,7 +27,6 @@ export const DynamicDetailCellRenderer = memo(
                 </h4>
                 <div className="space-y-1.5 font-mono text-xs text-slate-600 dark:text-slate-300">
                   {Object.entries(subObject).map(([key, value]) => {
-                    // Eliminate sensitive or internal system structural properties automatically
                     if (section.hiddenFields?.includes(key)) return null
 
                     return (

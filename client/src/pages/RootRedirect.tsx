@@ -12,10 +12,12 @@ export const RootRedirect = () => {
 
   const userRoleNumeric = roleStringToNumeric(currentUserRole)
 
+  console.log("Mapped Role:", userRoleNumeric, "Expected User Enum:", UserRole.User);
+
   switch (userRoleNumeric) {
     case UserRole.Admin:
       return <Navigate to="/dashboard" replace />
-    case UserRole.It: // Operator
+    case UserRole.Operator: // Operator
       return <Navigate to="/operator/dashboard" replace />
     case UserRole.Hod:
       return <Navigate to="/hod/pending-approvals" replace />

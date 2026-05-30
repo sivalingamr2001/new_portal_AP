@@ -19,6 +19,7 @@ import type {
   PagedResult,
   Result,
 } from "@/api/types"
+import { EditUsersModal } from "@/components/Users/EditUsersModal"
 
 const USERS_PAGE_CHUNK_SIZE = 20
 
@@ -26,6 +27,13 @@ export const UsersPage = () => {
   const location = useLocation()
   const [expandedRowIds, setExpandedRowIds] = useState<number[]>([])
   const { showLoader, hideLoader } = useLoader()
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+
+  const handleEditAction = (userData: any) => {
+    setSelectedUser(userData)
+    setIsEditModalOpen(true)
+  }
 
   const { title } = useMemo(
     () => getTitleFromSidebar(location.pathname),
@@ -105,10 +113,10 @@ export const UsersPage = () => {
               },
               hod: item.hod
                 ? {
-                    hodId:
-                      item.hod.idRow ?? 0,
-                    name: item.hod.hodName,
-                  }
+                  hodId:
+                    item.hod.idRow ?? 0,
+                  name: item.hod.hodName,
+                }
                 : null,
             })
           ),
@@ -162,12 +170,6 @@ export const UsersPage = () => {
     return flatList
   }, [users, expandedRowIds])
 
-  const handleEditAction = useCallback((rowData: UserRowPayload) => {
-    alert(
-      `Editing Target Reference for Compliance ID: ${rowData.cmplUser.cmplUserId}`
-    )
-  }, [])
-
   const dynamicSectionsConfig = useMemo<DetailSectionConfig[]>(
     () => [
       { title: "Core User Profile Info", objectKey: "user" },
@@ -217,7 +219,7 @@ export const UsersPage = () => {
           )
         },
       },
-      { headerName: "Compliance User ID", field: "cmplUser.cmplUserId" },
+      { headerName: "User ID", field: "cmplUser.cmplUserId" },
       { headerName: "Username", field: "cmplUser.cmplUserName" },
       { headerName: "Email Address", field: "cmplUser.mailId" },
       { headerName: "Mobile String", field: "cmplUser.mobNo" },
@@ -247,13 +249,33 @@ export const UsersPage = () => {
     [handleEditAction, expandedRowIds, toggleRowExpansion]
   )
 
+  const handleUserUpdate = async (updatedData: any) => {
+    try {
+      showLoader()
+      if (!selectedUser) return
+      await userApi.update(selectedUser.cmplUser.cmplUserId, {
+        role: updatedData.role,
+        location: updatedData.location,
+      })
+      await loadData(1) // Refresh the grid after update
+    }
+    catch (error) {
+      console.error("Failed to update user:", error)
+    }
+    finally {
+      hideLoader()
+      setIsEditModalOpen(false)
+    }
+  }
+
   const globalCustomActions = useMemo(() => [], [])
 
   return (
     <div className="w-full space-y-4">
       <DataGrid
         title={title}
-        rowData={computedRowData} // FIX 3: Changed from static 'users' list straight to 'computedRowData'
+        rowData={computedRowData}
+        rowSelection='none'
         columnDefs={columns}
         gridId="compliance_users_free_v35"
         pageSize={USERS_PAGE_CHUNK_SIZE}
@@ -285,6 +307,14 @@ export const UsersPage = () => {
           onLoadMore: async (nextPage: number) => {
             await loadMore(nextPage)
           },
+        }}
+      />
+      <EditUsersModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        userData={selectedUser}
+        onSave={(updatedData) => {
+          handleUserUpdate(updatedData)
         }}
       />
     </div>

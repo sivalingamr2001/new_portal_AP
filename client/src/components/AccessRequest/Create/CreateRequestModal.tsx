@@ -1,20 +1,18 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Controller, useForm } from "react-hook-form"
 
 import accessRequestApi from "@/api/accessRequestApi"
 import folderMappingApi from "@/api/folderMappingApi"
-import userApi from "@/api/userApi"
 import type {
   AccessRequestDto,
   AccessRequestItemDto,
   AccessType,
   ApiLoginResponseDto,
-  FolderMappingDto,
   FolderResponseDto,
   SubmitAccessRequestItemDto,
 } from "@/api/types"
+import userApi from "@/api/userApi"
 import { Button } from "@/components/ui/button"
-import { FolderNavigator, type FolderNode } from "@/components/AccessRequest/Create/FolderNavigator"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -23,26 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/context/AuthContext"
+import { AccessDetailsSection, type AccessRequestItemPayload, type AccessRequestPayload } from "./AccessDetailsSection"
+import { EmployeeSection } from "./EmployeeSection"
+import { type FolderNode } from "./FolderNavigator"
 
 type RequestModalMode = "create" | "resubmit" | "renew"
-
-type EditableItem = {
-  folderPath: string
-  accessType: AccessType
-  confirmAccessType: AccessType
-  reason: string
-}
 
 type CreateRequestModalProps = {
   isOpen: boolean
@@ -53,18 +37,12 @@ type CreateRequestModalProps = {
   onSuccess: () => void | Promise<void>
 }
 
-const ACCESS_TYPES = [
-  { value: 0, label: "Not Applicable" },
-  { value: 1, label: "Read Only" },
-  { value: 2, label: "Read and Write" },
-]
-
-const emptyItem = (): EditableItem => ({
+const DEFAULT_ACCESS_ITEM: AccessRequestItemPayload = {
   folderPath: "",
   accessType: 1,
   confirmAccessType: 1,
   reason: "",
-})
+}
 
 const readUserId = (user: unknown): number => {
   const candidate = user as any
@@ -88,7 +66,7 @@ const readUserEmail = (user: unknown): string => {
 
 const readDepartmentName = (user: unknown): string => {
   const candidate = user as any
-  return candidate?.department?.deptName ?? ""
+  return candidate?.department?.deptName ?? candidate?.department?.deptId ?? "N/A"
 }
 
 const readHodName = (user: unknown): string => {
@@ -103,35 +81,25 @@ function normalizeAccessType(value: AccessType | undefined | null): AccessType {
   return (value ?? 1) as AccessType
 }
 
-function buildFolderOptions(mappings: FolderMappingDto[]) {
-  return mappings
-    .map((mapping) => mapping.folderPath)
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-}
-
-function normalizeFolderPath(rawPath: string) {
-  return rawPath
-    .replace(/\//g, "\\")
-    .replace(/\\+/g, "\\")
-    .trim()
-}
-
 function mapFolderHierarchy(
   nodes: FolderResponseDto[],
-  parentPath = ""
+  parentPath = "",
+  inheritedDriveName = ""
 ): FolderNode[] {
   return nodes.map((node) => {
+    const driveName = node.DriveName || inheritedDriveName || ""
     const path = parentPath
       ? `${parentPath}\\${node.Name}`
-      : `${node.DriveName}\\${node.Name}`
+      : driveName
+      ? `${driveName}\\${node.Name}`
+      : node.Name
 
     return {
       id: path,
       name: node.Name,
       path,
-      driveName: node.DriveName,
-      children: node.Children ? mapFolderHierarchy(node.Children, path) : [],
+      driveName,
+      children: node.Children ? mapFolderHierarchy(node.Children, path, driveName) : [],
     }
   })
 }
@@ -155,41 +123,37 @@ function CreateRequestModal({
   onSuccess,
 }: CreateRequestModalProps) {
   const { currentUser } = useAuth()
-  const [folderMappings, setFolderMappings] = useState<FolderMappingDto[]>([])
   const [folderTree, setFolderTree] = useState<FolderNode[]>([])
-  const [folderTreeLoading, setFolderTreeLoading] = useState(false)
   const [folderTreeError, setFolderTreeError] = useState("")
-  const [isFolderNavigatorOpen, setIsFolderNavigatorOpen] = useState(false)
-  const [navigatorItemIndex, setNavigatorItemIndex] = useState<number | null>(null)
-  const [activeItemIndex, setActiveItemIndex] = useState(0)
   const [selectedUser, setSelectedUser] = useState<ApiLoginResponseDto | null>(null)
-  const [targetUserId, setTargetUserId] = useState(readUserId(currentUser))
-  const [itsrNo, setItsrNo] = useState("")
-  const [isAgreed, setIsAgreed] = useState(true)
-  const [items, setItems] = useState<EditableItem[]>([emptyItem()])
   const [isPending, setIsPending] = useState(false)
-  const [isFetchingUser, setIsFetchingUser] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+
+  const form = useForm<AccessRequestPayload>({
+    defaultValues: {
+      userId: readUserId(currentUser),
+      isAgreed: true,
+      itsrNo: "",
+      items: [DEFAULT_ACCESS_ITEM],
+    },
+  })
+
+  const { handleSubmit, watch, reset, setValue, control } = form
+  const targetUserId = watch("userId")
 
   const isEditingItem = mode !== "create" && request && item
   const title =
     mode === "resubmit"
       ? "Resubmit Access Request"
       : mode === "renew"
-        ? "Renew Access Request"
-        : "Create Access Request"
+      ? "Renew Access Request"
+      : "Create Access Request"
 
   const submitLabel =
     mode === "resubmit" ? "Resubmit" : mode === "renew" ? "Renew" : "Create Request"
 
-  const folderOptions = useMemo(
-    () => buildFolderOptions(folderMappings),
-    [folderMappings]
-  )
-
   const loadFolderHierarchy = async () => {
     setFolderTreeError("")
-    setFolderTreeLoading(true)
 
     try {
       const result = await folderMappingApi.getFolderHierarchy()
@@ -200,35 +164,7 @@ function CreateRequestModal({
       }
     } catch (error) {
       setFolderTreeError(getResultError(error))
-    } finally {
-      setFolderTreeLoading(false)
     }
-  }
-
-  const openFolderNavigator = async (index: number) => {
-    setNavigatorItemIndex(index)
-    setActiveItemIndex(index)
-    setIsFolderNavigatorOpen(true)
-
-    if (folderTree.length === 0) {
-      await loadFolderHierarchy()
-    }
-  }
-
-  const closeFolderNavigator = () => {
-    setIsFolderNavigatorOpen(false)
-    setNavigatorItemIndex(null)
-  }
-
-  const handleFolderSelection = (path: string) => {
-    if (navigatorItemIndex === null) return
-
-    updateItem(navigatorItemIndex, { folderPath: normalizeFolderPath(path) })
-    closeFolderNavigator()
-  }
-
-  const toggleItem = (index: number) => {
-    setActiveItemIndex((current) => (current === index ? -1 : index))
   }
 
   useEffect(() => {
@@ -236,38 +172,30 @@ function CreateRequestModal({
 
     const currentUserId = readUserId(currentUser)
     setErrorMessage("")
-    setTargetUserId(request?.userId ?? currentUserId)
-    setItsrNo(request?.itsrNo ?? "")
-    setIsAgreed(true)
     setSelectedUser(null)
-    setActiveItemIndex(0)
 
-    if (isEditingItem && item) {
-      setItems([
-        {
-          folderPath: item.folderPath,
-          accessType: normalizeAccessType(item.accessType),
-          confirmAccessType: normalizeAccessType(item.confirmAccessType),
-          reason: item.reason,
-        },
-      ])
-    } else {
-      setItems([emptyItem()])
-    }
-  }, [currentUser, isEditingItem, isOpen, item, request])
+    reset({
+      userId: request?.userId ?? currentUserId,
+      isAgreed: true,
+      itsrNo: request?.itsrNo ?? "",
+      items:
+        isEditingItem && item
+          ? [
+              {
+                folderPath: item.folderPath,
+                accessType: normalizeAccessType(item.accessType),
+                confirmAccessType: normalizeAccessType(item.confirmAccessType),
+                reason: item.reason,
+              },
+            ]
+          : [DEFAULT_ACCESS_ITEM],
+    })
+  }, [currentUser, isEditingItem, isOpen, item, request, reset])
 
   useEffect(() => {
-    if (!isOpen) return
-
-    folderMappingApi
-      .getAll({ page: 1, pageSize: 100 })
-      .then((result) => {
-        if (result.isSuccess && result.value) {
-          setFolderMappings(result.value.data)
-        }
-      })
-      .catch((error) => setErrorMessage(getResultError(error)))
-  }, [isOpen])
+    if (!isOpen || folderTree.length > 0) return
+    loadFolderHierarchy()
+  }, [isOpen, folderTree.length])
 
   useEffect(() => {
     if (!isOpen || !targetUserId) return
@@ -278,52 +206,31 @@ function CreateRequestModal({
       return
     }
 
-    setIsFetchingUser(true)
     userApi
       .getById(targetUserId)
       .then((result) => {
         setSelectedUser(result.isSuccess && result.value ? result.value : null)
       })
       .catch(() => setSelectedUser(null))
-      .finally(() => setIsFetchingUser(false))
   }, [currentUser, isOpen, targetUserId])
 
-  const updateItem = (index: number, patch: Partial<EditableItem>) => {
-    setItems((previous) =>
-      previous.map((entry, entryIndex) =>
-        entryIndex === index ? { ...entry, ...patch } : entry
-      )
-    )
-  }
+  const buildEmployeeName = () =>
+    readUserName(selectedUser ?? currentUser)
 
-  const addItem = () => {
-    setItems((previous) => {
-      const next = [...previous, emptyItem()]
-      setActiveItemIndex(next.length - 1)
-      return next
-    })
-  }
+  const buildEmployeeEmail = () =>
+    readUserEmail(selectedUser ?? currentUser)
 
-  const removeItem = (index: number) => {
-    setItems((previous) => {
-      const next = previous.filter((_, entryIndex) => entryIndex !== index)
+  const buildDepartmentName = () =>
+    readDepartmentName(selectedUser ?? currentUser)
 
-      setActiveItemIndex((current) => {
-        if (current === index) {
-          return next.length > 0 ? Math.min(index, next.length - 1) : -1
-        }
-        return current > index ? current - 1 : current
-      })
+  const buildHodName = () =>
+    readHodName(selectedUser ?? currentUser)
 
-      return next
-    })
-  }
+  const validate = (values: AccessRequestPayload) => {
+    if (!values.userId) return "Select a valid employee."
+    if (!values.isAgreed) return "Agreement is required before submitting."
 
-  const validate = () => {
-    if (!targetUserId) return "Select a valid employee."
-    if (!isAgreed) return "Agreement is required before submitting."
-
-    const invalidItem = items.find(
+    const invalidItem = values.items.find(
       (entry) => !entry.folderPath.trim() || !entry.reason.trim()
     )
     if (invalidItem) return "Each access item needs a folder path and reason."
@@ -331,9 +238,8 @@ function CreateRequestModal({
     return ""
   }
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const validationMessage = validate()
+  const onSubmit = async (values: AccessRequestPayload) => {
+    const validationMessage = validate(values)
     if (validationMessage) {
       setErrorMessage(validationMessage)
       return
@@ -344,17 +250,19 @@ function CreateRequestModal({
 
     try {
       if (mode === "create") {
-        const payloadItems: SubmitAccessRequestItemDto[] = items.map((entry) => ({
-          folderPath: entry.folderPath,
-          accessType: entry.accessType,
-          confirmAccessType: entry.confirmAccessType,
-          reason: entry.reason.trim(),
-        }))
+        const payloadItems: SubmitAccessRequestItemDto[] = values.items.map(
+          (entry) => ({
+            folderPath: entry.folderPath,
+            accessType: entry.accessType as AccessType,
+            confirmAccessType: entry.confirmAccessType as AccessType,
+            reason: entry.reason.trim(),
+          })
+        )
 
         const result = await accessRequestApi.submit({
-          userId: targetUserId,
-          isAgreed,
-          itsrNo: itsrNo.trim() || null,
+          userId: values.userId,
+          isAgreed: values.isAgreed,
+          itsrNo: values.itsrNo.trim() || null,
           items: payloadItems,
         })
 
@@ -362,18 +270,22 @@ function CreateRequestModal({
           throw new Error(result.error?.message)
         }
       } else if (request && item) {
-        const editedItem = items[0]
+        const editedItem = values.items[0]
         const payload = {
           userId: request.userId,
           folderPath: editedItem.folderPath,
-          accessType: editedItem.accessType,
-          confirmAccessType: editedItem.confirmAccessType,
+          accessType: editedItem.accessType as AccessType,
+          confirmAccessType: editedItem.confirmAccessType as AccessType,
           reason: editedItem.reason.trim(),
         }
 
         const result =
           mode === "renew"
-            ? await accessRequestApi.renew(request.accessReqId, item.accessItemId, payload)
+            ? await accessRequestApi.renew(
+                request.accessReqId,
+                item.accessItemId,
+                payload
+              )
             : await accessRequestApi.resubmit(
                 request.accessReqId,
                 item.accessItemId,
@@ -412,211 +324,39 @@ function CreateRequestModal({
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-5 py-2">
-          <section className="space-y-4 rounded-md border border-border bg-card p-4">
-            <h3 className="text-sm font-semibold">Employee Information</h3>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Field label="Employee ID">
-                <Input
-                  type="number"
-                  value={targetUserId || ""}
-                  disabled={mode !== "create"}
-                  onChange={(event) => setTargetUserId(Number(event.target.value))}
-                />
-              </Field>
-              <Field label="Employee Name">
-                <Input
-                  readOnly
-                  value={
-                    isFetchingUser
-                      ? "Loading..."
-                      : readUserName(selectedUser ?? currentUser)
-                  }
-                />
-              </Field>
-              <Field label="Email">
-                <Input readOnly value={readUserEmail(selectedUser ?? currentUser)} />
-              </Field>
-              <Field label="Department">
-                <Input readOnly value={readDepartmentName(selectedUser ?? currentUser)} />
-              </Field>
-              <Field label="Department HOD">
-                <Input readOnly value={readHodName(selectedUser ?? currentUser)} />
-              </Field>
-              <Field label="ITSR Number">
-                <Input
-                  value={itsrNo}
-                  disabled={mode !== "create"}
-                  onChange={(event) => setItsrNo(event.target.value)}
-                  placeholder="ITSR-001"
-                />
-              </Field>
-            </div>
-          </section>
+        {folderTreeError ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            {folderTreeError}
+          </div>
+        ) : null}
 
-          <section className="space-y-3 rounded-md border border-border bg-card p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold">Access Items</h3>
-              {mode === "create" ? (
-                <Button type="button" size="sm" onClick={addItem}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item
-                </Button>
-              ) : null}
-            </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 py-2">
+          <EmployeeSection
+            userId={targetUserId}
+            name={buildEmployeeName()}
+            email={buildEmployeeEmail()}
+            departmentName={buildDepartmentName()}
+            hodName={buildHodName()}
+            onUserIdChange={(value) => setValue("userId", value)}
+          />
 
-            <div className="space-y-3">
-              {items.map((entry, index) => {
-                const isExpanded = activeItemIndex === index
-
-                return (
-                  <div
-                    key={index}
-                    className="rounded-md border border-border p-3"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 text-left"
-                        onClick={() => toggleItem(index)}
-                      >
-                        <div className="text-xs font-semibold text-muted-foreground">
-                          Item {index + 1}
-                        </div>
-                        <div className="truncate text-sm text-foreground">
-                          {entry.folderPath || "No folder selected"}
-                          {entry.folderPath ? (
-                            <span className="text-muted-foreground"> · {ACCESS_TYPES.find((option) => option.value === entry.accessType)?.label ?? "Not Applicable"}</span>
-                          ) : null}
-                        </div>
-                      </button>
-
-                      <div className="flex items-center gap-2">
-                        {mode === "create" && items.length > 1 ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeItem(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <Field label="Folder Path">
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={entry.folderPath}
-                                onValueChange={(value) =>
-                                  updateItem(index, { folderPath: value })
-                                }
-                              >
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Select folder" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {folderOptions.map((path) => (
-                                    <SelectItem key={path} value={path}>
-                                      {path}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => openFolderNavigator(index)}
-                              >
-                                Browse
-                              </Button>
-                            </div>
-                          </Field>
-
-                          <Field label="Access Type">
-                            <Select
-                              value={String(entry.accessType)}
-                              onValueChange={(value) =>
-                                updateItem(index, {
-                                  accessType: Number(value) as AccessType,
-                                  confirmAccessType: Number(value) as AccessType,
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ACCESS_TYPES.map((option) => (
-                                  <SelectItem
-                                    key={option.value}
-                                    value={String(option.value)}
-                                  >
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </Field>
-                        </div>
-
-                        <div className="mt-4">
-                          <Field label="Reason">
-                            <Textarea
-                              value={entry.reason}
-                              onChange={(event) =>
-                                updateItem(index, { reason: event.target.value })
-                              }
-                              className="min-h-24"
-                              placeholder="Why is this access required?"
-                            />
-                          </Field>
-                        </div>
-
-                        {isFolderNavigatorOpen && navigatorItemIndex === index && (
-                          <div className="mt-4 rounded-3xl border border-border bg-background p-4">
-                            {folderTreeLoading ? (
-                              <div className="rounded-md border border-border/30 bg-card p-4 text-sm text-muted-foreground">
-                                Loading folder hierarchy...
-                              </div>
-                            ) : folderTreeError ? (
-                              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                                {folderTreeError}
-                              </div>
-                            ) : (
-                              <FolderNavigator
-                                folders={folderTree}
-                                onPathSelect={handleFolderSelection}
-                                initialPath={entry.folderPath}
-                              />
-                            )}
-
-                            <div className="mt-4 flex justify-end">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={closeFolderNavigator}
-                              >
-                                Close
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </section>
+          <AccessDetailsSection
+            form={form}
+            folders={folderTree}
+            canManageItems={mode === "create"}
+          />
 
           <label className="flex items-start gap-3 rounded-md border border-border bg-card p-4 text-sm">
-            <Checkbox checked={isAgreed} onCheckedChange={(checked) => setIsAgreed(!!checked)} />
+            <Controller
+              control={control}
+              name="isAgreed"
+              render={({ field }) => (
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(!!checked)}
+                />
+              )}
+            />
             <span>
               I agree that this access is for authorized business use and will be
               reviewed through the approval workflow.
@@ -634,21 +374,6 @@ function CreateRequestModal({
         </form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function Field({
-  children,
-  label,
-}: {
-  children: React.ReactNode
-  label: string
-}) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
-      {children}
-    </div>
   )
 }
 

@@ -1,12 +1,5 @@
-import {
-  apiService,
-  type PaginationParams,
-} from "@/api/axiosClient"
-import type {
-  ApiLoginResponseDto,
-  Result,
-  PagedResult,
-} from "@/api/types"
+import { apiService, type PaginationParams } from "@/api/axiosClient"
+import type { ApiLoginResponseDto, Result, PagedResult, HodDto } from "@/api/types"
 
 export interface UpdateUserRequest {
   role?: string
@@ -16,9 +9,7 @@ export interface UpdateUserRequest {
 const userApi = {
   getAll: async (
     params?: PaginationParams
-  ): Promise<
-    Result<PagedResult<ApiLoginResponseDto>>
-  > => {
+  ): Promise<Result<PagedResult<ApiLoginResponseDto>>> => {
     const { data } = await apiService.get<
       Result<PagedResult<ApiLoginResponseDto>>
     >("/user", {
@@ -42,6 +33,12 @@ const userApi = {
       `/user/${userId}`,
       payload
     )
+    return data
+  },
+
+  getHods: async (): Promise<Result<HodDto[]>> => {
+    const { data } =
+      await apiService.get<Result<HodDto[]>>("/user/hods")
     return data
   },
 }

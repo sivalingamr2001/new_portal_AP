@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronRight, Folder, LayoutDashboard } from 'lucide-react';
+import { ChevronRight, Database, Folder } from 'lucide-react';
 
 export interface FolderNode {
   id: string;
@@ -20,7 +20,7 @@ interface FolderNavigatorProps {
   initialPath?: string;
 }
 
-function sanitizeUNCPath(rawPath: string): string {
+function sanitizeUNCPath(rawPath?: string): string {
   if (!rawPath) return '';
   let sanitized = rawPath.replace(/\//g, '\\');
   sanitized = sanitized.replace(/\s*\\\s*/g, '\\');
@@ -58,14 +58,14 @@ export function FolderNavigator({
       currentMatchFound = false;
       for (const node of searchLevel) {
         const sanitizedNodePath = sanitizeUNCPath(node.path).toLowerCase();
-
+        
         // Exact match found: add to stack and terminate traversal loop
         if (sanitizedInitial === sanitizedNodePath) {
           reconstructedStack.push(node);
           searchLevel = [];
           currentMatchFound = true;
           break;
-        }
+        } 
         // Parent node match found: add to stack and step down into children branches
         else if (sanitizedInitial.startsWith(sanitizedNodePath + '\\')) {
           reconstructedStack.push(node);
@@ -79,7 +79,7 @@ export function FolderNavigator({
     if (reconstructedStack.length > 0) {
       setPathStack(reconstructedStack);
       const lastNode = reconstructedStack[reconstructedStack.length - 1];
-
+      
       if (
         lastNode.children &&
         lastNode.children.length > 0 &&
@@ -98,6 +98,7 @@ export function FolderNavigator({
   const handleFolderSelect = (folder: FolderNode) => {
     const newStack = [...pathStack, folder];
     setPathStack(newStack);
+    onPathSelect(sanitizeUNCPath(folder.path));
 
     if (
       folder.children &&
@@ -105,13 +106,10 @@ export function FolderNavigator({
       newStack.length < maxDepth
     ) {
       setCurrentLevel(folder.children);
-      setSearchTerm('');
-      return;
+    } else {
+      setCurrentLevel([]);
     }
-
-    setCurrentLevel([]);
     setSearchTerm('');
-    onPathSelect(sanitizeUNCPath(folder.path));
   };
 
   const handleGoBack = () => {
@@ -139,15 +137,16 @@ export function FolderNavigator({
     setSearchTerm('');
   };
 
-  const filteredFolders = currentLevel.filter(
-    (folder) =>
-      folder.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      folder.driveName.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const normalizedSearch = searchTerm?.toLowerCase() ?? ''
+  const filteredFolders = currentLevel.filter((folder) => {
+    const folderName = folder.name?.toLowerCase() ?? ''
+    const driveName = folder.driveName?.toLowerCase() ?? ''
+    return folderName.includes(normalizedSearch) || driveName.includes(normalizedSearch)
+  })
 
   const currentSelection = pathStack[pathStack.length - 1];
   const breadcrumbDrivePrefix = sanitizeUNCPath(
-    currentSelection?.driveName || '',
+    currentSelection?.driveName ?? '',
   );
   const remainingFoldersPath = pathStack.map((f) => f.name).join(' \\ ');
 
@@ -161,7 +160,7 @@ export function FolderNavigator({
         <span className="shrink-0">Folder Path:</span>
         {pathStack.length > 0 ? (
           <div className="flex w-full items-start gap-1.5 rounded bg-secondary/30 p-2 text-foreground">
-            <LayoutDashboard className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+            <Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
             <span className="whitespace-normal break-all font-mono text-xs font-medium leading-relaxed text-primary">
               {fullBreadcrumbDisplay}
             </span>
@@ -198,13 +197,15 @@ export function FolderNavigator({
             {searchTerm ? 'No matches found' : 'No folder listings available'}
           </div>
         ) : (
-          filteredFolders.map((folder) => {
+          filteredFolders.map((folder, index) => {
             const isAtRootLevel = pathStack.length === 0;
-            const sanitizedDriveLabel = sanitizeUNCPath(folder.driveName);
+            const sanitizedDriveLabel = sanitizeUNCPath(folder.driveName ?? '');
+            const folderKey =
+              folder.id || `${folder.driveName ?? 'unknown'}\\${folder.name ?? 'unknown'}-${index}`;
 
             return (
               <Button
-                key={folder.id}
+                key={folderKey}
                 type="button"
                 variant="ghost"
                 size="sm"
@@ -215,7 +216,7 @@ export function FolderNavigator({
                 }
               >
                 {isAtRootLevel ? (
-                  <LayoutDashboard className="mr-2 h-3.5 w-3.5 shrink-0 transition-transform text-emerald-500 group-hover/item:scale-105" />
+                  <Database className="mr-2 h-3.5 w-3.5 shrink-0 transition-transform text-emerald-500 group-hover/item:scale-105" />
                 ) : (
                   <Folder className="mr-2 h-3.5 w-3.5 shrink-0 transition-transform text-primary group-hover/item:scale-105" />
                 )}

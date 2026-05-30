@@ -25,7 +25,6 @@ export function EmployeeSection({
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Employee ID">
           <Input
-            type="number"
             value={userId || ""}
             onChange={(event) => onUserIdChange?.(Number(event.target.value))}
           />
