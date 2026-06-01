@@ -1,0 +1,107 @@
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import type { ReactNode } from "react"
+
+export type UserSectionValue = {
+  userId: number
+  employeeId: string
+  name: string
+  email?: string | null
+  departmentName?: string | null
+  hodName?: string | null
+  itsrNumber?: string | null
+}
+
+type UserSectionProps = {
+  value: UserSectionValue
+  onChange: (
+    field: keyof UserSectionValue,
+    value: string | number
+  ) => void
+}
+
+export function UserSection({
+  value,
+  onChange,
+}: UserSectionProps) {
+  return (
+    <section className="space-y-4 rounded-md border border-border bg-card p-4">
+      <h3 className="text-sm font-semibold">
+        Employee Information
+      </h3>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Field label="Employee ID">
+          <Input
+            value={value.employeeId}
+            onChange={(e) =>
+              onChange(
+                "employeeId",
+                e.target.value
+              )
+            }
+            placeholder="Enter employee id"
+          />
+        </Field>
+
+        <Field label="Email">
+          <Input
+            value={value.email ?? ""}
+            onChange={(e) =>
+              onChange(
+                "email",
+                e.target.value
+              )
+            }
+            placeholder="Enter email"
+          />
+        </Field>
+
+        <Field label="Employee Name">
+          <Input
+            readOnly
+            value={value.name}
+          />
+        </Field>
+
+        <Field label="Department">
+          <Input
+            readOnly
+            value={value.departmentName ?? ""}
+          />
+        </Field>
+
+        <Field label="Department HOD">
+          <Input
+            readOnly
+            value={value.hodName ?? ""}
+          />
+        </Field>
+
+        <Field label="ITSR Number">
+          <Input
+            readOnly
+            value={value.itsrNumber ?? ""}
+          />
+        </Field>
+      </div>
+    </section>
+  )
+}
+
+function Field({
+  children,
+  label,
+}: {
+  children: ReactNode
+  label: string
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold text-muted-foreground">
+        {label}
+      </Label>
+      {children}
+    </div>
+  )
+}

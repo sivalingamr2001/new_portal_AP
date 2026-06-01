@@ -20,75 +20,181 @@ public class UserController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<Result<PagedResult<LoginResponseDto>>>> GetAll(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
     {
-        if (page < 1 || pageSize < 1 || pageSize > 100)
-            return BadRequest(Result.Failure(new Error("InvalidPagination", "Invalid pagination parameters")));
-
-        var totalCount = await _db.Users.CountAsync();
-        var skip = (page - 1) * pageSize;
-
-        var users = await _db.Users
-            .OrderBy(u => u.UserId)
-            .Skip(skip)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var userIds = users.Select(u => u.UserId).ToList();
-
-        var cmplUsers = await _db.CmplUsers
-            .Where(c => userIds.Contains(c.CmplUserId))
-            .ToDictionaryAsync(c => c.CmplUserId);
-
-        var deptIds = cmplUsers.Values
-            .Where(c => c.DeptId != null && c.DeptId != 0)
-            .Select(c => c.DeptId!.Value)
-            .Distinct()
-            .ToList();
-
-        var departments = await _db.Departments
-            .Where(d => deptIds.Contains(d.DeptId))
-            .ToDictionaryAsync(d => d.DeptId);
-
-        var hodIds = departments.Values
-            .Where(d => d.HodId != null && d.HodId != 0)
-            .Select(d => d.HodId!.Value)
-            .Distinct()
-            .ToList();
-
-        var hods = await _db.HodMasters
-            .Where(h => hodIds.Contains(h.IdRow))
-            .ToDictionaryAsync(h => h.IdRow);
-
-        var response = users
-            .Select(user => BuildUserResponse(user, cmplUsers, departments, hods))
-            .ToList();
-
-        return Ok(Result.Success(new PagedResult<LoginResponseDto>(response, totalCount, page, pageSize)));
-    }
-
-    [HttpGet("{userId:int}")]
-    public async Task<ActionResult<Result<LoginResponseDto>>> GetById(int userId)
-    {
-        var user = await _db.Users.FindAsync(userId);
-
-        if (user is null)
-            return NotFound(Result.Failure<LoginResponseDto>(new Error("204", "User not found")));
-
-        var cmplUser = await _db.CmplUsers.FindAsync(userId);
-        Department? department = null;
-        HodMaster? hod = null;
-
-        if (cmplUser?.DeptId is > 0)
+        if (page < 1 || pageSize < 1)
         {
-            department = await _db.Departments.FindAsync(cmplUser.DeptId.Value);
-
-            if (department?.HodId is > 0)
-                hod = await _db.HodMasters.FindAsync(department.HodId.Value);
+            return BadRequest(
+                Result.Failure(
+                    new Error("400", "Invalid pagination parameters")));
         }
 
-        var response = BuildUserResponse(user, cmplUser, department, hod);
+        var totalCount = await _db.Users.CountAsync();
+
+        var users = await (
+            from u in _db.Users
+
+            join cu in _db.CmplUsers
+                on u.UserId equals cu.CmplUserId into cuGroup
+            from cu in cuGroup.DefaultIfEmpty()
+
+            join d in _db.Departments
+                on cu.DeptId equals d.DeptId into deptGroup
+            from d in deptGroup.DefaultIfEmpty()
+
+            join h in _db.HodMasters
+                on d.HodId equals h.IdRow into hodGroup
+            from h in hodGroup.DefaultIfEmpty()
+
+            orderby u.UserId
+
+            select new LoginResponseDto
+            {
+                CmplUser = new CmplUserDto(
+                    cu != null ? cu.CmplUserId : u.UserId,
+                    cu != null ? cu.CmplUserName : "",
+                    cu != null ? cu.EmpId : null,
+                    cu != null ? cu.MailId : null,
+                    cu != null ? cu.MobNo : null,
+                    cu != null ? cu.DeptId : null
+                ),
+
+                User = new UserDto(
+                    u.UserId,
+                    u.Role,
+                    u.Location
+                ),
+
+                Department = d == null
+                    ? null
+                    : new DepartmentDto(
+                        d.DeptId,
+                        d.DeptName
+                    ),
+
+                Hod = h == null
+                    ? null
+                    : new HodDto(
+                        h.IdRow,
+                        h.HodName,
+                        h.Id,
+                        h.EmailId,
+                        h.MobNo
+                    )
+            }
+        )
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .ToListAsync();
+
+        return Ok(
+            Result.Success(
+                new PagedResult<LoginResponseDto>(
+                    users,
+                    totalCount,
+                    page,
+                    pageSize)));
+    }
+
+    [HttpGet("search")]
+    public async Task<ActionResult<Result<LoginResponseDto>>> GetUser(
+    [FromQuery] int? userId,
+    [FromQuery] string? employeeId,
+    [FromQuery] string? emailId)
+    {
+        var query =
+            from u in _db.Users
+
+            join cu in _db.CmplUsers
+                on u.UserId equals cu.CmplUserId into cuGroup
+            from cu in cuGroup.DefaultIfEmpty()
+
+            join d in _db.Departments
+                on cu.DeptId equals d.DeptId into deptGroup
+            from d in deptGroup.DefaultIfEmpty()
+
+            join h in _db.HodMasters
+                on d.HodId equals h.IdRow into hodGroup
+            from h in hodGroup.DefaultIfEmpty()
+
+            select new
+            {
+                User = u,
+                CmplUser = cu,
+                Department = d,
+                Hod = h
+            };
+
+        if (userId.HasValue)
+        {
+            query = query.Where(x =>
+                x.User.UserId == userId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(employeeId))
+        {
+            query = query.Where(x =>
+                x.CmplUser != null &&
+                x.CmplUser.EmpId == employeeId);
+        }
+        else if (!string.IsNullOrWhiteSpace(emailId))
+        {
+            query = query.Where(x =>
+                x.CmplUser != null &&
+                x.CmplUser.MailId == emailId);
+        }
+        else
+        {
+            return BadRequest(
+                Result.Failure<LoginResponseDto>(
+                    new Error("400",
+                        "Provide userId, employeeId, or emailId")));
+        }
+
+        var result = await query.FirstOrDefaultAsync();
+
+        if (result == null)
+        {
+            return NotFound(
+                Result.Failure<LoginResponseDto>(
+                    new Error("404", "User not found")));
+        }
+
+        var response = new LoginResponseDto
+        {
+            CmplUser = new CmplUserDto(
+                result.CmplUser?.CmplUserId ?? result.User.UserId,
+                result.CmplUser?.CmplUserName ?? "",
+                result.CmplUser?.EmpId,
+                result.CmplUser?.MailId,
+                result.CmplUser?.MobNo,
+                result.CmplUser?.DeptId
+            ),
+
+            User = new UserDto(
+                result.User.UserId,
+                result.User.Role,
+                result.User.Location
+            ),
+
+            Department = result.Department == null
+                ? null
+                : new DepartmentDto(
+                    result.Department.DeptId,
+                    result.Department.DeptName
+                ),
+
+            Hod = result.Hod == null
+                ? null
+                : new HodDto(
+                    result.Hod.IdRow,
+                    result.Hod.HodName,
+                    result.Hod.Id,
+                    result.Hod.EmailId,
+                    result.Hod.MobNo
+                )
+        };
+
         return Ok(Result.Success(response));
     }
 

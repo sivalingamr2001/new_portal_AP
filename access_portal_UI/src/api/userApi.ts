@@ -21,10 +21,23 @@ const userApi = {
     return data
   },
 
-  getById: async (userId: number): Promise<Result<ApiLoginResponseDto>> => {
-    const { data } = await apiService.get<Result<ApiLoginResponseDto>>(
-      `/user/${userId}`
-    )
+  getById: async (
+    userId?: number,
+    employeeId?: string,
+    email?: string
+  ): Promise<Result<ApiLoginResponseDto>> => {
+    const { data } =
+      await apiService.get<Result<ApiLoginResponseDto>>(
+        "/User/search",
+        {
+          params: {
+            userId,
+            employeeId,
+            email,
+          },
+        }
+      )
+
     return data
   },
 

@@ -10,6 +10,7 @@ import type { DataGridProps } from "./types"
 import { Loader } from "../Loader"
 
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community"
+import { useTheme } from "@/context/theme-provider"
 ModuleRegistry.registerModules([AllCommunityModule])
 
 const BASE_COL_DEF: ColDef = {
@@ -37,7 +38,6 @@ export function DataGrid<TData extends object>(
     onRowClicked,
     onClearFilters: onClearFiltersCallback,
     compact = false,
-    theme = "system",
     defaultColDef: defaultColDefProp,
     customActions,
     detailSections,
@@ -46,6 +46,7 @@ export function DataGrid<TData extends object>(
     virtualScroll,
   } = props
 
+  const {theme} = useTheme()
   const { gridApiRef, state, handlers } = useDataGrid(props)
   const { setGridApi: setVirtualScrollGridApi, state: virtualScrollState } =
     useVirtualScroll({

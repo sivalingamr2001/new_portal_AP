@@ -9,6 +9,9 @@ export const RootRedirect = lazy(() =>
 )
 
 // User Group
+export const MyRequestsPage = lazy(() =>
+  import("@/pages/MyRequests").then((m) => ({ default: m.MyRequests }))
+)
 
 // Operator Group
 export const DashboardPage = lazy(() =>

@@ -18,14 +18,14 @@ export const GridToolbar = memo(
     gridApi,
   }: GridToolbarProps) => {
     return (
-      <div className="flex flex-col gap-4 bg-white pb-2">
+      <div className="flex flex-col gap-4 pb-2">
         {/* Top Row: Title and Description */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl leading-6 font-semibold text-slate-900">
+          <h1 className="text-2xl leading-6 font-semibold ">
             {title}
           </h1>
           {description && (
-            <span className="text-xs text-slate-500">{description}</span>
+            <span className="text-xs">{description}</span>
           )}
         </div>
 
@@ -38,7 +38,7 @@ export const GridToolbar = memo(
                 type="text"
                 value={state.quickFilter}
                 placeholder="Quick search..."
-                className="h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:outline-none"
+                className="h-9 w-full rounded-md border px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-slate-400 focus-visible:ring-1 focus-visible:ring-slate-400 focus-visible:outline-none"
                 onChange={(e) =>
                   onQuickFilterChange(
                     e.target.value
@@ -65,7 +65,8 @@ export const GridToolbar = memo(
                 key={idx}
                 variant={action.variant || "default"}
                 onClick={() => action.onClick(gridApi)}
-                className="h-9 px-3 text-sm font-medium"
+                size="sm"
+                className="rounded-[6px]"
               >
                 {action.icon && (
                   <span className="mr-1.5 flex items-center">
@@ -78,7 +79,7 @@ export const GridToolbar = memo(
 
             {showRefresh && (
               <Button
-                variant="default"
+                variant="outline"
                 onClick={onRefresh}
                 disabled={state.isRefreshing}
                 size="sm"
