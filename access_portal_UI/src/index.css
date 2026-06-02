@@ -138,3 +138,43 @@
     @apply font-sans;
   }
 }
+
+@layer base {
+  /* 1. Standard approach for Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  /* Show color on hover for Firefox */
+  *:hover {
+    scrollbar-color: theme("colors.border") transparent;
+  }
+
+  /* 2. Webkit Browsers (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent; /* Auto-hide effect */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: transparent; /* Hidden by default */
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+
+  /* Only show the thumb when hovering over the scrollable container */
+  *:hover::-webkit-scrollbar-thumb {
+    background: theme("colors.muted-foreground / 30%");
+  }
+
+  /* Make thumb darker when hovering directly over the scrollbar */
+  ::-webkit-scrollbar-thumb:hover {
+    background: theme("colors.muted-foreground / 50%") !important;
+  }
+}

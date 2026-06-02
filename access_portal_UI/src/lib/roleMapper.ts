@@ -12,8 +12,8 @@ export const roleStringToNumeric = (
 
   const roleMap: Record<string, number> = {
     Admin: UserRole.Admin,
-    It: UserRole.It,
-    Operator: UserRole.It,
+    ADMIN: UserRole.Admin,
+    Operator: UserRole.Operator,
     Hod: UserRole.Hod,
     HOD: UserRole.Hod,
     User: UserRole.User,
@@ -28,7 +28,7 @@ export const roleStringToNumeric = (
 export const numericToRoleString = (roleNumber: number): string => {
   const reverseMap: Record<number, string> = {
     [UserRole.Admin]: "Admin",
-    [UserRole.It]: "Operator",
+    [UserRole.Operator]: "Operator",
     [UserRole.Hod]: "HOD",
     [UserRole.User]: "User",
   }

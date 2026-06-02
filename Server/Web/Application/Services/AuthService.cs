@@ -41,14 +41,7 @@ public sealed class AuthService : IAuthService
 
         CmplUser? cmpl = null;
 
-        // Demo login via employee ID + fixed password
-        if (
-            demoEmployeeIds.Contains(
-                identifier,
-                StringComparer.OrdinalIgnoreCase
-            )
-            && password == "password"
-        )
+        if (demoEmployeeIds.Contains(identifier, StringComparer.OrdinalIgnoreCase) && password == "password")
         {
             cmpl = await _db.CmplUsers
                 .FirstOrDefaultAsync(c =>
@@ -59,7 +52,6 @@ public sealed class AuthService : IAuthService
         }
         else
         {
-            // Existing login logic remains unchanged
             cmpl = await _db.CmplUsers
                 .FirstOrDefaultAsync(c =>
                     c.CmplUserName.ToLower() ==

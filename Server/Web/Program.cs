@@ -6,30 +6,45 @@ using Web.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Define CORS Policy Name
 const string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 
-// Services
 builder.Services.AddControllers();
 
-// 2. Configure CORS service
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: MyAllowSpecificOrigins,
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173") // No trailing slash here
+            policy.WithOrigins("http://localhost:5173")
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials(); // Allows cookies/auth headers if needed
+                  .AllowCredentials();
         });
 });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
+
+// 🛠️ FIX: MySQL Connection block with proper ServerVersion auto-detection
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=app.db"));
+{
+    var provider = dbProvider?.Trim();
+
+    if (!string.IsNullOrEmpty(provider) && provider.Equals("MySQL", StringComparison.OrdinalIgnoreCase))
+    {
+        var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+
+        // Pomelo MySQL requires specifying the Server Version parameter
+        options.UseMySql(conn, ServerVersion.AutoDetect(conn));
+    }
+    else
+    {
+        var conn = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
+        options.UseSqlite(conn);
+    }
+});
 
 builder.Services.AddSingleton<FolderService>();
 
@@ -46,7 +61,6 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
-// Ensure DB exists
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -58,14 +72,13 @@ using (var scope = app.Services.CreateScope())
     await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
 }
 
-// Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Web API v1");
-        c.RoutePrefix = string.Empty;
+        c.RoutePrefix = "swagger";
     });
 }
 
@@ -73,7 +86,6 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseHttpsRedirection();
 
-// 3. Enable CORS middleware (Must be placed before MapControllers)
 app.UseCors(MyAllowSpecificOrigins);
 
 app.MapControllers();

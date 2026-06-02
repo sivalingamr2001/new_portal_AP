@@ -9,4 +9,3 @@ public sealed class CmplUser
     public string? MobNo { get; set; }
     public int? DeptId { get; set; } = 0;
 }
-

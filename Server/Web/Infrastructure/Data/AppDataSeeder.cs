@@ -10,6 +10,8 @@ public static class AppDataSeeder
         IWebHostEnvironment env,
         ILogger? logger = null)
     {
+        await db.Database.EnsureDeletedAsync();
+
         await db.Database.EnsureCreatedAsync();
 
         if (await db.CmplUsers.AnyAsync() || await db.HodMasters.AnyAsync())
@@ -55,44 +57,85 @@ public static class AppDataSeeder
     {
         var lines = await File.ReadAllLinesAsync(csvPath);
 
-        if (lines.Length <= 1)
-            return;
-
-        for (var i = 1; i < lines.Length; i++)
+        // 1. Process existing CSV records
+        if (lines.Length > 1)
         {
-            var parts = ParseCsvLine(lines[i]);
-
-            if (parts.Count == 0)
-                continue;
-
-            int.TryParse(parts.ElementAtOrDefault(0), out var id);
-
-            if (id == 0)
-                continue;
-
-            int? deptId = null;
-            if (int.TryParse(parts.ElementAtOrDefault(10), out var parsedDeptId))
-                deptId = parsedDeptId;
-
-            db.CmplUsers.Add(new CmplUser
+            for (var i = 1; i < lines.Length; i++)
             {
-                CmplUserId = id,
-                CmplUserName = parts.ElementAtOrDefault(1) ?? string.Empty,
-                EmpId = NormalizeValue(parts.ElementAtOrDefault(27)),
-                MailId = NormalizeValue(parts.ElementAtOrDefault(9)),
-                MobNo = NormalizeValue(parts.ElementAtOrDefault(8)),
-                DeptId = deptId
-            });
+                var parts = ParseCsvLine(lines[i]);
 
-            if (await db.Users.FindAsync(id) != null)
-                continue;
+                if (parts.Count == 0)
+                    continue;
 
-            db.Users.Add(new User
+                int.TryParse(parts.ElementAtOrDefault(0), out var id);
+
+                if (id == 0)
+                    continue;
+
+                // Skip if the CSV contains IDs that conflict with our target demo IDs (1, 2, 5, 6)
+                if (id == 1 || id == 2 || id == 5 || id == 6)
+                    continue;
+
+                int? deptId = null;
+                if (int.TryParse(parts.ElementAtOrDefault(10), out var parsedDeptId))
+                    deptId = parsedDeptId;
+
+                db.CmplUsers.Add(new CmplUser
+                {
+                    CmplUserId = id,
+                    CmplUserName = parts.ElementAtOrDefault(1) ?? string.Empty,
+                    EmpId = NormalizeValue(parts.ElementAtOrDefault(27)),
+                    MailId = NormalizeValue(parts.ElementAtOrDefault(9)),
+                    MobNo = NormalizeValue(parts.ElementAtOrDefault(8)),
+                    DeptId = deptId
+                });
+
+                if (await db.Users.FindAsync(id) != null)
+                    continue;
+
+                db.Users.Add(new User
+                {
+                    UserId = id,
+                    Role = "User",
+                    Location = "Default"
+                });
+            }
+        }
+
+        // 2. Explicitly inject your 4 demo records with unique roles
+        var demoUsers = new[]
+        {
+        new { Id = 1, EmpId = "E001", Name = "Demo Admin", Role = "ADMIN" },
+        new { Id = 2, EmpId = "E002", Name = "Demo Operator", Role = "Operator" },
+        new { Id = 5, EmpId = "E003", Name = "Demo HOD", Role = "HOd" },
+        new { Id = 6, EmpId = "E004", Name = "Demo User", Role = "User" }
+    };
+
+        foreach (var demo in demoUsers)
+        {
+            // Prevent duplicate keys if seeder runs multiple times
+            if (await db.CmplUsers.FindAsync(demo.Id) == null)
             {
-                UserId = id,
-                Role = "User",
-                Location = "Default"
-            });
+                db.CmplUsers.Add(new CmplUser
+                {
+                    CmplUserId = demo.Id,
+                    CmplUserName = demo.Name,
+                    EmpId = demo.EmpId,
+                    MailId = $"{demo.EmpId.ToLower()}@demo.com",
+                    MobNo = "0000000000",
+                    DeptId = 1 // Ensure this matches a valid department ID if needed
+                });
+            }
+
+            if (await db.Users.FindAsync(demo.Id) == null)
+            {
+                db.Users.Add(new User
+                {
+                    UserId = demo.Id,
+                    Role = demo.Role, // Assigns the unique role here
+                    Location = "Default"
+                });
+            }
         }
 
         await db.SaveChangesAsync();
@@ -102,28 +145,48 @@ public static class AppDataSeeder
     {
         var lines = await File.ReadAllLinesAsync(csvPath);
 
-        if (lines.Length <= 1)
-            return;
-
-        for (var i = 1; i < lines.Length; i++)
+        // 1. Process existing CSV records
+        if (lines.Length > 1)
         {
-            var parts = ParseCsvLine(lines[i]);
+            for (var i = 1; i < lines.Length; i++)
+            {
+                var parts = ParseCsvLine(lines[i]);
 
-            if (parts.Count == 0)
-                continue;
+                if (parts.Count == 0)
+                    continue;
 
-            int.TryParse(parts.ElementAtOrDefault(8), out var idRow);
+                int.TryParse(parts.ElementAtOrDefault(8), out var idRow);
 
-            if (idRow == 0)
-                continue;
+                if (idRow == 0)
+                    continue;
 
+                // Skip if the CSV contains an ID that conflicts with our target demo HOD ID (100)
+                if (idRow == 100)
+                    continue;
+
+                db.HodMasters.Add(new HodMaster
+                {
+                    IdRow = idRow,
+                    HodName = parts.ElementAtOrDefault(0) ?? string.Empty,
+                    Id = NormalizeValue(parts.ElementAtOrDefault(4)),
+                    EmailId = NormalizeValue(parts.ElementAtOrDefault(6)),
+                    MobNo = NormalizeValue(parts.ElementAtOrDefault(7))
+                });
+            }
+        }
+
+        // 2. Explicitly inject your demo HOD record
+        const int demoHodIdRow = 175;
+
+        if (await db.HodMasters.FindAsync(demoHodIdRow) == null)
+        {
             db.HodMasters.Add(new HodMaster
             {
-                IdRow = idRow,
-                HodName = parts.ElementAtOrDefault(0) ?? string.Empty,
-                Id = NormalizeValue(parts.ElementAtOrDefault(4)),
-                EmailId = NormalizeValue(parts.ElementAtOrDefault(6)),
-                MobNo = NormalizeValue(parts.ElementAtOrDefault(7))
+                IdRow = demoHodIdRow,
+                HodName = "Demo HOD User",
+                Id = "E003",
+                EmailId = "e003@demo.com",
+                MobNo = "0000000000"
             });
         }
 

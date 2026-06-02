@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext"
 import { useLoader } from "@/hooks/useLoader"
 import { useEffect, useState } from "react"
 
-export const MyRequests = () => {
+export const MyRequestsPage = () => {
     const [requests, setRequests] = useState([])
     const { loading, withLoader } = useLoader()
     const { currentUser } = useAuth()
