@@ -5,7 +5,12 @@ namespace Web.Domain.Entities;
 [Table("jan_departments")]
 public sealed class Department
 {
-    public int DeptId { get; set; }
-    public string? DeptName { get; set; } = string.Empty;
+    [Column("DeptId")]
+    public int Id { get; set; }
+
+    [Column("DeptName")]
+    public string? Name { get; set; } = string.Empty;
+
+    [Column("HodId")]
     public string? HodId { get; set; } = string.Empty;
 }

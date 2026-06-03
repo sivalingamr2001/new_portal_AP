@@ -1,14 +1,23 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Web.Domain.Entities;
 
 public sealed class HodMaster
 {
     [Key]
-    public int IdRow { get; set; } //User_id
-    public string HodName { get; set; } = string.Empty;
-    public string? Id { get; set; } //emp_id
-    public string? EmailId { get; set; }
-    public string? MobNo { get; set; }
-}
+    [Column("IdRow")]
+    public int UserId { get; set; }
 
+    [Column("HodName")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("Id")]
+    public string? EmployeeId { get; set; }
+
+    [Column("EmailId")]
+    public string? Email { get; set; }
+
+    [Column("MobNo")]
+    public string? MobileNumber { get; set; }
+}

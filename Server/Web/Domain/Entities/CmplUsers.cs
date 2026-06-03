@@ -1,11 +1,24 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Web.Domain.Entities;
 
 public sealed class CmplUser
 {
-    public int CmplUserId { get; set; }
-    public string CmplUserName { get; set; } = string.Empty;
-    public string? EmpId { get; set; }
-    public string? MailId { get; set; }
-    public string? MobNo { get; set; }
-    public int? DeptId { get; set; } = 0;
+    [Column("CmplUserId")]
+    public int Id { get; set; }
+
+    [Column("CmplUserName")]
+    public string Name { get; set; } = string.Empty;
+
+    [Column("EmpId")]
+    public string? EmployeeId { get; set; }
+
+    [Column("MailId")]
+    public string? Email { get; set; }
+
+    [Column("MobNo")]
+    public string? MobileNumber { get; set; }
+
+    [Column("DeptId")]
+    public int? DepartmentId { get; set; } = 0;
 }
