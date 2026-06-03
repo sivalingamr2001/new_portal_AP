@@ -36,14 +36,19 @@ public class DepartmentController : ControllerBase
             .ToListAsync();
 
         var hodIds = departments
-            .Where(d => d.HodId != null && d.HodId != 0)
-            .Select(d => d.HodId!.Value)
-            .Distinct()
+            .Where(d => !string.IsNullOrWhiteSpace(d.HodId))
+            .Select(d => d.HodId!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var hods = await _db.HodMasters
-            .Where(h => hodIds.Contains(h.IdRow))
-            .ToDictionaryAsync(h => h.IdRow);
+            .ToListAsync();
+
+        var hodLookup = hods
+            .Where(h => hodIds.Contains(h.Id ?? string.Empty) || hodIds.Contains(h.IdRow.ToString()))
+            .GroupBy(h => h.Id ?? h.IdRow.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .ToDictionary(h => h.Id ?? h.IdRow.ToString(), StringComparer.OrdinalIgnoreCase);
 
         var deptIds = departments.Select(d => d.DeptId).ToList();
 
@@ -65,7 +70,7 @@ public class DepartmentController : ControllerBase
                     .ToList());
 
         var response = departments
-            .Select(department => BuildDepartmentResponse(department, hods, usersByDepartment))
+            .Select(department => BuildDepartmentResponse(department, hodLookup, usersByDepartment))
             .ToList();
 
         return Ok(Result.Success(new PagedResult<DepartmentResponseDto>(response, totalCount, page, pageSize)));
@@ -80,8 +85,12 @@ public class DepartmentController : ControllerBase
             return NotFound(Result.Failure<DepartmentResponseDto>(new Error("NotFound", "Department not found")));
 
         HodMaster? hod = null;
-        if (department.HodId is > 0)
-            hod = await _db.HodMasters.FindAsync(department.HodId.Value);
+
+        if (!string.IsNullOrWhiteSpace(department.HodId))
+        {
+            hod = await _db.HodMasters
+                .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
+        }
 
         var users = await _db.CmplUsers
             .Where(c => c.DeptId == deptId)
@@ -118,8 +127,9 @@ public class DepartmentController : ControllerBase
         await _db.SaveChangesAsync();
 
         HodMaster? hod = null;
-        if (dept.HodId is > 0)
-            hod = await _db.HodMasters.FindAsync(dept.HodId.Value);
+        if (!string.IsNullOrWhiteSpace(dept.HodId))
+            hod = await _db.HodMasters
+                .FirstOrDefaultAsync(h => h.Id == dept.HodId || h.IdRow.ToString() == dept.HodId);
 
         var users = await _db.CmplUsers
             .Where(c => c.DeptId == deptId)
@@ -139,12 +149,12 @@ public class DepartmentController : ControllerBase
 
     private static DepartmentResponseDto BuildDepartmentResponse(
         Department department,
-        IReadOnlyDictionary<int, HodMaster> hods,
+        IReadOnlyDictionary<string, HodMaster> hods,
         IReadOnlyDictionary<int, IReadOnlyList<CmplUserDto>> usersByDepartment)
     {
         HodMaster? hod = null;
-        if (department.HodId is > 0)
-            hods.TryGetValue(department.HodId.Value, out hod);
+        if (!string.IsNullOrWhiteSpace(department.HodId))
+            hods.TryGetValue(department.HodId, out hod);
 
         usersByDepartment.TryGetValue(department.DeptId, out var users);
         return BuildDepartmentResponse(department, hod, users ?? Array.Empty<CmplUserDto>());
@@ -156,11 +166,11 @@ public class DepartmentController : ControllerBase
         IReadOnlyList<CmplUserDto> users)
     {
         return new DepartmentResponseDto(
-            new DepartmentDto(department.DeptId, department.DeptName),
+            new DepartmentDto(department.DeptId, department.DeptName, department.HodId ?? string.Empty),
             hod is null ? null : new HodDto(hod.IdRow, hod.HodName, hod.Id, hod.EmailId, hod.MobNo),
             users
         );
     }
 
-    public sealed record UpdateDepartmentRequest(string? DeptName, int? HodId);
+    public sealed record UpdateDepartmentRequest(string? DeptName, string? HodId);
 }

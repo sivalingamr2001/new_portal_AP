@@ -11,8 +11,43 @@ import useSessionStorage from "@/hooks/useSessionStorage"
 
 const STORAGE_KEY = "jan_AP_user"
 
+type cmplUser = {
+  cmplUserId: number
+  cmplUserName: string
+  empId: string
+  mailId: string
+  mobNo: string
+  deptId: number
+}
+
+type user = {
+  role: string
+  location: string
+}
+
+type department = {
+  deptId: number
+  deptName: string
+  hodId: string
+}
+
+type hod = {
+  idRow: number
+  hodName: string
+  id: string
+  emailId: string
+  mobNo: string
+}
+
+type currentUser = {
+  user: user
+  cmplUser: cmplUser
+  department: department
+  hod: hod
+}
+
 type AuthContextType = {
-  currentUser: any | null
+  currentUser: currentUser | null
   currentUserRole: string | null
   isAuthenticated: boolean
   login: (user: any, expireInMinutes?: number) => void

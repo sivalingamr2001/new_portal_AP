@@ -25,11 +25,11 @@ public sealed class AuthService : IAuthService
         string identifier,
         string password)
     {
-        await AppDataSeeder.SeedIfNeededAsync(
-            _db,
-            _env,
-            _logger
-        );
+        //await AppDataSeeder.SeedIfNeededAsync(
+        //    _db,
+        //    _env,
+        //    _logger
+        //);
 
         var demoEmployeeIds = new[]
         {
@@ -87,67 +87,67 @@ public sealed class AuthService : IAuthService
             await _db.SaveChangesAsync();
         }
 
-        DepartmentDto? departmentDto = null;
-        HodDto? hodDto = null;
+        var userDetails = await (
+            from u in _db.Users
+            join cu in _db.CmplUsers
+                on u.UserId equals cu.CmplUserId into cuGroup
+            from cmplUser in cuGroup.DefaultIfEmpty()
 
-        if (
-            cmpl.DeptId != null &&
-            cmpl.DeptId != 0
-        )
-        {
-            var dept = await _db.Departments
-                .FindAsync(cmpl.DeptId.Value);
+            join d in _db.Departments
+                on cmplUser.DeptId equals d.DeptId into deptGroup
+            from department in deptGroup.DefaultIfEmpty()
 
-            if (dept != null)
+            join h in _db.HodMasters
+                on department.HodId equals h.Id into hodGroup
+            from hod in hodGroup.DefaultIfEmpty()
+
+            where u.UserId == user.UserId
+
+            select new
             {
-                departmentDto =
-                    new DepartmentDto(
-                        dept.DeptId,
-                        dept.DeptName
-                    );
-
-                if (
-                    dept.HodId != null &&
-                    dept.HodId != 0
-                )
-                {
-                    var hod =
-                        await _db.HodMasters
-                            .FindAsync(
-                                dept.HodId.Value
-                            );
-
-                    if (hod != null)
-                    {
-                        hodDto = new HodDto(
-                            hod.IdRow,
-                            hod.HodName,
-                            hod.Id,
-                            hod.EmailId,
-                            hod.MobNo
-                        );
-                    }
-                }
+                User = u,
+                CmplUser = cmplUser,
+                Department = department,
+                Hod = hod
             }
-        }
+        ).FirstOrDefaultAsync();
+
+        var resolvedUser = userDetails?.User ?? user;
+        var resolvedCmplUser = userDetails?.CmplUser ?? cmpl;
+        var resolvedDepartment = userDetails?.Department;
+        var resolvedHod = userDetails?.Hod;
 
         return new LoginResponseDto
         {
             CmplUser = new CmplUserDto(
-                cmpl.CmplUserId,
-                cmpl.CmplUserName,
-                cmpl.EmpId,
-                cmpl.MailId,
-                cmpl.MobNo,
-                cmpl.DeptId
+                resolvedCmplUser?.CmplUserId ?? resolvedUser.UserId,
+                resolvedCmplUser?.CmplUserName ?? string.Empty,
+                resolvedCmplUser?.EmpId,
+                resolvedCmplUser?.MailId,
+                resolvedCmplUser?.MobNo,
+                resolvedCmplUser?.DeptId
             ),
             User = new UserDto(
-                user.UserId,
-                user.Role,
-                user.Location
+                resolvedUser.UserId,
+                resolvedUser.Role,
+                resolvedUser.Location
             ),
-            Department = departmentDto,
-            Hod = hodDto
+            Department = resolvedDepartment == null
+                ? null
+                : new DepartmentDto(
+                    resolvedDepartment.DeptId,
+                    resolvedDepartment.DeptName,
+                    resolvedDepartment.HodId ?? string.Empty
+                ),
+            Hod = resolvedHod == null
+                ? null
+                : new HodDto(
+                    resolvedHod.IdRow,
+                    resolvedHod.HodName,
+                    resolvedHod.Id,
+                    resolvedHod.EmailId,
+                    resolvedHod.MobNo
+                )
         };
     }
 }

@@ -13,9 +13,12 @@ import {
 import { useAuth } from "@/context/AuthContext"
 
 import { AgreementCheckbox } from "./AgreementsSection"
-import RequestDetailsSection from "./RequestDetailsSection"
+import AccessDetailsSection, { type RequestItem } from "./AccessDetailsSection"
 import { UserSection, type UserSectionValue } from "./UserSection"
 import userApi from "@/api/userApi"
+import { toast } from "sonner"
+import accessRequestApi from "@/api/accessRequestApi"
+import type { SubmitAccessRequestDto } from "@/api/types"
 
 type CreateRequestModalProps = {
     isOpen: boolean
@@ -27,6 +30,15 @@ export const CreateRequestModal = ({
     onOpenChange,
 }: CreateRequestModalProps) => {
     const { currentUser } = useAuth()
+    const [isLoading, setIsLoading] = useState(false)
+    const [requestItems, setRequestItems] = useState<RequestItem[]>([
+        {
+            id: 1,
+            accessType: "not-applicable",
+            folderPath: "",
+            reason: "",
+        },
+    ])
 
     const handleUserChange = async (
         field: keyof UserSectionValue,
@@ -71,7 +83,7 @@ export const CreateRequestModal = ({
         email: currentUser?.cmplUser?.mailId ?? "",
         itsrNumber: "",
         departmentName: currentUser?.department?.deptName ?? "",
-        hodName: currentUser?.hod?.cmplUserName ?? "",
+        hodName: currentUser?.hod?.hodName ?? "",
         location: currentUser?.user?.location ?? "",
         mobile: currentUser?.cmplUser?.mobNo ?? "",
         agreementAccepted: false,
@@ -87,12 +99,46 @@ export const CreateRequestModal = ({
         }))
     }
 
-    const handleCreate = (e: React.FormEvent) => {
+    const normalizeAccessType = (value: string): 0 | 1 | 2 => {
+        switch (value) {
+            case "read-only":
+                return 1
+            case "read-write":
+                return 2
+            default:
+                return 0
+        }
+    }
+
+    const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault()
+        setIsLoading(true)
 
-        console.log("Creating request:", value)
+        try {
+            const payload: SubmitAccessRequestDto = {
+                userId: value.userId,
+                isAgreed: value.agreementAccepted,
+                itsrNo: value.itsrNumber || null,
+                items: requestItems.map((item) => ({
+                    folderPath: item.folderPath,
+                    accessType: normalizeAccessType(item.accessType),
+                    confirmAccessType: normalizeAccessType(item.confirmAccessType ?? item.accessType),
+                    reason: item.reason,
+                })),
+            }
 
-        onOpenChange(false)
+            const response = await accessRequestApi.submit(payload)
+
+            if (response) {
+                toast.success("Access request submitted successfully!")
+                onOpenChange(false)
+            }
+        } catch (error) {
+            console.error("Submission failed:", error)
+            toast.error("Failed to create request. Please try again.")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -113,7 +159,10 @@ export const CreateRequestModal = ({
                         onChange={handleUserChange}
                     />
 
-                    <RequestDetailsSection />
+                    <AccessDetailsSection
+                        items={requestItems}
+                        onItemsChange={setRequestItems}
+                    />
 
                     <AgreementCheckbox
                         checked={value.agreementAccepted}
@@ -123,10 +172,10 @@ export const CreateRequestModal = ({
                     />
 
                     <DialogFooter>
-                        <Button type="submit" disabled={!value.agreementAccepted}>
-                            Create Request
+                        <Button type="submit" disabled={!value.agreementAccepted || isLoading}>
+                            {isLoading ? "Submitting..." : "Create Request"}
                         </Button>
-                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button variant="outline" type="button" onClick={() => onOpenChange(false)} disabled={isLoading}>
                             Close
                         </Button>
                     </DialogFooter>

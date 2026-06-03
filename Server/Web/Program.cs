@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Server.Shared.Helpers;
+using Web.Application.Common;
 using Web.Application.Interfaces;
 using Web.Application.Services;
 using Web.Infrastructure.Data;
@@ -7,8 +8,12 @@ using Web.Infrastructure.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 const string MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
+var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
+var serverVersion = ServerVersion.AutoDetect(connectionStringCmpl);
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 builder.Services.AddCors(options =>
 {
@@ -27,7 +32,6 @@ builder.Services.AddSwaggerGen();
 
 var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
 
-// 🛠️ FIX: MySQL Connection block with proper ServerVersion auto-detection
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var provider = dbProvider?.Trim();
@@ -36,7 +40,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     {
         var conn = builder.Configuration.GetConnectionString("DefaultConnection");
 
-        // Pomelo MySQL requires specifying the Server Version parameter
         options.UseMySql(conn, ServerVersion.AutoDetect(conn));
     }
     else
@@ -45,6 +48,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(conn);
     }
 });
+
+builder.Services.AddDbContext<CmplDbContext>(options =>
+    options.UseMySql(connectionStringCmpl, serverVersion));
+
+builder.Services.AddDbContext<HodDbContext>(options =>
+    options.UseMySql(connectionStringHod, serverVersion));
 
 builder.Services.AddSingleton<FolderService>();
 
@@ -69,7 +78,7 @@ using (var scope = app.Services.CreateScope())
         .CreateLogger("AppDataSeeder");
 
     await WorkflowSchemaInitializer.EnsureCreatedAsync(db);
-    await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+    //await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
 }
 
 if (app.Environment.IsDevelopment())
@@ -89,5 +98,6 @@ app.UseHttpsRedirection();
 app.UseCors(MyAllowSpecificOrigins);
 
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

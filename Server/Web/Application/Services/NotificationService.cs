@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Web.Application.Common;
 using Web.Application.Interfaces;
 using Web.Domain.Dto;
 using Web.Infrastructure.Data;
@@ -10,15 +12,18 @@ public sealed class NotificationService : INotificationService
     private readonly AppDbContext _db;
     private readonly IAuditService _auditService;
     private readonly IEmailService _emailService;
+    private readonly IHubContext<NotificationHub> _hubContext;
 
     public NotificationService(
         AppDbContext db,
         IAuditService auditService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IHubContext<NotificationHub> hubContext)
     {
         _db = db;
         _auditService = auditService;
         _emailService = emailService;
+        _hubContext = hubContext;
     }
 
     public async Task SendStageNotificationAsync(
@@ -37,7 +42,7 @@ public sealed class NotificationService : INotificationService
             if (user is null || cmplUser is null)
                 continue;
 
-            await _auditService.AddAsync(
+            var audit = await _auditService.AddAsync(
                 accessReqId,
                 accessItemId,
                 null,
@@ -47,6 +52,15 @@ public sealed class NotificationService : INotificationService
                 cmplUser.CmplUserName,
                 user.Role,
                 actorUserId);
+
+            await _hubContext.Clients
+                .Group(NotificationHub.GroupName(recipientUserId))
+                .SendAsync("ReceiveNotification", new AccessNotificationDto(
+                    audit.AuditId,
+                    audit.EventType,
+                    audit.Message,
+                    audit.IsRead,
+                    audit.CreatedAtUtc));
 
             if (!string.IsNullOrWhiteSpace(cmplUser.MailId))
             {

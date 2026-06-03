@@ -46,7 +46,7 @@ public static class AppDataSeeder
             {
                 DeptId = id,
                 DeptName = null,
-                HodId = 0
+                HodId = string.Empty
             });
         }
 
@@ -123,7 +123,7 @@ public static class AppDataSeeder
                     EmpId = demo.EmpId,
                     MailId = $"{demo.EmpId.ToLower()}@demo.com",
                     MobNo = "0000000000",
-                    DeptId = 1 // Ensure this matches a valid department ID if needed
+                    DeptId = 101 // Ensure this matches a valid department ID if needed
                 });
             }
 

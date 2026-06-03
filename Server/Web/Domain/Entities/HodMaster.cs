@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Web.Domain.Entities;
 
 public sealed class HodMaster
 {
+    [Key]
     public int IdRow { get; set; } //User_id
     public string HodName { get; set; } = string.Empty;
     public string? Id { get; set; } //emp_id

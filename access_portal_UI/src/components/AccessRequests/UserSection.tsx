@@ -59,28 +59,26 @@ export function UserSection({
 
         <Field label="Employee Name">
           <Input
-            readOnly
             value={value.name}
           />
         </Field>
 
         <Field label="Department">
           <Input
-            readOnly
+          readOnly
             value={value.departmentName ?? ""}
           />
         </Field>
 
         <Field label="Department HOD">
           <Input
-            readOnly
+          readOnly
             value={value.hodName ?? ""}
           />
         </Field>
 
         <Field label="ITSR Number">
           <Input
-            readOnly
             value={value.itsrNumber ?? ""}
           />
         </Field>

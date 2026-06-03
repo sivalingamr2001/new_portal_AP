@@ -1,16 +1,7 @@
+import accessRequestApi from "@/api/accessRequestApi"
+import type { AccessNotificationDto } from "@/api/types"
+import { NotificationSheet } from "@/components/NotificationSheet"
 import { Button } from "@/components/ui/button"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Bell, LogOut, User } from "lucide-react"
-// 1. Import shadcn Sheet components for notifications
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-// 2. Import shadcn DropdownMenu components for the profile options
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,21 +10,93 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Sheet, SheetTrigger } from "@/components/ui/sheet"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/context/AuthContext"
+import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr"
+import { Bell, LogOut, User } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-const useUserSession = () => {
-  return {
-    name: "John Doe",
-    email: "john.doe@janatics.com",
-  }
-}
-
 export function AppHeader() {
-  const {currentUser, logout} = useAuth()
+  const { currentUser, logout } = useAuth()
   const navigate = useNavigate()
 
-  // Handler logic placeholder for logouts
+  const [notifications, setNotifications] = useState<AccessNotificationDto[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isError, setIsError] = useState<boolean>(false)
+
+  const userId = currentUser?.cmplUser?.userId || 0 
+
+  // 2. Fetch notifications in the parent
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!userId) return
+      try {
+        setIsLoading(true)
+        setIsError(false)
+        const data = await accessRequestApi.getNotifications(userId)
+        setNotifications(data || [])
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error)
+        setIsError(true)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchNotifications()
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const hubUrl = `${import.meta.env.VITE_SIGNALR_URL || "http://localhost:5067"}/hubs/notifications?userId=${userId}`
+    const connection = new HubConnectionBuilder()
+      .withUrl(hubUrl, {
+        withCredentials: true,
+      })
+      .configureLogging(LogLevel.Information)
+      .withAutomaticReconnect()
+      .build()
+
+    connection.on("ReceiveNotification", (notification: AccessNotificationDto) => {
+      setNotifications((prev) => [notification, ...prev])
+      setIsError(false)
+    })
+
+    connection
+      .start()
+      .catch((error) => {
+        console.error("Failed to connect to notifications hub:", error)
+        setIsError(true)
+      })
+
+    return () => {
+      connection.off("ReceiveNotification")
+      connection.stop().catch((error) => {
+        console.error("Failed to stop notifications hub:", error)
+      })
+    }
+  }, [userId])
+
+  const handleMarkAsRead = async (auditId: number) => {
+    try {
+      setNotifications((prev) =>
+        prev.map((n) => (n.auditId === auditId ? { ...n, isRead: true } : n))
+      )
+      await accessRequestApi.markNotificationAsRead(auditId, userId)
+    } catch (error) {
+      console.error("Failed to mark notification as read:", error)
+      setNotifications((prev) =>
+        prev.map((n) => (n.auditId === auditId ? { ...n, isRead: false } : n))
+      )
+    }
+  }
+
+  // 4. Calculate unread count to show/hide the red dot indicator
+  const hasUnread = notifications.some((n) => !n.isRead)
+
   const handleLogout = () => {
     logout()
     navigate("/login")
@@ -43,9 +106,7 @@ export function AppHeader() {
     <header className="flex h-16 w-full shrink-0 items-center justify-between border-b bg-background px-4">
       <div className="flex items-center gap-3">
         <SidebarTrigger className="h-9 w-9" />
-
         <div className="h-5 w-px bg-border" />
-
         <div className="flex items-center gap-3">
           <span className="hidden text-xs font-medium text-muted-foreground sm:inline-block">
             Access Portal
@@ -62,22 +123,20 @@ export function AppHeader() {
               className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
             >
               <Bell className="h-5 w-5" />
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive" />
+              {/* The red circle now conditionally updates based on live array data */}
+              {hasUnread && (
+                <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+              )}
             </Button>
           </SheetTrigger>
-          {/* side="right" ensures it slides in from the right edge */}
-          <SheetContent side="right" className="w-100 sm:w-135">
-            <SheetHeader>
-              <SheetTitle>Notifications</SheetTitle>
-              <SheetDescription>
-                Stay updated with your enterprise automation logs.
-              </SheetDescription>
-            </SheetHeader>
-            {/* Feed Box: Put your live notification elements here */}
-            <div className="mt-6 flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-sm text-muted-foreground">
-              No new notifications at this time.
-            </div>
-          </SheetContent>
+          
+          {/* Pass data down to the child view layer */}
+          <NotificationSheet 
+            notifications={notifications}
+            isLoading={isLoading}
+            isError={isError}
+            onMarkAsRead={handleMarkAsRead}
+          />
         </Sheet>
 
         <div className="h-5 w-px bg-border" />
@@ -85,7 +144,6 @@ export function AppHeader() {
         {/* USER DROPDOWN MENU */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            {/* Button wrapper makes the entire layout block interactively hoverable and clickable */}
             <Button
               variant="ghost"
               className="flex h-auto items-center gap-3 rounded-lg p-1 transition-colors hover:bg-accent/50"
@@ -119,9 +177,12 @@ export function AppHeader() {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem className="cursor-pointer gap-2">
+            <DropdownMenuItem
+              className="cursor-pointer gap-2"
+              onClick={() => navigate("/profile")}
+            >
               <User className="h-4 w-4 text-muted-foreground" />
-              <span>Profile Settings</span>
+              <span>Profile</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

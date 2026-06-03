@@ -28,7 +28,8 @@ public sealed record CmplUserDto(
 
 public sealed record DepartmentDto(
     int DeptId,
-    string? DeptName
+    string? DeptName,
+    string HodId
 );
 
 public sealed record HodDto(

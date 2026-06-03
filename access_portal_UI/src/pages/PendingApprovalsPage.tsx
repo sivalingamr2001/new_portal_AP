@@ -5,14 +5,20 @@ import accessRequestApi from "@/api/accessRequestApi"
 import type { AccessRequestDto } from "@/api/types"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
+import { Button } from "@/components/ui/button"
 
 export const PendingApprovalsPage = () => {
   const location = useLocation()
   const { currentUser } = useAuth()
   const [requests, setRequests] = useState<AccessRequestDto[]>([])
   const { loading, withLoader } = useLoader()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetchRequests()
+  }, [])
 
   const { title } = useMemo(
     () => getTitleFromSidebar(location.pathname),
@@ -20,10 +26,10 @@ export const PendingApprovalsPage = () => {
   )
 
   const fetchRequests = useCallback(async () => {
-    if (!currentUser?.userId) return
+    if (!currentUser?.cmplUser?.cmplUserId) return
     try {
       const result = await withLoader(() =>
-        accessRequestApi.getHodCart(currentUser.userId)
+        accessRequestApi.getHodCart(currentUser.cmplUser.cmplUserId)
       )
       if (!result.isSuccess || !result.value) {
         console.error("Failed to load pending approvals:", result.error?.message)
@@ -35,55 +41,43 @@ export const PendingApprovalsPage = () => {
     }
   }, [currentUser?.userId, withLoader])
 
-  useEffect(() => {
-    fetchRequests()
-  }, [])
+  const handleEditAction = (data: any): void => {
+    navigate(`/request/${data.accessReqId}`)
+  }
 
   const columns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
     () => [
+      { headerName: "Ticket Number", field: "ticketNumber", width: 160 },
+      { headerName: "Folder Path", field: "folderPath", width: 300 },
       {
-        headerName: "Request ID",
-        field: "accessReqId",
-        width: 100,
+        headerName: "Access Type", field: "accessType", width: 120,
+        valueFormatter: (params) => params.value === 2 ? "Read/Write" : params.value
       },
       {
-        headerName: "User Name",
-        field: "userName",
-        width: 150,
+        headerName: "Status", field: "status", width: 120,
+        valueFormatter: (params) => params.value === 2 ? "Pending" : params.value
       },
       {
-        headerName: "Email",
-        field: "userEmail",
-        width: 180,
-      },
-      {
-        headerName: "Current Status",
-        field: "currentStatus",
-        width: 120,
-      },
-      {
-        headerName: "Requested Date",
-        field: "requestedAtUtc",
-        width: 150,
-        valueFormatter: (params: any) => {
-          if (!params.value) return "-"
-          return new Date(params.value).toLocaleDateString()
+        headerName: "Actions",
+        sortable: false,
+        filter: false,
+        cellRenderer: (params: any) => {
+          if (!params.data || params.data.__isDetailRow) return null
+
+          return (
+            <div className="flex h-full items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={() => handleEditAction(params.data)}
+              >
+                Edit
+              </Button>
+            </div>
+          )
         },
-      },
-      {
-        headerName: "Last Action",
-        field: "lastActionAtUtc",
-        width: 150,
-        valueFormatter: (params: any) => {
-          if (!params.value) return "-"
-          return new Date(params.value).toLocaleDateString()
-        },
-      },
-      {
-        headerName: "Items Count",
-        field: "items",
         width: 100,
-        valueGetter: (params: any) => params.data?.items?.length || 0,
       },
     ],
     []

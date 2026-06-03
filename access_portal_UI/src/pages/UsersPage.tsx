@@ -220,12 +220,13 @@ export const UsersPage = () => {
         },
       },
       { headerName: "User ID", field: "cmplUser.cmplUserId" },
+      { headerName: "Employee ID", field: "cmplUser.emp_id" },
       { headerName: "Username", field: "cmplUser.cmplUserName" },
       { headerName: "Email Address", field: "cmplUser.mailId" },
-      { headerName: "Mobile String", field: "cmplUser.mobNo" },
+      { headerName: "Mobile", field: "cmplUser.mobNo" },
       { headerName: "Department ID", field: "department.deptId" },
       {
-        headerName: "Actions Panel",
+        headerName: "Actions",
         sortable: false,
         filter: false,
         cellRenderer: (params: any) => {

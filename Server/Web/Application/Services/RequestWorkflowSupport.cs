@@ -15,13 +15,33 @@ internal static class RequestWorkflowSupport
         role.Equals("It", StringComparison.OrdinalIgnoreCase)
         || role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
 
+    public static string GetTargetFolder(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return string.Empty;
+
+        // 1. Remove the network prefix
+        string prefix = @"\\10.30.50.15\jipl\";
+        if (fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            fullPath = fullPath.Substring(prefix.Length);
+        }
+
+        // 2. Get the first folder segment
+        string[] segments = fullPath.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+
+        return segments.Length > 0 ? segments[0] : string.Empty;
+    }
+
     public static async Task<int?> ResolveMappedHodApproverAsync(
         AppDbContext db,
         int requesterUserId,
         string folderPath)
     {
+        var parentFolder = GetTargetFolder(folderPath);
+
         var mapping = await db.FolderMappings
-            .FirstOrDefaultAsync(f => f.FolderName.ToLower() == folderPath.ToLower());
+            .FirstOrDefaultAsync(f => f.FolderName.ToLower() == parentFolder.ToLower());
 
         if (mapping is null)
             return null;
@@ -43,9 +63,10 @@ internal static class RequestWorkflowSupport
         {
             var department = await db.Departments.FindAsync(requester.DeptId.Value);
 
-            if (department?.HodId is > 0)
+            if (!string.IsNullOrWhiteSpace(department?.HodId))
             {
-                var hod = await db.HodMasters.FindAsync(department.HodId.Value);
+                var hod = await db.HodMasters
+                    .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
                 var requesterDeptHodUserId = await ResolveUserIdAsync(
                     db,
                     hod?.Id,
@@ -75,10 +96,11 @@ internal static class RequestWorkflowSupport
             return null;
 
         var department = await db.Departments.FindAsync(requester.DeptId.Value);
-        if (department?.HodId is not > 0)
+        if (string.IsNullOrWhiteSpace(department?.HodId))
             return null;
 
-        var hod = await db.HodMasters.FindAsync(department.HodId.Value);
+        var hod = await db.HodMasters
+            .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
         return await ResolveUserIdAsync(
             db,
             hod?.Id,

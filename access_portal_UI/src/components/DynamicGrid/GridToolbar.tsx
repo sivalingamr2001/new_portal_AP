@@ -6,7 +6,7 @@ import type { GridToolbarProps } from "./types"
 export const GridToolbar = memo(
   ({
     title,
-    description = "Test description for the grid toolbar component, can be customized via props.",
+    description = "",
     state,
     showSearch,
     showRefresh,

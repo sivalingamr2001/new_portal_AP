@@ -24,3 +24,11 @@ export const UserRole = {
   Hod: 3,
   User: 4,
 } as const
+
+export const getInitials = (name: string) => {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+}

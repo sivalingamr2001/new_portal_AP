@@ -44,7 +44,7 @@ public class UserController : ControllerBase
             from d in deptGroup.DefaultIfEmpty()
 
             join h in _db.HodMasters
-                on d.HodId equals h.IdRow into hodGroup
+                on d.HodId equals h.Id into hodGroup
             from h in hodGroup.DefaultIfEmpty()
 
             orderby u.UserId
@@ -70,7 +70,8 @@ public class UserController : ControllerBase
                     ? null
                     : new DepartmentDto(
                         d.DeptId,
-                        d.DeptName
+                        d.DeptName,
+                        d.HodId ?? string.Empty
                     ),
 
                 Hod = h == null
@@ -115,7 +116,7 @@ public class UserController : ControllerBase
             from d in deptGroup.DefaultIfEmpty()
 
             join h in _db.HodMasters
-                on d.HodId equals h.IdRow into hodGroup
+                on d.HodId equals h.Id into hodGroup
             from h in hodGroup.DefaultIfEmpty()
 
             select new
@@ -181,7 +182,8 @@ public class UserController : ControllerBase
                 ? null
                 : new DepartmentDto(
                     result.Department.DeptId,
-                    result.Department.DeptName
+                    result.Department.DeptName,
+                    result.Department.HodId ?? string.Empty
                 ),
 
             Hod = result.Hod == null
@@ -220,8 +222,8 @@ public class UserController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        var cmplUser = await _db.CmplUsers.FindAsync(userId);
-        var response = BuildUserResponse(user, cmplUser, null, null);
+
+        var response = await BuildUserResponseAsync(userId);
         return Ok(Result.Success(response));
     }
 
@@ -234,11 +236,45 @@ public class UserController : ControllerBase
         return Ok(Result.Success(hods));
     }
 
+    private async Task<LoginResponseDto> BuildUserResponseAsync(int userId)
+    {
+        var result = await (
+            from u in _db.Users
+            join cu in _db.CmplUsers
+                on u.UserId equals cu.CmplUserId into cuGroup
+            from cmplUser in cuGroup.DefaultIfEmpty()
+
+            join d in _db.Departments
+                on cmplUser.DeptId equals d.DeptId into deptGroup
+            from department in deptGroup.DefaultIfEmpty()
+
+            join h in _db.HodMasters
+                on department.HodId equals h.Id into hodGroup
+            from hod in hodGroup.DefaultIfEmpty()
+
+            where u.UserId == userId
+
+            select new
+            {
+                User = u,
+                CmplUser = cmplUser,
+                Department = department,
+                Hod = hod
+            }
+        ).FirstOrDefaultAsync();
+
+        return BuildUserResponse(
+            result?.User ?? new User { UserId = userId },
+            result?.CmplUser,
+            result?.Department,
+            result?.Hod);
+    }
+
     private static LoginResponseDto BuildUserResponse(
         User user,
         IReadOnlyDictionary<int, CmplUser> cmplUsers,
         IReadOnlyDictionary<int, Department> departments,
-        IReadOnlyDictionary<int, HodMaster> hods)
+        IReadOnlyDictionary<string, HodMaster> hods)
     {
         cmplUsers.TryGetValue(user.UserId, out var cmplUser);
 
@@ -247,8 +283,8 @@ public class UserController : ControllerBase
             departments.TryGetValue(cmplUser.DeptId.Value, out department);
 
         HodMaster? hod = null;
-        if (department?.HodId is > 0)
-            hods.TryGetValue(department.HodId.Value, out hod);
+        if (!string.IsNullOrWhiteSpace(department?.HodId))
+            hods.TryGetValue(department.HodId, out hod);
 
         return BuildUserResponse(user, cmplUser, department, hod);
     }
@@ -272,7 +308,7 @@ public class UserController : ControllerBase
             User = new UserDto(user.UserId, user.Role, user.Location),
             Department = department is null
                 ? null
-                : new DepartmentDto(department.DeptId, department.DeptName),
+                : new DepartmentDto(department.DeptId, department.DeptName, department.HodId ?? string.Empty),
             Hod = hod is null
                 ? null
                 : new HodDto(hod.IdRow, hod.HodName, hod.Id, hod.EmailId, hod.MobNo)
