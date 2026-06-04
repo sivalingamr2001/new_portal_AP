@@ -1,107 +1,78 @@
 using Microsoft.EntityFrameworkCore;
-using Web.Application.Interfaces;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 
 namespace Web.Application.Services;
 
-public sealed class AuthService : IAuthService
+public sealed class AuthService(
+    CmplDbContext cmplDb,
+    HodDbContext hodDb,
+    AppDbContext db) : IAuthService
 {
-    private readonly AppDbContext _db;
-    private readonly CmplDbContext _cmplDb;
-    private readonly HodDbContext _hodDb;
-    private readonly IHostEnvironment _env;
-    private readonly ILogger<AuthService> _logger;
-
-    public AuthService(
-        AppDbContext db,
-        CmplDbContext cmplDb,
-        HodDbContext hodDb,
-        IHostEnvironment env,
-        ILogger<AuthService> logger)
+    public async Task<Result<LoginResponseDto>> LoginAsync(LoginRequestDto dto)
     {
-        _db = db;
-        _cmplDb = cmplDb;
-        _hodDb = hodDb;
-        _env = env;
-        _logger = logger;
-    }
+        bool isTestEnv = db.Database.IsSqlite();
 
-    public async Task<LoginResponseDto?> LoginAsync(string identifier, string password)
-    {
-        var demoEmployeeIds = new[] { "E001", "E002", "E003", "E004" };
-        CmplUser? cmpl = null;
-        string lowerIdentifier = identifier.ToLower();
+        var cmplUser = isTestEnv
+            ? await db.CmplUsers.FirstOrDefaultAsync(u =>
+                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier)
+            : await cmplDb.CmplUsers.FirstOrDefaultAsync(u =>
+                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier);
 
-        if (demoEmployeeIds.Contains(identifier, StringComparer.OrdinalIgnoreCase) && password == "password")
-        {
-            cmpl = await _cmplDb.CmplUsers
-                .FirstOrDefaultAsync(c => c.EmployeeId != null && c.EmployeeId.ToLower() == lowerIdentifier);
-        }
-        else
-        {
-            cmpl = await _cmplDb.CmplUsers
-                .FirstOrDefaultAsync(c =>
-                    (c.Name != null && c.Name.ToLower() == lowerIdentifier) ||
-                    (!string.IsNullOrWhiteSpace(c.Email) && c.Email.ToLower() == lowerIdentifier));
-        }
+        if (cmplUser is null)
+            return Result.Failure<LoginResponseDto>(
+                Error.NotFound("AUTH_001", "User not found."));
 
-        if (cmpl == null)
-            return null;
+        var portalUser = await db.Users.FirstOrDefaultAsync(u => u.Id == cmplUser.Id);
 
-        var user = await _db.Users.FindAsync(cmpl.Id);
+        if (portalUser is null || !portalUser.IsActive)
+            return Result.Failure<LoginResponseDto>(
+                Error.Validation("AUTH_002", "Account is inactive or not registered in the portal."));
 
-        if (user == null)
-        {
-            user = new User
-            {
-                Id = cmpl.Id,
-                Role = "User",
-                Location = "Default"
-            };
-
-            _db.Users.Add(user);
-            await _db.SaveChangesAsync();
-        }
-
-        // 3. Fetch related department out of AppDbContext
-        var department = cmpl.DepartmentId.HasValue
-            ? await _db.Departments.FirstOrDefaultAsync(d => d.Id == cmpl.DepartmentId.Value)
-            : null;
-
+        // Resolve department
+        Department? department = null;
         HodMaster? hod = null;
-        if (department != null && !string.IsNullOrWhiteSpace(department.HodId))
+
+        if (cmplUser.DepartmentId.HasValue)
         {
-            // Query from HodDbContext using primary key configurations
-            hod = await _hodDb.HodMasters.FirstOrDefaultAsync(h => h.EmployeeId == department.HodId);
+            department = await db.Departments
+                .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
+
+            if (department?.HodId is not null
+                && int.TryParse(department.HodId, out var hodId))
+            {
+                hod = isTestEnv
+                    ? await db.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0)
+                    : await hodDb.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0);
+            }
         }
 
-        // 4. Map entities onto clean Data Transfer Objects
-        return new LoginResponseDto
+        var userProfile = new UserProfile(
+            Id: cmplUser.Id,
+            Name: cmplUser.Name,
+            Role: portalUser.Role,
+            Location: portalUser.Location,
+            EmployeeId: cmplUser.EmployeeId,
+            Email: cmplUser.Email,
+            MobileNumber: cmplUser.MobileNumber,
+            DepartmentId: cmplUser.DepartmentId
+        );
+
+        return Result.Success(new LoginResponseDto
         {
-            User = new UserProfile(
-                Id: user.Id,
-                Name: cmpl.Name ?? string.Empty,
-                Role: user.Role,
-                Location: user.Location,
-                EmployeeId: cmpl.EmployeeId,
-                Email: cmpl.Email,
-                MobileNumber: cmpl.MobileNumber,
-                DepartmentId: cmpl.DepartmentId
-            ),
-            Department = department == null ? null : new DepartmentDto(
-                Id: department.Id,
-                Name: department.Name,
-                HodId: department.HodId ?? string.Empty
-            ),
-            HeadOfDepartment = hod == null ? null : new HodDto(
-                Id: hod.UserId,
-                Name: hod.Name ?? string.Empty,
-                EmployeeId: hod.EmployeeId,
-                Email: hod.Email,
-                MobileNumber: hod.MobileNumber
-            )
-        };
+            User = userProfile,
+            Department = department is null ? null : new DepartmentDto(
+                department.Id,
+                department.Name,
+                department.HodId),
+            HeadOfDepartment = hod is null ? null : new HodDto(
+                hod.UserId,
+                hod.Name,
+                hod.EmployeeId,
+                hod.Email,
+                hod.MobileNumber),
+        });
     }
 }

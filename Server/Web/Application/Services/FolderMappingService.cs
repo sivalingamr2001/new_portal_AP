@@ -1,103 +1,173 @@
 using Microsoft.EntityFrameworkCore;
-using Server.Shared.Helpers;
-using System.Threading;
-using Web.Application.Interfaces;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 
 namespace Web.Application.Services;
 
-public sealed class FolderMappingService : IFolderMappingService
+public sealed class FolderMappingService(
+    AppDbContext db,
+    HodDbContext hodDb) : IFolderMappingService
 {
-    private readonly AppDbContext _db;
-    private readonly FolderService _folderService;
-
-    public FolderMappingService(AppDbContext db, FolderService folderService)
+    public async Task<PagedResult<FolderMappingDto>> GetAllAsync(
+        int page, int pageSize, string? search)
     {
-        _db = db;
-        _folderService = folderService;
-    }
+        var query = db.FolderMappings.Where(f => f.IsActive);
 
-    public async Task<IReadOnlyList<FolderMappingDto>> GetAllAsync()
-    {
-        var entities = await _db.FolderMappings
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(f => f.FolderName.Contains(search));
+
+        var total = await query.CountAsync();
+        var data = await query
             .OrderBy(f => f.FolderName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(f => MapToDto(f))
             .ToListAsync();
 
-        return entities.Select(MapToDto).ToList();
+        return new PagedResult<FolderMappingDto>(data, total, page, pageSize);
     }
 
-    public async Task<FolderMappingDto?> GetByIdAsync(int id)
+    public async Task<Result<FolderMappingDto>> GetByIdAsync(int id)
     {
-        var entity = await _db.FolderMappings.FirstOrDefaultAsync(f => f.Id == id);
-        return entity is null ? null : MapToDto(entity);
-    }
+        var entity = await db.FolderMappings
+            .FirstOrDefaultAsync(f => f.Id == id && f.IsActive);
 
-    public async Task<FolderMappingDto> CreateAsync(UpsertFolderMappingRequest request)
-    {
-        var entity = new FolderMappingEntity();
-        Apply(entity, request);
-
-        _db.FolderMappings.Add(entity);
-        await _db.SaveChangesAsync();
-
-        return MapToDto(entity);
-    }
-
-    public async Task<FolderMappingDto?> UpdateAsync(int id, UpsertFolderMappingRequest request)
-    {
-        var entity = await _db.FolderMappings.FindAsync(id);
         if (entity is null)
-            return null;
+            return Result.Failure<FolderMappingDto>(
+                Error.NotFound("FOLDER_001", "Folder mapping not found."));
 
-        Apply(entity, request);
-        await _db.SaveChangesAsync();
-
-        return MapToDto(entity);
+        return Result.Success(MapToDto(entity));
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<Result<int>> CreateAsync(
+        UpsertFolderMappingRequest dto, int createdBy)
     {
-        var entity = await _db.FolderMappings.FindAsync(id);
+        bool isTestEnv = db.Database.IsSqlite();
+        // Validate duplicate folder path
+        var exists = await db.FolderMappings
+            .AnyAsync(f => f.FolderName == dto.FolderPath && f.IsActive);
+
+        if (exists)
+            return Result.Failure<int>(
+                Error.Conflict("FOLDER_002", "A mapping for this folder path already exists."));
+
+        var validationError = await ValidateHodIdsAsync(dto.PrimaryHodId, dto.SecondaryHodId, isTestEnv);
+        if (validationError is not null)
+            return Result.Failure<int>(validationError);
+
+        var entity = new FolderMappingEntity
+        {
+            FolderName = dto.FolderPath,
+            PrimaryHodId = dto.PrimaryHodId,
+            PrimaryHodName = dto.PrimaryHodName,
+            PrimaryHodEmail = dto.PrimaryHodEmail,
+            SecondaryHodId = dto.SecondaryHodId,
+            SecondaryHodName = dto.SecondaryHodName,
+            SecondaryHodEmail = dto.SecondaryHodEmail,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = createdBy
+        };
+
+        db.FolderMappings.Add(entity);
+        await db.SaveChangesAsync();
+        return Result.Success(entity.Id);
+    }
+
+    public async Task<Result> UpdateAsync(
+        int id, UpsertFolderMappingRequest dto, int updatedBy)
+    {
+        var entity = await db.FolderMappings
+            .FirstOrDefaultAsync(f => f.Id == id && f.IsActive);
+
         if (entity is null)
-            return false;
+            return Result.Failure(Error.NotFound("FOLDER_001", "Folder mapping not found."));
 
-        _db.FolderMappings.Remove(entity);
-        await _db.SaveChangesAsync();
-        return true;
+        // Check path conflict (excluding self)
+        var pathConflict = await db.FolderMappings
+            .AnyAsync(f => f.FolderName == dto.FolderPath && f.Id != id && f.IsActive);
+
+        if (pathConflict)
+            return Result.Failure(
+                Error.Conflict("FOLDER_002", "Another mapping already uses this folder path."));
+
+        bool isTestEnv = db.Database.IsSqlite();
+
+        var validationError = await ValidateHodIdsAsync(dto.PrimaryHodId, dto.SecondaryHodId, isTestEnv);
+        if (validationError is not null)
+            return Result.Failure(validationError);
+
+        entity.FolderName = dto.FolderPath;
+        entity.PrimaryHodId = dto.PrimaryHodId;
+        entity.PrimaryHodName = dto.PrimaryHodName;
+        entity.PrimaryHodEmail = dto.PrimaryHodEmail;
+        entity.SecondaryHodId = dto.SecondaryHodId;
+        entity.SecondaryHodName = dto.SecondaryHodName;
+        entity.SecondaryHodEmail = dto.SecondaryHodEmail;
+        entity.ModifiedOn = DateTime.UtcNow;
+        entity.ModifiedBy = updatedBy;
+
+        await db.SaveChangesAsync();
+        return Result.Success();
     }
 
-    private static void Apply(FolderMappingEntity entity, UpsertFolderMappingRequest request)
+    public async Task<Result> DeleteAsync(int id, int deletedBy)
     {
-        entity.FolderName = RequestWorkflowSupport.NormalizeFolderPath(request.FolderPath);
-        entity.PrimaryHodId = request.PrimaryHodId?.Trim();
-        entity.PrimaryHodName = request.PrimaryHodName?.Trim();
-        entity.PrimaryHodEmail = request.PrimaryHodEmail?.Trim();
-        entity.SecondaryHodId = request.SecondaryHodId?.Trim();
-        entity.SecondaryHodName = request.SecondaryHodName?.Trim();
-        entity.SecondaryHodEmail = request.SecondaryHodEmail?.Trim();
+        var entity = await db.FolderMappings
+            .FirstOrDefaultAsync(f => f.Id == id && f.IsActive);
+
+        if (entity is null)
+            return Result.Failure(Error.NotFound("FOLDER_001", "Folder mapping not found."));
+
+        entity.IsActive = false;
+        entity.ModifiedOn = DateTime.UtcNow;
+        entity.ModifiedBy = deletedBy;
+
+        await db.SaveChangesAsync();
+        return Result.Success();
     }
 
-    private static FolderMappingDto MapToDto(FolderMappingEntity entity) =>
-        new(
-            entity.Id,
-            entity.FolderName,
-            entity.PrimaryHodId,
-            entity.PrimaryHodName,
-            entity.PrimaryHodEmail,
-            entity.SecondaryHodId,
-            entity.SecondaryHodName,
-            entity.SecondaryHodEmail
-        );
+    // ─── Private ─────────────────────────────────────────────────────────────────
 
-    public async Task<List<FolderResponse>> GetParentFoldersAsync()
+    private async Task<Error?> ValidateHodIdsAsync(string? primaryHodId, string? secondaryHodId, bool isTestEnv)
     {
-        return await _folderService.GetParentFoldersAsync(CancellationToken.None);
+        if (!string.IsNullOrWhiteSpace(primaryHodId))
+        {
+            if (!int.TryParse(primaryHodId, out var pid))
+                return Error.Validation("FOLDER_003", "PrimaryHodId must be a valid integer.");
+
+            var exists = isTestEnv
+                ? await db.HodMasters.AnyAsync(h => h.UserId == pid && h.Deleted == 0)
+                : await hodDb.HodMasters.AnyAsync(h => h.UserId == pid && h.Deleted == 0);
+            if (!exists)
+                return Error.NotFound("FOLDER_004", "Primary HOD not found in HOD master.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(secondaryHodId))
+        {
+            if (!int.TryParse(secondaryHodId, out var sid))
+                return Error.Validation("FOLDER_005", "SecondaryHodId must be a valid integer.");
+
+            var exists = isTestEnv
+                ? await db.HodMasters.AnyAsync(h => h.UserId == sid && h.Deleted == 0)
+                : await hodDb.HodMasters.AnyAsync(h => h.UserId == sid && h.Deleted == 0);
+            if (!exists)
+                return Error.NotFound("FOLDER_006", "Secondary HOD not found in HOD master.");
+        }
+
+        return null;
     }
 
-    public Task<List<FolderResponse>> GetFolderHierarchyAsync()
-    {
-        return Task.FromResult(_folderService.GetStrictFolderHierarchy());
-    }
+    private static FolderMappingDto MapToDto(FolderMappingEntity f) => new(
+        f.Id,
+        f.FolderName,
+        f.PrimaryHodId,
+        f.PrimaryHodName,
+        f.PrimaryHodEmail,
+        f.SecondaryHodId,
+        f.SecondaryHodName,
+        f.SecondaryHodEmail
+    );
 }

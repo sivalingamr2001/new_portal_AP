@@ -10,7 +10,7 @@ public sealed class HodMaster
     public int UserId { get; set; }
 
     [Column("hodname")]
-    public string Name { get; set; } = string.Empty;
+    public string? Name { get; set; }
 
     [Column("id")]
     public string? EmployeeId { get; set; }

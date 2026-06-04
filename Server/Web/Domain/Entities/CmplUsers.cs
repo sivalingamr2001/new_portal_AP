@@ -8,7 +8,7 @@ public sealed class CmplUser
     public int Id { get; set; }
 
     [Column("CMPL_USER_NAME")]
-    public string Name { get; set; } = string.Empty;
+    public string? Name { get; set; }
 
     [Column("emp_id")]
     public string? EmployeeId { get; set; }
@@ -17,7 +17,7 @@ public sealed class CmplUser
     public string? Email { get; set; }
 
     [Column("MOB_NO")]
-    public string? MobileNumber { get; set; }
+    public long? MobileNumber { get; set; }
 
     [Column("DEPT_ID")]
     public int? DepartmentId { get; set; } = 0;

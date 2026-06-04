@@ -1,15 +1,13 @@
-using Server.Shared.Helpers;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 
-namespace Web.Application.Interfaces;
+namespace Web.Application.Services;
 
 public interface IFolderMappingService
 {
-    Task<IReadOnlyList<FolderMappingDto>> GetAllAsync();
-    Task<FolderMappingDto?> GetByIdAsync(int id);
-    Task<FolderMappingDto> CreateAsync(UpsertFolderMappingRequest request);
-    Task<FolderMappingDto?> UpdateAsync(int id, UpsertFolderMappingRequest request);
-    Task<bool> DeleteAsync(int id);
-    Task<List<FolderResponse>> GetParentFoldersAsync();
-    Task<List<FolderResponse>> GetFolderHierarchyAsync();
+    Task<PagedResult<FolderMappingDto>> GetAllAsync(int page, int pageSize, string? search);
+    Task<Result<FolderMappingDto>> GetByIdAsync(int id);
+    Task<Result<int>> CreateAsync(UpsertFolderMappingRequest dto, int createdBy);
+    Task<Result> UpdateAsync(int id, UpsertFolderMappingRequest dto, int updatedBy);
+    Task<Result> DeleteAsync(int id, int deletedBy);
 }

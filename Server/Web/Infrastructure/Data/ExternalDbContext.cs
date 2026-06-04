@@ -3,11 +3,8 @@ using Web.Domain.Entities;
 
 namespace Web.Infrastructure.Data;
 
-// Context for CMPL Users
-public sealed class CmplDbContext : DbContext
+public sealed class CmplDbContext(DbContextOptions<CmplDbContext> options) : DbContext(options)
 {
-    public CmplDbContext(DbContextOptions<CmplDbContext> options) : base(options) { }
-
     public DbSet<CmplUser> CmplUsers => Set<CmplUser>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -18,11 +15,8 @@ public sealed class CmplDbContext : DbContext
     }
 }
 
-// Context for HOD Masters
-public sealed class HodDbContext : DbContext
+public sealed class HodDbContext(DbContextOptions<HodDbContext> options) : DbContext(options)
 {
-    public HodDbContext(DbContextOptions<HodDbContext> options) : base(options) { }
-
     public DbSet<HodMaster> HodMasters => Set<HodMaster>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

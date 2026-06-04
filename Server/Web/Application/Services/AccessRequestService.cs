@@ -1,288 +1,389 @@
 using Microsoft.EntityFrameworkCore;
-using Web.Application.Interfaces;
+using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Infrastructure.Data;
+using Web.Infrastructure.Utilities;
 
 namespace Web.Application.Services;
 
-public sealed class AccessRequestService : IAccessRequestService
+public sealed class AccessRequestService(
+    AppDbContext db,
+    INotificationService notificationService,
+    HodDbContext hodDb,
+    CmplDbContext cmplDb) : IAccessRequestService
 {
-    private readonly AppDbContext _db;
-    private readonly CmplDbContext _cmplDb;
-    private readonly HodDbContext _hodDb;
-    private readonly INotificationService _notificationService;
+    // ─── Submit (User) ───────────────────────────────────────────────────────────
 
-    public AccessRequestService(
-        AppDbContext db,
-        CmplDbContext cmplDb,
-        HodDbContext hodDb,
-        INotificationService notificationService)
+    public async Task<Result<int>> SubmitRequestAsync(
+        SubmitAccessRequestDto dto, int submittedByUserId)
     {
-        _db = db;
-        _notificationService = notificationService;
-        _cmplDb = cmplDb;
-        _hodDb = hodDb;
-    }
+        bool isTestEnv = db.Database.IsSqlite();
 
-    public async Task<AccessRequestDto> SubmitAsync(SubmitAccessRequestDto request)
-    {
-        if (!request.IsAgreed)
-            throw new InvalidOperationException("User must agree before submitting the request.");
+        var user = isTestEnv
+            ? await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId)
+            : await cmplDb.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId);
 
-        if (request.Items.Count == 0)
-            throw new InvalidOperationException("At least one folder access item is required.");
+        if (!dto.IsAgreed)
+            return Result.Failure<int>(Error.Validation("REQ_001",
+                "You must agree to the terms before submitting."));
 
-        var requester = await _cmplDb.CmplUsers.FindAsync(request.UserId);
-        if (requester is null)
-            throw new InvalidOperationException("Request user was not found.");
-
-        var now = DateTime.UtcNow;
-        var nextSequence = await GetNextTicketSequenceAsync(now.Year);
-        var requestEntity = new AccessRequestEntity
+        var request = new AccessRequestEntity
         {
-            UserId = request.UserId,
-            IsAgreed = request.IsAgreed,
-            ItsrNo = request.ItsrNo?.Trim(),
+            UserId        = submittedByUserId,
+            ReqTo         = dto.ReqTo,
+            IsAgreed      = true,
             CurrentStatus = RequestStatus.PendingWithHod,
-            CreatedOn = now,
-            ModifiedOn = now
+            IsActive      = true,
+            CreatedOn     = DateTime.UtcNow,
+            CreatedBy     = submittedByUserId
         };
 
-        var createdItems = new List<AccessItemEntity>();
+        db.AccessRequests.Add(request);
+        await db.SaveChangesAsync();
 
-        foreach (var item in request.Items)
+        var items = await CreateItemsAsync(dto.Items, request.AccessReqId, submittedByUserId);
+
+        // Audit each item
+        foreach (var item in items)
         {
-            var folderPath = RequestWorkflowSupport.NormalizeFolderPath(item.FolderPath);
-            var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
-                _db,
-                _cmplDb,
-                _hodDb,
-                request.UserId,
-                folderPath);
+            db.AccessReqAudits.Add(BuildAudit(request.AccessReqId, item.AccessItemId,
+                "Submitted", $"Item {item.TicketNumber} submitted by user.", submittedByUserId));
+        }
 
-            if (hodApproverId is null)
-                throw new InvalidOperationException($"No HOD mapping found for folder path '{folderPath}'.");
+        await db.SaveChangesAsync();
 
-            var ticketNumber = $"REQ-{now.Year}-{nextSequence:000}";
-            nextSequence++;
+        // ─── Notifications ────────────────────────────────────────────────────
+        await SendSubmissionNotificationsAsync(request, items, user);
 
-            createdItems.Add(new AccessItemEntity
+        return Result.Success(request.AccessReqId);
+    }
+
+    // ─── Submit (HOD — goes directly to IT) ─────────────────────────────────────
+
+    public async Task<Result<int>> SubmitHodRequestAsync(
+        SubmitAccessRequestDto dto, int hodUserId)
+    {
+        var hod = await hodDb.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodUserId);
+        if (hod is null)
+            return Result.Failure<int>(Error.NotFound("HOD_001", "HOD not found."));
+
+        var request = new AccessRequestEntity
+        {
+            UserId        = hodUserId,
+            ReqTo         = dto.ReqTo,
+            IsAgreed      = true,
+            CurrentStatus = RequestStatus.PendingWithIt,
+            IsActive      = true,
+            CreatedOn     = DateTime.UtcNow,
+            CreatedBy     = hodUserId
+        };
+
+        db.AccessRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var items = await CreateItemsAsync(dto.Items, request.AccessReqId, hodUserId,
+            hodApproverId: hodUserId, initialStatus: RequestStatus.PendingWithIt);
+
+        foreach (var item in items)
+        {
+            db.AccessReqAudits.Add(BuildAudit(request.AccessReqId, item.AccessItemId,
+                "HodSelfSubmit", $"HOD submitted item {item.TicketNumber} — forwarded to IT.", hodUserId));
+        }
+
+        await db.SaveChangesAsync();
+
+        // Notify IT operators
+        await notificationService.NotifyRoleGroupAsync(
+            role: "It",
+            title: "New HOD Access Request",
+            message: $"HOD {hod.Name} submitted an access request with {items.Count} item(s).",
+            type: "HodRequest",
+            requestId: request.AccessReqId);
+
+        return Result.Success(request.AccessReqId);
+    }
+
+    // ─── Get Request Detail ──────────────────────────────────────────────────────
+
+    public async Task<Result<AccessRequestDetailDto>> GetRequestDetailAsync(
+        int requestId, int callerUserId)
+    {
+        var request = await db.AccessRequests
+            .Include(r => r.AccessItems)
+            .FirstOrDefaultAsync(r => r.AccessReqId == requestId);
+
+        if (request is null)
+            return Result.Failure<AccessRequestDetailDto>(
+                Error.NotFound("REQ_002", "Request not found."));
+
+        return Result.Success(MapToDetailDto(request));
+    }
+
+    // ─── My Requests (Paged) ─────────────────────────────────────────────────────
+
+    public async Task<PagedResult<AccessRequestSummaryDto>> GetMyRequestsAsync(
+        int userId, int page, int pageSize)
+    {
+        var query = db.AccessRequests
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedOn);
+
+        var total = await query.CountAsync();
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(r => r.AccessItems)
+            .Select(r => MapToSummaryDto(r))
+            .ToListAsync();
+
+        return new PagedResult<AccessRequestSummaryDto>(items, total, page, pageSize);
+    }
+
+    // ─── Resubmit Rejected Item ──────────────────────────────────────────────────
+
+    public async Task<Result> ResubmitItemAsync(int accessItemId, string reason, int userId)
+    {
+        var item = await db.AccessItems
+            .Include(i => i.AccessRequest)
+            .FirstOrDefaultAsync(i => i.AccessItemId == accessItemId);
+
+        if (item is null)
+            return Result.Failure(Error.NotFound("ITEM_001", "Access item not found."));
+
+        if (item.AccessRequest.UserId != userId)
+            return Result.Failure(Error.Validation("ITEM_002", "You do not own this item."));
+
+        var allowedStatuses = new[] { RequestStatus.HodRejected, RequestStatus.ItRejected };
+        if (!allowedStatuses.Contains(item.Status))
+            return Result.Failure(Error.Validation("ITEM_003",
+                "Only rejected items can be resubmitted."));
+
+        // Reset item back to PendingWithHod
+        item.Status           = RequestStatus.PendingWithHod;
+        item.Reason           = reason;
+        item.RejectionReason  = null;
+        item.HodApproverId    = null;
+        item.ItApproverId     = null;
+        item.ModifiedOn       = DateTime.UtcNow;
+        item.ModifiedBy       = userId;
+
+        db.AccessReqAudits.Add(BuildAudit(item.AccessReqId, item.AccessItemId,
+            "Resubmitted", $"Item {item.TicketNumber} resubmitted by user.", userId));
+
+        await db.SaveChangesAsync();
+
+        await NotifyHodsForItemAsync(item, "Item Resubmitted",
+            $"Ticket {item.TicketNumber} has been resubmitted and awaits your review.", userId);
+
+        return Result.Success();
+    }
+
+    // ─── Renew Item ──────────────────────────────────────────────────────────────
+
+    public async Task<Result> RenewItemAsync(int accessItemId, string reason, int userId)
+    {
+        var item = await db.AccessItems
+            .Include(i => i.AccessRequest)
+            .FirstOrDefaultAsync(i => i.AccessItemId == accessItemId);
+
+        if (item is null)
+            return Result.Failure(Error.NotFound("ITEM_001", "Access item not found."));
+
+        if (item.AccessRequest.UserId != userId)
+            return Result.Failure(Error.Validation("ITEM_002", "You do not own this item."));
+
+        var renewableStatuses = new[]
+            { RequestStatus.ItApproved, RequestStatus.Expired };
+
+        if (!renewableStatuses.Contains(item.Status))
+            return Result.Failure(Error.Validation("ITEM_004",
+                "Only approved or expired items can be renewed."));
+
+        // Reset for re-approval cycle
+        item.Status          = RequestStatus.PendingWithHod;
+        item.Reason          = reason;
+        item.RejectionReason = null;
+        item.ApprovedAtUtc   = null;
+        item.ExpiresAtUtc    = null;
+        item.HodApproverId   = null;
+        item.ItApproverId    = null;
+        item.ModifiedOn      = DateTime.UtcNow;
+        item.ModifiedBy      = userId;
+
+        db.AccessReqAudits.Add(BuildAudit(item.AccessReqId, item.AccessItemId,
+            "RenewalRequested", $"User requested renewal of ticket {item.TicketNumber}.", userId));
+
+        await db.SaveChangesAsync();
+
+        await NotifyHodsForItemAsync(item, "Renewal Request",
+            $"Ticket {item.TicketNumber} renewal has been submitted.", userId);
+
+        return Result.Success();
+    }
+
+    // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+    private async Task<List<AccessItemEntity>> CreateItemsAsync(
+        IEnumerable<AccessItemRequestDto> itemDtos,
+        int requestId,
+        int createdBy,
+        int? hodApproverId = null,
+        RequestStatus initialStatus = RequestStatus.PendingWithHod)
+    {
+        var items = new List<AccessItemEntity>();
+
+        foreach (var dto in itemDtos)
+        {
+            var item = new AccessItemEntity
             {
-                TicketNumber = ticketNumber,
-                Status = RequestStatus.PendingWithHod,
-                FolderPath = folderPath,
-                AccessType = item.AccessType,
-                ConfirmAccessType = item.ConfirmAccessType,
-                Reason = item.Reason.Trim(),
-                HodApproverId = hodApproverId,
-                CreatedOn = now,
-                ModifiedOn = now
-            });
+                AccessReqId        = requestId,
+                TicketNumber       = TicketNumberGenerator.Generate(),
+                Status             = initialStatus,
+                FolderPath         = dto.FolderPath,
+                AccessType         = dto.AccessType,
+                ConfirmAccessType  = dto.AccessType,
+                Reason             = dto.Reason,
+                HodApproverId      = hodApproverId,
+                IsActive           = true,
+                CreatedOn          = DateTime.UtcNow,
+                CreatedBy          = createdBy
+            };
+
+            db.AccessItems.Add(item);
+            items.Add(item);
         }
 
-        requestEntity.ReqTo = createdItems.First().HodApproverId ?? 0;
-        requestEntity.CurrentApproverId = createdItems.First().HodApproverId;
-        requestEntity.AccessItems = createdItems;
-
-        _db.AccessRequests.Add(requestEntity);
-        await _db.SaveChangesAsync();
-
-        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(
-            _db,
-            _cmplDb,
-            _hodDb,
-            request.UserId);
-
-        var recipientIds = createdItems
-            .Select(i => i.HodApproverId)
-            .OfType<int>()
-            .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
-            .Distinct()
-            .ToList();
-
-        await _notificationService.SendStageNotificationAsync(
-            requestEntity.AccessReqId,
-            null,
-            "RequestSubmitted",
-            $"Access request {requestEntity.AccessReqId} has been submitted and moved to HOD cart.",
-            new[] { request.UserId });
-
-        await _notificationService.SendStageNotificationAsync(
-            requestEntity.AccessReqId,
-            null,
-            "PendingWithHod",
-            $"Access request {requestEntity.AccessReqId} is waiting for your approval.",
-            recipientIds,
-            request.UserId);
-
-        return (await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestEntity.AccessReqId))!;
+        await db.SaveChangesAsync();
+        return items;
     }
 
-    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetAllPagedAsync(int? userId, int page, int pageSize)
+    private async Task SendSubmissionNotificationsAsync(
+        AccessRequestEntity request,
+        List<AccessItemEntity> items,
+        CmplUser user)
     {
-        var query = _db.AccessRequests.AsQueryable();
+        // 1. Notify the user: confirm receipt with ticket numbers
+        var ticketList = string.Join(", ", items.Select(i => i.TicketNumber));
+        await notificationService.NotifyUserAsync(
+            userId: user.Id,
+            role: "User",
+            title: "Access Request Submitted",
+            message: $"Your request has been submitted. Tickets: {ticketList}",
+            type: "RequestSubmitted",
+            requestId: request.AccessReqId);
 
-        if (userId is not null)
-            query = query.Where(r => r.UserId == userId.Value);
-
-        var totalCount = await query.CountAsync();
-        var requestIds = await query
-            .OrderByDescending(r => r.CreatedOn)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(r => r.AccessReqId)
-            .ToListAsync();
-
-        var results = new List<AccessRequestDto>(requestIds.Count);
-
-        foreach (var requestId in requestIds)
+        // 2. Resolve HODs for each item and notify them
+        foreach (var item in items)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
+            await NotifyHodsForItemAsync(item,
+                "New Access Request Awaiting Approval",
+                $"Ticket {item.TicketNumber} from {user.Name} is pending your review.",
+                user.Id);
         }
 
-        return (results, totalCount);
+        // 3. Notify all IT Operators about new request
+        await notificationService.NotifyRoleGroupAsync(
+            role: "It",
+            title: "New Access Request",
+            message: $"{items.Count} new item(s) submitted by {user.Name} await HOD approval.",
+            type: "NewRequest",
+            requestId: request.AccessReqId);
     }
 
-    public async Task<IReadOnlyList<AccessRequestDto>> GetAllAsync(int? userId = null)
+    /// <summary>
+    /// Resolves the folder's HOD and the user's department HOD.
+    /// If they differ, notifies both; otherwise notifies just one.
+    /// </summary>
+    private async Task NotifyHodsForItemAsync(
+        AccessItemEntity item, string title, string message, int actorUserId)
     {
-        var query = _db.AccessRequests.AsQueryable();
+        var folderMapping = await db.FolderMappings
+            .FirstOrDefaultAsync(f => f.FolderName == item.FolderPath);
 
-        if (userId is not null)
-            query = query.Where(r => r.UserId == userId.Value);
+        // Collect unique HOD userIds to notify
+        var hodUserIds = new HashSet<int>();
 
-        var requestIds = await query
-            .OrderByDescending(r => r.CreatedOn)
-            .Select(r => r.AccessReqId)
-            .ToListAsync();
+        // Folder's primary HOD
+        if (folderMapping?.PrimaryHodId is not null
+            && int.TryParse(folderMapping.PrimaryHodId, out var foldPrimaryHodId))
+            hodUserIds.Add(foldPrimaryHodId);
 
-        var results = new List<AccessRequestDto>(requestIds.Count);
+        // Folder's secondary HOD (if exists)
+        if (folderMapping?.SecondaryHodId is not null
+            && int.TryParse(folderMapping.SecondaryHodId, out var foldSecondHodId))
+            hodUserIds.Add(foldSecondHodId);
 
-        foreach (var requestId in requestIds)
+        // User's department HOD
+        var user = await cmplDb.CmplUsers.FirstOrDefaultAsync(u => u.Id == actorUserId);
+        if (user?.DepartmentId is not null)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
+            var dept = await db.Departments.FirstOrDefaultAsync(d => d.Id == user.DepartmentId);
+            if (dept?.HodId is not null && int.TryParse(dept.HodId, out var deptHodId))
+                hodUserIds.Add(deptHodId);
         }
 
-        return results;
+        // If folder HOD ≠ user dept HOD, both already added above
+        // Notify all resolved HODs
+        foreach (var hodId in hodUserIds)
+        {
+            await notificationService.NotifyUserAsync(
+                userId: hodId,
+                role: "Hod",
+                title: title,
+                message: message,
+                type: "HodAction",
+                requestId: item.AccessReqId,
+                itemId: item.AccessItemId,
+                ticketNumber: item.TicketNumber);
+        }
     }
 
-    public Task<AccessRequestDto?> GetByIdAsync(int accessReqId) =>
-        RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
-
-    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetPendingHodCartPagedAsync(int approverId, int page, int pageSize)
+    private static AccessReqAuditEntity BuildAudit(int requestId, int? itemId,
+        string eventType, string message, int actorUserId) => new()
     {
-        var query = _db.AccessItems
-            .Where(i => i.Status == RequestStatus.PendingWithHod && i.HodApproverId == approverId)
-            .Select(i => i.AccessReqId)
-            .Distinct();
+        AccessReqId   = requestId,
+        AccessItemId  = itemId,
+        EventType     = eventType,
+        Message       = message,
+        ActorUserId   = actorUserId,
+        RecipientUserId = actorUserId,
+        RecipientName = string.Empty,
+        RecipientRole = string.Empty,
+        IsActive      = true,
+        CreatedOn     = DateTime.UtcNow,
+        CreatedBy     = actorUserId
+    };
 
-        var totalCount = await query.CountAsync();
-        var requestIds = await query
-            .OrderBy(id => id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+    private static AccessRequestDetailDto MapToDetailDto(AccessRequestEntity r) => new(
+        r.AccessReqId,
+        r.UserId,
+        r.CurrentStatus,
+        r.ItsrNo,
+        r.CreatedOn,
+        r.AccessItems.Select(i => new AccessItemDto(
+            i.AccessItemId,
+            i.TicketNumber,
+            i.FolderPath,
+            i.AccessType,
+            i.ConfirmAccessType,
+            i.Status,
+            i.Reason,
+            i.RejectionReason,
+            i.ApprovedAtUtc,
+            i.ExpiresAtUtc
+        )).ToList()
+    );
 
-        var results = new List<AccessRequestDto>(requestIds.Count);
-
-        foreach (var requestId in requestIds)
-        {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
-        }
-
-        return (results, totalCount);
-    }
-
-    public async Task<IReadOnlyList<AccessRequestDto>> GetPendingHodCartAsync(int approverId)
-    {
-        var requestIds = await _db.AccessItems
-            .Where(i => i.Status == RequestStatus.PendingWithHod && i.HodApproverId == approverId)
-            .Select(i => i.AccessReqId)
-            .Distinct()
-            .ToListAsync();
-
-        var results = new List<AccessRequestDto>(requestIds.Count);
-
-        foreach (var requestId in requestIds)
-        {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
-        }
-
-        return results;
-    }
-
-    public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetPendingItCartPagedAsync(int page, int pageSize)
-    {
-        var query = _db.AccessItems
-            .Where(i => i.Status == RequestStatus.PendingWithIt)
-            .Select(i => i.AccessReqId)
-            .Distinct();
-
-        var totalCount = await query.CountAsync();
-        var requestIds = await query
-            .OrderBy(id => id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
-
-        var results = new List<AccessRequestDto>(requestIds.Count);
-
-        foreach (var requestId in requestIds)
-        {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
-        }
-
-        return (results, totalCount);
-    }
-
-    public async Task<IReadOnlyList<AccessRequestDto>> GetPendingItCartAsync()
-    {
-        var requestIds = await _db.AccessItems
-            .Where(i => i.Status == RequestStatus.PendingWithIt)
-            .Select(i => i.AccessReqId)
-            .Distinct()
-            .ToListAsync();
-
-        var results = new List<AccessRequestDto>(requestIds.Count);
-
-        foreach (var requestId in requestIds)
-        {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
-            if (dto is not null)
-                results.Add(dto);
-        }
-
-        return results;
-    }
-
-    private async Task<int> GetNextTicketSequenceAsync(int year)
-    {
-        var prefix = $"REQ-{year}-";
-        var existing = await _db.AccessItems
-            .Where(i => i.TicketNumber.StartsWith(prefix))
-            .Select(i => i.TicketNumber)
-            .ToListAsync();
-
-        var maxSequence = 0;
-
-        foreach (var ticket in existing)
-        {
-            var sequencePart = ticket[prefix.Length..];
-            if (int.TryParse(sequencePart, out var parsed))
-                maxSequence = Math.Max(maxSequence, parsed);
-        }
-
-        return maxSequence + 1;
-    }
+    private static AccessRequestSummaryDto MapToSummaryDto(AccessRequestEntity r) => new(
+        r.AccessReqId,
+        r.CurrentStatus,
+        r.ItsrNo,
+        r.CreatedOn,
+        r.AccessItems.Count,
+        r.AccessItems.Count(i => i.Status == RequestStatus.ItApproved),
+        r.AccessItems.Count(i => i.Status is RequestStatus.HodRejected or RequestStatus.ItRejected)
+    );
 }

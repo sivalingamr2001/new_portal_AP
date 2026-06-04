@@ -1,8 +1,10 @@
+using Web.Domain.Common;
 using Web.Domain.Dto;
+using Web.Domain.Entities;
 
-namespace Web.Application.Interfaces;
+namespace Web.Application.Services;
 
 public interface IAuthService
 {
-	Task<LoginResponseDto?> LoginAsync(string identifier, string password);
+    Task<Result<LoginResponseDto>> LoginAsync(LoginRequestDto dto);
 }

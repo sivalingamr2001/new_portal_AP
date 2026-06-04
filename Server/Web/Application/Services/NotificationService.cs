@@ -1,103 +1,151 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Web.Application.Common;
-using Web.Application.Interfaces;
+using Web.Domain.Common;
 using Web.Domain.Dto;
+using Web.Domain.Entities;
 using Web.Infrastructure.Data;
+using Web.Infrastructure.Hubs;
 
 namespace Web.Application.Services;
 
-public sealed class NotificationService : INotificationService
+public sealed class NotificationService(
+    AppDbContext db,
+    IHubContext<NotificationHub> hubContext) : INotificationService
 {
-    private readonly AppDbContext _db;
-    private readonly CmplDbContext _cmplDb;
-    private readonly IAuditService _auditService;
-    private readonly IEmailService _emailService;
-    private readonly IHubContext<NotificationHub> _hubContext;
-
-    public NotificationService(
-        AppDbContext db,
-        CmplDbContext cmplDb,
-        IAuditService auditService,
-        IEmailService emailService,
-        IHubContext<NotificationHub> hubContext)
+    public async Task NotifyUserAsync(int userId, string role, string title, string message,
+        string type, int? requestId = null, int? itemId = null, string? ticketNumber = null)
     {
-        _db = db;
-        _auditService = auditService;
-        _emailService = emailService;
-        _hubContext = hubContext;
+        var notification = await PersistAsync(userId, role, title, message, type,
+            requestId, itemId, ticketNumber);
+
+        var dto = MapToDto(notification);
+
+        // Push to the user's personal SignalR group
+        await hubContext.Clients
+            .Group($"user_{userId}")
+            .SendAsync("ReceiveNotification", dto);
     }
 
-    public async Task SendStageNotificationAsync(
-        int accessReqId,
-        int? accessItemId,
-        string eventType,
-        string message,
-        IReadOnlyCollection<int> recipientUserIds,
-        int? actorUserId = null)
+    public async Task NotifyRoleGroupAsync(string role, string title, string message,
+        string type, int? requestId = null, int? itemId = null, string? ticketNumber = null)
     {
-        foreach (var recipientUserId in recipientUserIds.Distinct())
+        // Persist a notification for each user in that role
+        var usersInRole = await db.Users
+            .Where(u => u.Role == role && u.IsActive)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        foreach (var uid in usersInRole)
         {
-            var user = await _db.Users.FindAsync(recipientUserId);
-            var cmplUser = await _cmplDb.CmplUsers.FindAsync(recipientUserId);
+            await PersistAsync(uid, role, title, message, type, requestId, itemId, ticketNumber);
+        }
 
-            if (user is null || cmplUser is null)
-                continue;
-
-            var audit = await _auditService.AddAsync(
-                accessReqId,
-                accessItemId,
-                null,
-                eventType,
-                message,
-                recipientUserId,
-                cmplUser.Name,
-                user.Role,
-                actorUserId);
-
-            await _hubContext.Clients
-                .Group(NotificationHub.GroupName(recipientUserId))
-                .SendAsync("ReceiveNotification", new AccessNotificationDto(
-                    audit.AuditId,
-                    audit.EventType,
-                    audit.Message,
-                    audit.IsRead,
-                    audit.CreatedOn));
-
-            if (!string.IsNullOrWhiteSpace(cmplUser.Email))
+        // Broadcast to role group
+        await hubContext.Clients
+            .Group($"role_{role}")
+            .SendAsync("ReceiveNotification", new
             {
-                await _emailService.SendAsync(
-                    new[] { cmplUser.Email! },
-                    $"Access Request Update - {eventType}",
-                    message);
-            }
+                Title = title,
+                Message = message,
+                Type = type,
+                TicketNumber = ticketNumber
+            });
+    }
+
+    public async Task NotifyMultipleUsersAsync(IEnumerable<(int UserId, string Role)> recipients,
+        string title, string message, string type,
+        int? requestId = null, int? itemId = null, string? ticketNumber = null)
+    {
+        foreach (var (uid, role) in recipients)
+        {
+            await NotifyUserAsync(uid, role, title, message, type,
+                requestId, itemId, ticketNumber);
         }
     }
 
-    public async Task<IReadOnlyList<AccessNotificationDto>> GetNotificationsAsync(int userId)
+    public async Task<List<NotificationDto>> GetUserNotificationsAsync(int userId, bool unreadOnly = false)
     {
-        return await _db.AccessReqAudits
-            .Where(a => a.RecipientUserId == userId)
-            .OrderByDescending(a => a.CreatedOn)
-            .Select(a => new AccessNotificationDto(
-                a.AuditId,
-                a.EventType,
-                a.Message,
-                a.IsRead,
-                a.CreatedOn))
+        var query = db.AccessReqAudits
+            .Where(n => n.RecipientUserId == userId);
+
+        if (unreadOnly)
+            query = query.Where(n => !n.IsRead);
+
+        // Bring data into memory before mapping to avoid EF conversion errors with [NotMapped] properties
+        var entities = await query
+            .OrderByDescending(n => n.CreatedOn)
+            .Take(100)
             .ToListAsync();
+
+        return entities.Select(MapToDto).ToList();
     }
 
-    public async Task<bool> MarkAsReadAsync(int auditId, int userId)
+    public async Task<Result> MarkAsReadAsync(int notificationId, int userId)
     {
-        var audit = await _db.AccessReqAudits
-            .FirstOrDefaultAsync(a => a.AuditId == auditId && a.RecipientUserId == userId);
+        var notification = await db.AccessReqAudits
+            .FirstOrDefaultAsync(n => n.AuditId == notificationId
+                                   && n.RecipientUserId == userId);
 
-        if (audit is null)
-            return false;
+        if (notification is null)
+            return Result.Failure(Error.NotFound("NOTIF_001", "Notification not found."));
 
-        audit.IsRead = true;
-        await _db.SaveChangesAsync();
-        return true;
+        notification.IsRead = true;
+        notification.ModifiedOn = DateTime.UtcNow; // Act as ReadAtUtc
+        notification.ModifiedBy = userId;
+
+        await db.SaveChangesAsync();
+        return Result.Success();
     }
+
+    public async Task<Result> MarkAllAsReadAsync(int userId)
+    {
+        await db.AccessReqAudits
+            .Where(n => n.RecipientUserId == userId && !n.IsRead)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(n => n.IsRead, true)
+                .SetProperty(n => n.ModifiedOn, DateTime.UtcNow) // Bulk act as ReadAtUtc
+                .SetProperty(n => n.ModifiedBy, userId));
+
+        return Result.Success();
+    }
+
+    public async Task<int> GetUnreadCountAsync(int userId)
+        => await db.AccessReqAudits.CountAsync(n => n.RecipientUserId == userId && !n.IsRead);
+
+    // ─── Private Helpers ────────────────────────────────────────────────────────
+
+    private async Task<AccessReqAuditEntity> PersistAsync(int userId, string role,
+        string title, string message, string type,
+        int? requestId, int? itemId, string? ticketNumber)
+    {
+        var entity = new AccessReqAuditEntity
+        {
+            RecipientUserId = userId,
+            RecipientRole = role,
+            Message = message,
+            EventType = type,          // Map 'type' to 'EventType'
+            AccessReqId = requestId ?? 0, // Map 'requestId' to non-nullable 'AccessReqId'
+            AccessItemId = itemId,
+            TicketNumber = ticketNumber,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = userId
+        };
+
+        db.AccessReqAudits.Add(entity);
+        await db.SaveChangesAsync();
+        return entity;
+    }
+
+    private static NotificationDto MapToDto(AccessReqAuditEntity n) => new(
+        n.AuditId,
+        n.EventType,
+        n.Message,
+        n.TicketNumber,
+        n.AccessReqId,
+        n.AccessItemId,
+        n.IsRead,
+        n.ReadAtUtc,
+        n.CreatedOn
+    );
 }

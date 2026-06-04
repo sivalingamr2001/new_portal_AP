@@ -1,17 +1,22 @@
+using Web.Domain.Common;
 using Web.Domain.Dto;
 
-namespace Web.Application.Interfaces;
+namespace Web.Application.Services;
 
 public interface INotificationService
 {
-    Task SendStageNotificationAsync(
-        int accessReqId,
-        int? accessItemId,
-        string eventType,
-        string message,
-        IReadOnlyCollection<int> recipientUserIds,
-        int? actorUserId = null);
+    Task NotifyUserAsync(int userId, string role, string title, string message,
+        string type, int? requestId = null, int? itemId = null, string? ticketNumber = null);
 
-    Task<IReadOnlyList<AccessNotificationDto>> GetNotificationsAsync(int userId);
-    Task<bool> MarkAsReadAsync(int auditId, int userId);
+    Task NotifyRoleGroupAsync(string role, string title, string message,
+        string type, int? requestId = null, int? itemId = null, string? ticketNumber = null);
+
+    Task NotifyMultipleUsersAsync(IEnumerable<(int UserId, string Role)> recipients,
+        string title, string message, string type,
+        int? requestId = null, int? itemId = null, string? ticketNumber = null);
+
+    Task<List<NotificationDto>> GetUserNotificationsAsync(int userId, bool unreadOnly = false);
+    Task<Result> MarkAsReadAsync(int notificationId, int userId);
+    Task<Result> MarkAllAsReadAsync(int userId);
+    Task<int> GetUnreadCountAsync(int userId);
 }
