@@ -10,12 +10,14 @@ namespace Web.Application.Services;
 public sealed class NotificationService : INotificationService
 {
     private readonly AppDbContext _db;
+    private readonly CmplDbContext _cmplDb;
     private readonly IAuditService _auditService;
     private readonly IEmailService _emailService;
     private readonly IHubContext<NotificationHub> _hubContext;
 
     public NotificationService(
         AppDbContext db,
+        CmplDbContext cmplDb,
         IAuditService auditService,
         IEmailService emailService,
         IHubContext<NotificationHub> hubContext)
@@ -37,7 +39,7 @@ public sealed class NotificationService : INotificationService
         foreach (var recipientUserId in recipientUserIds.Distinct())
         {
             var user = await _db.Users.FindAsync(recipientUserId);
-            var cmplUser = await _db.CmplUsers.FindAsync(recipientUserId);
+            var cmplUser = await _cmplDb.CmplUsers.FindAsync(recipientUserId);
 
             if (user is null || cmplUser is null)
                 continue;
@@ -49,7 +51,7 @@ public sealed class NotificationService : INotificationService
                 eventType,
                 message,
                 recipientUserId,
-                cmplUser.CmplUserName,
+                cmplUser.Name,
                 user.Role,
                 actorUserId);
 
@@ -60,12 +62,12 @@ public sealed class NotificationService : INotificationService
                     audit.EventType,
                     audit.Message,
                     audit.IsRead,
-                    audit.CreatedAtUtc));
+                    audit.CreatedOn));
 
-            if (!string.IsNullOrWhiteSpace(cmplUser.MailId))
+            if (!string.IsNullOrWhiteSpace(cmplUser.Email))
             {
                 await _emailService.SendAsync(
-                    new[] { cmplUser.MailId! },
+                    new[] { cmplUser.Email! },
                     $"Access Request Update - {eventType}",
                     message);
             }
@@ -76,13 +78,13 @@ public sealed class NotificationService : INotificationService
     {
         return await _db.AccessReqAudits
             .Where(a => a.RecipientUserId == userId)
-            .OrderByDescending(a => a.CreatedAtUtc)
+            .OrderByDescending(a => a.CreatedOn)
             .Select(a => new AccessNotificationDto(
                 a.AuditId,
                 a.EventType,
                 a.Message,
                 a.IsRead,
-                a.CreatedAtUtc))
+                a.CreatedOn))
             .ToListAsync();
     }
 

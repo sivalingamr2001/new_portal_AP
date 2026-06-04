@@ -4,21 +4,21 @@ namespace Web.Domain.Entities;
 
 public sealed class CmplUser
 {
-    [Column("CmplUserId")]
+    [Column("CMPL_USER_ID")]
     public int Id { get; set; }
 
-    [Column("CmplUserName")]
+    [Column("CMPL_USER_NAME")]
     public string Name { get; set; } = string.Empty;
 
-    [Column("EmpId")]
+    [Column("emp_id")]
     public string? EmployeeId { get; set; }
 
-    [Column("MailId")]
+    [Column("MAIL_ID")]
     public string? Email { get; set; }
 
-    [Column("MobNo")]
+    [Column("MOB_NO")]
     public string? MobileNumber { get; set; }
 
-    [Column("DeptId")]
+    [Column("DEPT_ID")]
     public int? DepartmentId { get; set; } = 0;
 }

@@ -6,18 +6,21 @@ namespace Web.Domain.Entities;
 public sealed class HodMaster
 {
     [Key]
-    [Column("IdRow")]
+    [Column("id_row")]
     public int UserId { get; set; }
 
-    [Column("HodName")]
+    [Column("hodname")]
     public string Name { get; set; } = string.Empty;
 
-    [Column("Id")]
+    [Column("id")]
     public string? EmployeeId { get; set; }
 
-    [Column("EmailId")]
+    [Column("Email_ID")]
     public string? Email { get; set; }
 
-    [Column("MobNo")]
+    [Column("Mob_no")]
     public string? MobileNumber { get; set; }
+
+    [Column("deleted")]
+    public uint Deleted { get; set; } = 0;
 }

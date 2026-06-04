@@ -1,18 +1,22 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Web.Domain.Common;
 
 namespace Web.Domain.Entities;
 
 [Table("jan_portal_users")]
-public sealed class User
+public sealed class User : BaseEntity
 {
     [Key]
-    [Column("UserId")]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
     public int Id { get; set; }
 
-    [Column("Role")]
+    [Column("role")]
+    [MaxLength(100)]
     public string Role { get; set; } = string.Empty;
 
-    [Column("Location")]
+    [Column("location")]
+    [MaxLength(255)]
     public string Location { get; set; } = string.Empty;
 }

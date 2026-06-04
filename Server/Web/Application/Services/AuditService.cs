@@ -35,7 +35,7 @@ public sealed class AuditService : IAuditService
             RecipientName = recipientName,
             RecipientRole = recipientRole,
             ActorUserId = actorUserId,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedOn = DateTime.UtcNow
         };
 
         _db.AccessReqAudits.Add(entity);

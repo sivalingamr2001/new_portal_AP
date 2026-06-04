@@ -35,6 +35,8 @@ internal static class RequestWorkflowSupport
 
     public static async Task<int?> ResolveMappedHodApproverAsync(
         AppDbContext db,
+        CmplDbContext cmplDb,
+        HodDbContext hodDb,
         int requesterUserId,
         string folderPath)
     {
@@ -48,32 +50,33 @@ internal static class RequestWorkflowSupport
 
         var primary = await ResolveUserIdAsync(
             db,
+            cmplDb,
             mapping.PrimaryHodId,
             mapping.PrimaryHodEmail,
             mapping.PrimaryHodName);
 
         var secondary = await ResolveUserIdAsync(
             db,
+            cmplDb,
             mapping.SecondaryHodId,
             mapping.SecondaryHodEmail,
             mapping.SecondaryHodName);
 
-        var requester = await db.CmplUsers.FindAsync(requesterUserId);
-        if (requester?.DeptId is > 0)
+        var requester = await cmplDb.CmplUsers.FindAsync(requesterUserId);
+        if (requester?.DepartmentId is > 0)
         {
-            var department = await db.Departments.FindAsync(requester.DeptId.Value);
+            var department = await db.Departments.FindAsync(requester.DepartmentId.Value);
 
             if (!string.IsNullOrWhiteSpace(department?.HodId))
             {
-                var hod = await db.HodMasters
-                    .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
+                var hod = await hodDb.HodMasters
+                    .FirstOrDefaultAsync(h => h.EmployeeId == department.HodId || h.UserId.ToString() == department.HodId);
                 var requesterDeptHodUserId = await ResolveUserIdAsync(
                     db,
-                    hod?.Id,
-                    hod?.EmailId,
-                    hod?.HodName);
-
-                if (requesterDeptHodUserId != null)
+                    cmplDb,
+                    hod?.EmployeeId,
+                    hod?.Email,
+                    hod?.Name);
                 {
                     if (primary == requesterDeptHodUserId)
                         return primary;
@@ -89,40 +92,43 @@ internal static class RequestWorkflowSupport
 
     public static async Task<int?> ResolveRequesterDeptHodApproverAsync(
         AppDbContext db,
+        CmplDbContext cmplDb,
+        HodDbContext hodDb,
         int requesterUserId)
     {
-        var requester = await db.CmplUsers.FindAsync(requesterUserId);
-        if (requester?.DeptId is not > 0)
+        var requester = await cmplDb.CmplUsers.FindAsync(requesterUserId);
+        if (requester?.DepartmentId is not > 0)
             return null;
 
-        var department = await db.Departments.FindAsync(requester.DeptId.Value);
+        var department = await db.Departments.FindAsync(requester.DepartmentId.Value);
         if (string.IsNullOrWhiteSpace(department?.HodId))
             return null;
 
-        var hod = await db.HodMasters
-            .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
+        var hod = await hodDb.HodMasters
+            .FirstOrDefaultAsync(h => h.EmployeeId == department.HodId || h.UserId.ToString() == department.HodId);
         return await ResolveUserIdAsync(
             db,
-            hod?.Id,
-            hod?.EmailId,
-            hod?.HodName);
+            cmplDb,
+            hod?.EmployeeId,
+            hod?.Email,
+            hod?.Name);
     }
 
     public static async Task<IReadOnlyList<int>> GetItUserIdsAsync(AppDbContext db)
     {
         return await db.Users
             .Where(u => u.Role.ToLower() == "it" || u.Role.ToLower() == "admin")
-            .Select(u => u.UserId)
+            .Select(u => u.Id)
             .ToListAsync();
     }
 
-    public static async Task<AccessRequestDto?> BuildRequestDtoAsync(AppDbContext db, int accessReqId)
+    public static async Task<AccessRequestDto?> BuildRequestDtoAsync(AppDbContext db, CmplDbContext cmplDb, int accessReqId)
     {
         var request = await db.AccessRequests.FindAsync(accessReqId);
         if (request is null)
             return null;
 
-        var requester = await db.CmplUsers.FindAsync(request.UserId);
+        var requester = await cmplDb.CmplUsers.FindAsync(request.UserId);
 
         var items = await db.AccessItems
             .Where(i => i.AccessReqId == accessReqId)
@@ -133,7 +139,7 @@ internal static class RequestWorkflowSupport
 
         var approvals = await db.AccessApprovals
             .Where(a => itemIds.Contains(a.AccessItemId))
-            .OrderBy(a => a.ActionedAtUtc)
+            .OrderBy(a => a.CreatedOn)
             .ToListAsync();
 
         var approvalsByItem = approvals
@@ -148,7 +154,7 @@ internal static class RequestWorkflowSupport
                         a.ApprovalLevel,
                         a.ApprovalStatus,
                         a.Comments,
-                        a.ActionedAtUtc))
+                        a.CreatedOn))
                     .ToList());
 
         var itemDtos = items
@@ -167,8 +173,8 @@ internal static class RequestWorkflowSupport
                     item.Status,
                     item.HodApproverId,
                     item.ItApproverId,
-                    item.RequestedAtUtc,
-                    item.LastActionAtUtc,
+                    item.CreatedOn,
+                    item.ModifiedOn ?? item.CreatedOn,
                     item.ApprovedAtUtc,
                     item.ExpiresAtUtc,
                     itemApprovals ?? Array.Empty<AccessApprovalDto>());
@@ -178,15 +184,15 @@ internal static class RequestWorkflowSupport
         return new AccessRequestDto(
             request.AccessReqId,
             request.UserId,
-            requester?.CmplUserName ?? string.Empty,
-            requester?.MailId,
+            requester?.Name ?? string.Empty,
+            requester?.Email,
             request.ReqTo,
             request.IsAgreed,
             request.ItsrNo,
             request.CurrentStatus,
             request.CurrentApproverId,
-            request.RequestedAtUtc,
-            request.LastActionAtUtc,
+            request.CreatedOn,
+            request.ModifiedOn ?? request.CreatedOn,
             itemDtos);
     }
 
@@ -201,7 +207,7 @@ internal static class RequestWorkflowSupport
         request.CurrentApproverId = items
             .FirstOrDefault(i => i.Status == RequestStatus.PendingWithHod)?.HodApproverId;
         request.ReqTo = request.CurrentApproverId ?? 0;
-        request.LastActionAtUtc = DateTime.UtcNow;
+        request.ModifiedOn = DateTime.UtcNow;
     }
 
     public static RequestStatus DetermineAggregateStatus(IReadOnlyCollection<AccessItemEntity> items)
@@ -232,43 +238,44 @@ internal static class RequestWorkflowSupport
 
     public static async Task<int?> ResolveUserIdAsync(
         AppDbContext db,
+        CmplDbContext cmplDb,
         string? employeeId,
         string? email,
         string? name)
     {
         if (!string.IsNullOrWhiteSpace(employeeId))
         {
-            var byEmpId = await db.CmplUsers
-                .FirstOrDefaultAsync(c => c.EmpId != null && c.EmpId.ToLower() == employeeId.ToLower());
+            var byEmployeeId = await cmplDb.CmplUsers
+                .FirstOrDefaultAsync(c => c.EmployeeId != null && c.EmployeeId.ToLower() == employeeId.ToLower());
 
-            if (byEmpId is not null)
-                return byEmpId.CmplUserId;
+            if (byEmployeeId is not null)
+                return byEmployeeId.Id;
         }
 
         if (!string.IsNullOrWhiteSpace(email))
         {
-            var byEmail = await db.CmplUsers
-                .FirstOrDefaultAsync(c => c.MailId != null && c.MailId.ToLower() == email.ToLower());
+            var byEmail = await cmplDb.CmplUsers
+                .FirstOrDefaultAsync(c => c.Email != null && c.Email.ToLower() == email.ToLower());
 
             if (byEmail is not null)
-                return byEmail.CmplUserId;
+                return byEmail.Id;
         }
 
         if (!string.IsNullOrWhiteSpace(name))
         {
-            var byName = await db.CmplUsers
-                .FirstOrDefaultAsync(c => c.CmplUserName.ToLower() == name.ToLower());
+            var byName = await cmplDb.CmplUsers
+                .FirstOrDefaultAsync(c => c.Name.ToLower() == name.ToLower());
 
             if (byName is not null)
-                return byName.CmplUserId;
+                return byName.Id;
         }
 
         return null;
     }
 
-    public static async Task<string?> ResolveEmailAsync(AppDbContext db, int userId)
+    public static async Task<string?> ResolveEmailAsync(AppDbContext db, CmplDbContext cmplDb, int userId)
     {
-        var cmplUser = await db.CmplUsers.FindAsync(userId);
-        return cmplUser?.MailId;
+        var cmplUser = await cmplDb.CmplUsers.FindAsync(userId);
+        return cmplUser?.Email;
     }
 }

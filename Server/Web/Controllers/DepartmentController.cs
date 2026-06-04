@@ -12,10 +12,14 @@ namespace Web.Controllers;
 public class DepartmentController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly CmplDbContext _cmplDb;
+    private readonly HodDbContext _hodDb;
 
-    public DepartmentController(AppDbContext db)
+    public DepartmentController(AppDbContext db, CmplDbContext cmplDb, HodDbContext hodDb)
     {
         _db = db;
+        _cmplDb = cmplDb;
+        _hodDb = hodDb;
     }
 
     [HttpGet]
@@ -30,7 +34,7 @@ public class DepartmentController : ControllerBase
         var skip = (page - 1) * pageSize;
 
         var departments = await _db.Departments
-            .OrderBy(d => d.DeptId)
+            .OrderBy(d => d.Id)
             .Skip(skip)
             .Take(pageSize)
             .ToListAsync();
@@ -41,31 +45,33 @@ public class DepartmentController : ControllerBase
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var hods = await _db.HodMasters
+        var hods = await _hodDb.HodMasters
             .ToListAsync();
 
         var hodLookup = hods
-            .Where(h => hodIds.Contains(h.Id ?? string.Empty) || hodIds.Contains(h.IdRow.ToString()))
-            .GroupBy(h => h.Id ?? h.IdRow.ToString(), StringComparer.OrdinalIgnoreCase)
+            .Where(h => hodIds.Contains(h.EmployeeId ?? string.Empty) || hodIds.Contains(h.UserId.ToString()))
+            .GroupBy(h => h.EmployeeId ?? h.UserId.ToString(), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
-            .ToDictionary(h => h.Id ?? h.IdRow.ToString(), StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(h => h.EmployeeId ?? h.UserId.ToString(), StringComparer.OrdinalIgnoreCase);
 
-        var deptIds = departments.Select(d => d.DeptId).ToList();
+        var deptIds = departments.Select(d => d.Id).ToList();
 
-        var usersByDepartment = await _db.CmplUsers
-            .Where(c => c.DeptId != null && deptIds.Contains(c.DeptId.Value))
-            .GroupBy(c => c.DeptId!.Value)
+        var usersByDepartment = await _cmplDb.CmplUsers
+            .Where(c => c.DepartmentId != null && deptIds.Contains(c.DepartmentId.Value))
+            .GroupBy(c => c.DepartmentId!.Value)
             .ToDictionaryAsync(
                 group => group.Key,
-                group => (IReadOnlyList<CmplUserDto>)group
-                    .OrderBy(c => c.CmplUserName)
-                    .Select(c => new CmplUserDto(
-                        c.CmplUserId,
-                        c.CmplUserName,
-                        c.EmpId,
-                        c.MailId,
-                        c.MobNo,
-                        c.DeptId
+                group => (IReadOnlyList<UserProfile>)group
+                    .OrderBy(c => c.Name)
+                    .Select(c => new UserProfile(
+                        c.Id,
+                        c.Name,
+                        string.Empty,
+                        string.Empty,
+                        c.EmployeeId,
+                        c.Email,
+                        c.MobileNumber,
+                        c.DepartmentId
                     ))
                     .ToList());
 
@@ -88,20 +94,22 @@ public class DepartmentController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(department.HodId))
         {
-            hod = await _db.HodMasters
-                .FirstOrDefaultAsync(h => h.Id == department.HodId || h.IdRow.ToString() == department.HodId);
+            hod = await _hodDb.HodMasters
+                .FirstOrDefaultAsync(h => h.EmployeeId == department.HodId || h.UserId.ToString() == department.HodId);
         }
 
-        var users = await _db.CmplUsers
-            .Where(c => c.DeptId == deptId)
-            .OrderBy(c => c.CmplUserName)
-            .Select(c => new CmplUserDto(
-                c.CmplUserId,
-                c.CmplUserName,
-                c.EmpId,
-                c.MailId,
-                c.MobNo,
-                c.DeptId
+        var users = await _cmplDb.CmplUsers
+            .Where(c => c.DepartmentId == deptId)
+            .OrderBy(c => c.Name)
+            .Select(c => new UserProfile(
+                c.Id,
+                c.Name,
+                string.Empty,
+                string.Empty,
+                c.EmployeeId,
+                c.Email,
+                c.MobileNumber,
+                c.DepartmentId
             ))
             .ToListAsync();
 
@@ -114,12 +122,12 @@ public class DepartmentController : ControllerBase
         var dept = await _db.Departments.FindAsync(deptId);
         if (dept is null)
         {
-            dept = new Department { DeptId = deptId, DeptName = request.DeptName, HodId = request.HodId };
+            dept = new Department { Id = deptId, Name = request.DeptName, HodId = request.HodId };
             _db.Departments.Add(dept);
         }
         else
         {
-            dept.DeptName = request.DeptName ?? dept.DeptName;
+            dept.Name = request.DeptName ?? dept.Name;
             dept.HodId = request.HodId ?? dept.HodId;
             _db.Departments.Update(dept);
         }
@@ -128,19 +136,21 @@ public class DepartmentController : ControllerBase
 
         HodMaster? hod = null;
         if (!string.IsNullOrWhiteSpace(dept.HodId))
-            hod = await _db.HodMasters
-                .FirstOrDefaultAsync(h => h.Id == dept.HodId || h.IdRow.ToString() == dept.HodId);
+            hod = await _hodDb.HodMasters
+                .FirstOrDefaultAsync(h => h.EmployeeId == dept.HodId || h.UserId.ToString() == dept.HodId);
 
-        var users = await _db.CmplUsers
-            .Where(c => c.DeptId == deptId)
-            .OrderBy(c => c.CmplUserName)
-            .Select(c => new CmplUserDto(
-                c.CmplUserId,
-                c.CmplUserName,
-                c.EmpId,
-                c.MailId,
-                c.MobNo,
-                c.DeptId
+        var users = await _cmplDb.CmplUsers
+            .Where(c => c.DepartmentId == deptId)
+            .OrderBy(c => c.Name)
+            .Select(c => new UserProfile(
+                c.Id,
+                c.Name,
+                string.Empty,
+                string.Empty,
+                c.EmployeeId,
+                c.Email,
+                c.MobileNumber,
+                c.DepartmentId
             ))
             .ToListAsync();
 
@@ -150,24 +160,24 @@ public class DepartmentController : ControllerBase
     private static DepartmentResponseDto BuildDepartmentResponse(
         Department department,
         IReadOnlyDictionary<string, HodMaster> hods,
-        IReadOnlyDictionary<int, IReadOnlyList<CmplUserDto>> usersByDepartment)
+        IReadOnlyDictionary<int, IReadOnlyList<UserProfile>> usersByDepartment)
     {
         HodMaster? hod = null;
         if (!string.IsNullOrWhiteSpace(department.HodId))
             hods.TryGetValue(department.HodId, out hod);
 
-        usersByDepartment.TryGetValue(department.DeptId, out var users);
-        return BuildDepartmentResponse(department, hod, users ?? Array.Empty<CmplUserDto>());
+        usersByDepartment.TryGetValue(department.Id, out var users);
+        return BuildDepartmentResponse(department, hod, users ?? Array.Empty<UserProfile>());
     }
 
     private static DepartmentResponseDto BuildDepartmentResponse(
         Department department,
         HodMaster? hod,
-        IReadOnlyList<CmplUserDto> users)
+        IReadOnlyList<UserProfile> users)
     {
         return new DepartmentResponseDto(
-            new DepartmentDto(department.DeptId, department.DeptName, department.HodId ?? string.Empty),
-            hod is null ? null : new HodDto(hod.IdRow, hod.HodName, hod.Id, hod.EmailId, hod.MobNo),
+            new DepartmentDto(department.Id, department.Name, department.HodId ?? string.Empty),
+            hod is null ? null : new HodDto(hod.UserId, hod.Name, hod.EmployeeId, hod.Email, hod.MobileNumber),
             users
         );
     }

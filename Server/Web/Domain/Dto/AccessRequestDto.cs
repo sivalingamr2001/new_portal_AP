@@ -2,18 +2,17 @@ using Web.Domain.Enums;
 
 namespace Web.Domain.Dto;
 
-public sealed record SubmitAccessRequestItemDto(
-    string FolderPath,
-    AccessTypes AccessType,
-    AccessTypes ConfirmAccessType,
-    string Reason
-);
-
 public sealed record SubmitAccessRequestDto(
     int UserId,
     bool IsAgreed,
     string? ItsrNo,
     IReadOnlyList<SubmitAccessRequestItemDto> Items
+);
+public sealed record SubmitAccessRequestItemDto(
+    string FolderPath,
+    AccessTypes AccessType,
+    AccessTypes ConfirmAccessType,
+    string Reason
 );
 
 public sealed record ApprovalActionRequestDto(
@@ -37,7 +36,7 @@ public sealed record AccessApprovalDto(
     string ApprovalLevel,
     RequestStatus ApprovalStatus,
     string Comments,
-    DateTime ActionedAtUtc
+    DateTime CreatedOn
 );
 
 public sealed record AccessAuditDto(
@@ -51,7 +50,7 @@ public sealed record AccessAuditDto(
     string RecipientRole,
     bool IsRead,
     int? ActorUserId,
-    DateTime CreatedAtUtc
+    DateTime CreatedOn
 );
 
 public sealed record AccessRequestItemDto(
@@ -65,8 +64,8 @@ public sealed record AccessRequestItemDto(
     RequestStatus Status,
     int? HodApproverId,
     int? ItApproverId,
-    DateTime RequestedAtUtc,
-    DateTime LastActionAtUtc,
+    DateTime CreatedOn,
+    DateTime ModifiedOn,
     DateTime? ApprovedAtUtc,
     DateTime? ExpiresAtUtc,
     IReadOnlyList<AccessApprovalDto> Approvals
@@ -82,8 +81,8 @@ public sealed record AccessRequestDto(
     string? ItsrNo,
     RequestStatus CurrentStatus,
     int? CurrentApproverId,
-    DateTime RequestedAtUtc,
-    DateTime LastActionAtUtc,
+    DateTime CreatedOn,
+    DateTime ModifiedOn,
     IReadOnlyList<AccessRequestItemDto> Items
 );
 
@@ -92,5 +91,5 @@ public sealed record AccessNotificationDto(
     string EventType,
     string Message,
     bool IsRead,
-    DateTime CreatedAtUtc
+    DateTime CreatedOn
 );

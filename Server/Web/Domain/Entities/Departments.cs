@@ -1,16 +1,22 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Web.Domain.Common;
 
 namespace Web.Domain.Entities;
 
 [Table("jan_departments")]
-public sealed class Department
+public sealed class Department : BaseEntity
 {
-    [Column("DeptId")]
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Column("id")]
     public int Id { get; set; }
 
-    [Column("DeptName")]
+    [Column("dept_name")]
+    [MaxLength(255)]
     public string? Name { get; set; } = string.Empty;
 
-    [Column("HodId")]
+    [Column("hod_id")]
+    [MaxLength(255)]
     public string? HodId { get; set; } = string.Empty;
 }

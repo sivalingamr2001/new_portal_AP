@@ -10,14 +10,20 @@ namespace Web.Application.Services;
 public sealed class AccessRequestService : IAccessRequestService
 {
     private readonly AppDbContext _db;
+    private readonly CmplDbContext _cmplDb;
+    private readonly HodDbContext _hodDb;
     private readonly INotificationService _notificationService;
 
     public AccessRequestService(
         AppDbContext db,
+        CmplDbContext cmplDb,
+        HodDbContext hodDb,
         INotificationService notificationService)
     {
         _db = db;
         _notificationService = notificationService;
+        _cmplDb = cmplDb;
+        _hodDb = hodDb;
     }
 
     public async Task<AccessRequestDto> SubmitAsync(SubmitAccessRequestDto request)
@@ -28,7 +34,7 @@ public sealed class AccessRequestService : IAccessRequestService
         if (request.Items.Count == 0)
             throw new InvalidOperationException("At least one folder access item is required.");
 
-        var requester = await _db.CmplUsers.FindAsync(request.UserId);
+        var requester = await _cmplDb.CmplUsers.FindAsync(request.UserId);
         if (requester is null)
             throw new InvalidOperationException("Request user was not found.");
 
@@ -40,8 +46,8 @@ public sealed class AccessRequestService : IAccessRequestService
             IsAgreed = request.IsAgreed,
             ItsrNo = request.ItsrNo?.Trim(),
             CurrentStatus = RequestStatus.PendingWithHod,
-            RequestedAtUtc = now,
-            LastActionAtUtc = now
+            CreatedOn = now,
+            ModifiedOn = now
         };
 
         var createdItems = new List<AccessItemEntity>();
@@ -51,6 +57,8 @@ public sealed class AccessRequestService : IAccessRequestService
             var folderPath = RequestWorkflowSupport.NormalizeFolderPath(item.FolderPath);
             var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
                 _db,
+                _cmplDb,
+                _hodDb,
                 request.UserId,
                 folderPath);
 
@@ -69,8 +77,8 @@ public sealed class AccessRequestService : IAccessRequestService
                 ConfirmAccessType = item.ConfirmAccessType,
                 Reason = item.Reason.Trim(),
                 HodApproverId = hodApproverId,
-                RequestedAtUtc = now,
-                LastActionAtUtc = now
+                CreatedOn = now,
+                ModifiedOn = now
             });
         }
 
@@ -83,6 +91,8 @@ public sealed class AccessRequestService : IAccessRequestService
 
         var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(
             _db,
+            _cmplDb,
+            _hodDb,
             request.UserId);
 
         var recipientIds = createdItems
@@ -107,7 +117,7 @@ public sealed class AccessRequestService : IAccessRequestService
             recipientIds,
             request.UserId);
 
-        return (await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestEntity.AccessReqId))!;
+        return (await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestEntity.AccessReqId))!;
     }
 
     public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetAllPagedAsync(int? userId, int page, int pageSize)
@@ -119,7 +129,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         var totalCount = await query.CountAsync();
         var requestIds = await query
-            .OrderByDescending(r => r.RequestedAtUtc)
+            .OrderByDescending(r => r.CreatedOn)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(r => r.AccessReqId)
@@ -129,7 +139,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }
@@ -145,7 +155,7 @@ public sealed class AccessRequestService : IAccessRequestService
             query = query.Where(r => r.UserId == userId.Value);
 
         var requestIds = await query
-            .OrderByDescending(r => r.RequestedAtUtc)
+            .OrderByDescending(r => r.CreatedOn)
             .Select(r => r.AccessReqId)
             .ToListAsync();
 
@@ -153,7 +163,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }
@@ -162,7 +172,7 @@ public sealed class AccessRequestService : IAccessRequestService
     }
 
     public Task<AccessRequestDto?> GetByIdAsync(int accessReqId) =>
-        RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
 
     public async Task<(IReadOnlyList<AccessRequestDto> Items, int TotalCount)> GetPendingHodCartPagedAsync(int approverId, int page, int pageSize)
     {
@@ -182,7 +192,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }
@@ -202,7 +212,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }
@@ -228,7 +238,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }
@@ -248,7 +258,7 @@ public sealed class AccessRequestService : IAccessRequestService
 
         foreach (var requestId in requestIds)
         {
-            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, requestId);
+            var dto = await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, requestId);
             if (dto is not null)
                 results.Add(dto);
         }

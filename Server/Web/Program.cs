@@ -78,7 +78,6 @@ using (var scope = app.Services.CreateScope())
         .CreateLogger("AppDataSeeder");
 
     await WorkflowSchemaInitializer.EnsureCreatedAsync(db);
-    //await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
 }
 
 if (app.Environment.IsDevelopment())

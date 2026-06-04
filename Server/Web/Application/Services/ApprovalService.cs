@@ -10,13 +10,19 @@ namespace Web.Application.Services;
 public sealed class ApprovalService : IApprovalService
 {
     private readonly AppDbContext _db;
+    private readonly CmplDbContext _cmplDb;
+    private readonly HodDbContext _hodDb;
     private readonly INotificationService _notificationService;
 
     public ApprovalService(
         AppDbContext db,
+        CmplDbContext cmplDb,
+        HodDbContext hodDb,
         INotificationService notificationService)
     {
         _db = db;
+        _cmplDb = cmplDb;
+        _hodDb = hodDb;
         _notificationService = notificationService;
     }
 
@@ -31,7 +37,7 @@ public sealed class ApprovalService : IApprovalService
 
         context.Item.Status = RequestStatus.PendingWithIt;
         context.Item.RejectionReason = null;
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
 
         await AddApprovalAsync(
             accessReqId,
@@ -62,7 +68,7 @@ public sealed class ApprovalService : IApprovalService
             itUsers,
             request.ApproverId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> RejectByHodAsync(int accessReqId, int accessItemId, ApprovalActionRequestDto request)
@@ -76,7 +82,7 @@ public sealed class ApprovalService : IApprovalService
 
         context.Item.Status = RequestStatus.HodRejected;
         context.Item.RejectionReason = request.Comments?.Trim();
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
 
         await AddApprovalAsync(
             accessReqId,
@@ -97,7 +103,7 @@ public sealed class ApprovalService : IApprovalService
             new[] { context.Request.UserId },
             request.ApproverId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> ApproveByItAsync(int accessReqId, int accessItemId, ApprovalActionRequestDto request)
@@ -114,8 +120,8 @@ public sealed class ApprovalService : IApprovalService
         context.Item.RejectionReason = null;
         context.Item.ConfirmAccessType = request.ConfirmAccessType ?? context.Item.ConfirmAccessType;
         context.Item.ApprovedAtUtc = DateTime.UtcNow;
-        context.Item.ExpiresAtUtc = context.Item.ApprovedAtUtc.Value.AddDays(90);
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ExpiresAtUtc = DateTime.UtcNow.AddDays(90);
+        context.Item.ModifiedOn = DateTime.UtcNow;
 
         await AddApprovalAsync(
             accessReqId,
@@ -140,7 +146,7 @@ public sealed class ApprovalService : IApprovalService
             recipients,
             request.ApproverId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> RejectByItAsync(int accessReqId, int accessItemId, ApprovalActionRequestDto request)
@@ -155,7 +161,7 @@ public sealed class ApprovalService : IApprovalService
         context.Item.Status = RequestStatus.ItRejected;
         context.Item.ItApproverId = request.ApproverId;
         context.Item.RejectionReason = request.Comments?.Trim();
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
         context.Item.ApprovedAtUtc = null;
         context.Item.ExpiresAtUtc = null;
 
@@ -182,7 +188,7 @@ public sealed class ApprovalService : IApprovalService
             recipients,
             request.ApproverId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> ResubmitAsync(int accessReqId, int accessItemId, ResubmitAccessRequestDto request)
@@ -204,6 +210,8 @@ public sealed class ApprovalService : IApprovalService
 
         var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
             _db,
+            _cmplDb,
+            _hodDb,
             request.UserId,
             folderPath);
 
@@ -220,12 +228,12 @@ public sealed class ApprovalService : IApprovalService
         context.Item.ItApproverId = null;
         context.Item.ApprovedAtUtc = null;
         context.Item.ExpiresAtUtc = null;
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
 
         await RequestWorkflowSupport.UpdateRequestAggregateAsync(_db, context.Request);
         await _db.SaveChangesAsync();
 
-        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, request.UserId);
+        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, _cmplDb, _hodDb, request.UserId);
         var recipients = new[] { request.UserId, hodApproverId.Value }
             .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
             .Distinct()
@@ -239,7 +247,7 @@ public sealed class ApprovalService : IApprovalService
             recipients,
             request.UserId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> RenewAsync(int accessReqId, int accessItemId, ResubmitAccessRequestDto request)
@@ -261,6 +269,8 @@ public sealed class ApprovalService : IApprovalService
 
         var hodApproverId = await RequestWorkflowSupport.ResolveMappedHodApproverAsync(
             _db,
+            _cmplDb,
+            _hodDb,
             request.UserId,
             folderPath);
 
@@ -277,13 +287,12 @@ public sealed class ApprovalService : IApprovalService
         context.Item.ItApproverId = null;
         context.Item.ApprovedAtUtc = null;
         context.Item.ExpiresAtUtc = null;
-        context.Item.RequestedAtUtc = DateTime.UtcNow;
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
 
         await RequestWorkflowSupport.UpdateRequestAggregateAsync(_db, context.Request);
         await _db.SaveChangesAsync();
 
-        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, request.UserId);
+        var requesterDeptHodId = await RequestWorkflowSupport.ResolveRequesterDeptHodApproverAsync(_db, _cmplDb, _hodDb, request.UserId);
         var recipients = new[] { request.UserId, hodApproverId.Value }
             .Concat(requesterDeptHodId is null ? Array.Empty<int>() : new[] { requesterDeptHodId.Value })
             .Distinct()
@@ -297,7 +306,7 @@ public sealed class ApprovalService : IApprovalService
             recipients,
             request.UserId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<AccessRequestDto?> RevokeAsync(int accessReqId, int accessItemId, ApprovalActionRequestDto request)
@@ -313,7 +322,7 @@ public sealed class ApprovalService : IApprovalService
             throw new InvalidOperationException("Only IT approved requests can be revoked.");
 
         context.Item.Status = RequestStatus.Revoked;
-        context.Item.LastActionAtUtc = DateTime.UtcNow;
+        context.Item.ModifiedOn = DateTime.UtcNow;
         context.Item.ExpiresAtUtc = DateTime.UtcNow;
         context.Item.ItApproverId = request.ApproverId;
 
@@ -340,7 +349,7 @@ public sealed class ApprovalService : IApprovalService
             recipients,
             request.ApproverId);
 
-        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, accessReqId);
+        return await RequestWorkflowSupport.BuildRequestDtoAsync(_db, _cmplDb, accessReqId);
     }
 
     public async Task<int> ExpireApprovedRequestsAsync(DateTime utcNow)
@@ -368,7 +377,7 @@ public sealed class ApprovalService : IApprovalService
         foreach (var item in expiringItems)
         {
             item.Status = RequestStatus.Expired;
-            item.LastActionAtUtc = utcNow;
+            item.ModifiedOn = utcNow;
 
             var request = requests[item.AccessReqId];
 
@@ -438,7 +447,7 @@ public sealed class ApprovalService : IApprovalService
             ApprovalStatus = status,
             ApprovalLevel = approvalLevel,
             Comments = comments?.Trim() ?? string.Empty,
-            ActionedAtUtc = DateTime.UtcNow
+            CreatedOn = DateTime.UtcNow
         };
 
         _db.AccessApprovals.Add(approval);
