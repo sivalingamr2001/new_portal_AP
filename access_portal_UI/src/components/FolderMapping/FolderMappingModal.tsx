@@ -3,7 +3,6 @@ import type {
   FolderMappingDto,
   UpsertFolderMappingRequest
 } from "@/api/types"
-import { usersApi } from "@/api/usersApi"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,15 +12,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { startTransition, useEffect, useState } from "react"
-
-export interface HodDto {
-  idRow?: number
-  hodName: string
-  id?: string | null
-  emailId?: string | null
-  mobNo?: string | null
-}
+import { useEffect, useState } from "react"
+import { HodSelect } from "../Hod/HodSelect"
+import { toast } from "sonner"
 
 export interface FolderResponseDto {
   id?: string | null
@@ -34,22 +27,27 @@ interface FolderMappingModalProps {
   isOpen: boolean
   onClose: () => void
   initialData: FolderMappingDto | null
-  onSave: (payload: UpsertFolderMappingRequest) => Promise<void> // Fully matches DynamicGridPage contract
 }
 
 export const FolderMappingModal = ({
   isOpen,
   onClose,
   initialData,
-  onSave,
 }: FolderMappingModalProps) => {
   const [loading, setLoading] = useState(false)
   const [folders, setFolders] = useState<FolderResponseDto[]>([])
-  const [hods, setHods] = useState<HodDto[]>([])
 
   const [folderPath, setFolderPath] = useState<string>("")
-  const [primaryHod, setPrimaryHod] = useState<HodDto | null>(null)
-  const [secondaryHod, setSecondaryHod] = useState<HodDto | null>(null)
+  const [primaryHod, setPrimaryHod] = useState<{
+    id: string
+    hodName?: string
+    emailId?: string
+  } | null>(null)
+  const [secondaryHod, setSecondaryHod] = useState<{
+    id: string
+    hodName?: string
+    emailId?: string
+  } | null>(null)
 
   // 1. Data Lookups aligned with non-wrapped raw endpoints context
   useEffect(() => {
@@ -57,10 +55,7 @@ export const FolderMappingModal = ({
 
     const loadDropdownData = async () => {
       try {
-        const [foldersRes, hodsRes] = await Promise.all([
-          folderMappingsApi.getParentFolders(),
-          usersApi.getHods(),
-        ])
+        const foldersRes = await folderMappingsApi.getParentFolders()
 
         if (foldersRes) {
           // Normalize Drive/Path structure if needed from FolderResponse
@@ -70,20 +65,6 @@ export const FolderMappingModal = ({
             path: f.driveName ? `${f.driveName}:\\${f.name}` : f.name || "",
           }))
           setFolders(transformedFolders)
-        }
-
-        if (hodsRes) {
-          const extractedHods = Array.isArray(hodsRes)
-            ? hodsRes
-            : (hodsRes as any).data || (hodsRes as any).value || []
-
-          // Map backend attributes cleanly onto client UI dropdown models
-          const normalizedHods = extractedHods.map((h: any) => ({
-            id: String(h.employeeId || h.hodId || h.userId || h.id || ""),
-            hodName: h.hodName || h.name || "N/A",
-            emailId: h.emailId || h.email || "",
-          }))
-          setHods(normalizedHods)
         }
       } catch (err) {
         console.error("Failed to load modal dropdown data", err)
@@ -135,12 +116,21 @@ export const FolderMappingModal = ({
     }
 
     try {
-      await onSave(payload) // Orchestrated directly by the shared parent component
+      await folderMappingsApi.createFolderMapping(payload)
+
+      toast.success(
+        initialData
+          ? "Folder mapping updated successfully"
+          : "Folder mapping created successfully"
+      )
+
+      onClose()
     } catch (err) {
       console.error(
         "Failed to save folder mapping inside modular boundary:",
         err
       )
+      toast.error("Failed to save folder mapping")
     } finally {
       setLoading(false)
     }
@@ -178,43 +168,48 @@ export const FolderMappingModal = ({
 
           <div className="space-y-2">
             <Label htmlFor="primaryHod">Primary HOD</Label>
-            <select
-              id="primaryHod"
-              value={primaryHod?.id || ""}
-              onChange={(e) => {
-                const selected = hods.find((h) => h.id === e.target.value)
-                setPrimaryHod(selected || null)
+            {/* HodSelect returns EmployeeId */}
+            <HodSelect
+              value={
+                primaryHod
+                  ? {
+                      employeeId: primaryHod.id,
+                      hodName: primaryHod.hodName || "",
+                      emailId: primaryHod.emailId,
+                    }
+                  : null
+              }
+              onChange={(hod) => {
+                setPrimaryHod({
+                  id: hod.employeeId,
+                  hodName: hod.hodName,
+                  emailId: hod.emailId,
+                })
               }}
-              className="w-full rounded-md border bg-background p-2 text-sm"
-              required
-            >
-              <option value="">Select Primary HOD</option>
-              {hods.map((h, idx) => (
-                <option key={h.id || idx} value={h.id || ""}>
-                  {h.hodName} {h.emailId ? `(${h.emailId})` : ""}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="secondaryHod">Secondary HOD</Label>
-            <select
-              id="secondaryHod"
-              value={secondaryHod?.id || ""}
-              onChange={(e) => {
-                const selected = hods.find((h) => h.id === e.target.value)
-                startTransition(() => setSecondaryHod(selected || null))
+            {/* HodSelect returns EmployeeId */}
+            <HodSelect
+              value={
+                secondaryHod
+                  ? {
+                      employeeId: secondaryHod.id,
+                      hodName: secondaryHod.hodName || "",
+                      emailId: secondaryHod.emailId,
+                    }
+                  : null
+              }
+              onChange={(hod) => {
+                setSecondaryHod({
+                  id: hod.employeeId,
+                  hodName: hod.hodName,
+                  emailId: hod.emailId,
+                })
               }}
-              className="w-full rounded-md border bg-background p-2 text-sm"
-            >
-              <option value="">Select Secondary HOD (Optional)</option>
-              {hods.map((h, idx) => (
-                <option key={h.id || idx} value={h.id || ""}>
-                  {h.hodName} {h.emailId ? `(${h.emailId})` : ""}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <DialogFooter className="pt-4">

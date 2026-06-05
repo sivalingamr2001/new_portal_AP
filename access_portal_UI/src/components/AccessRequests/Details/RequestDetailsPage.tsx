@@ -1,31 +1,28 @@
-import { useEffect, useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
-import accessRequestApi from "@/api/accessRequestApi"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useParams, useSearchParams } from "react-router-dom"
+import { accessRequestsApi, hodCartApi, operatorCartApi } from "@/api"
 import { useAuth } from "@/context/AuthContext"
+import type { AccessRequestDetailDto } from "@/api/types"
 import RequestDetails from "./RequestDetailSheet"
-import RequestDetailHeaders from "./RequestDetailHeader"
-
-export type StepStatus = "idle" | "completed" | "inprogress" | "destructive"
-
-export interface StepItem {
-  id: number | string
-  title: string
-  sub: string
-  status: StepStatus
-  label?: string
-}
+import { toast } from "sonner"
+import { AccessRequestBpf } from "./AccessRequestBpf"
 
 export const RequestDetailsPage = () => {
   const { requestId } = useParams<{ requestId: string }>()
-  const id = requestId || ""
-  const { currentUser } = useAuth()
+  const [searchParams] = useSearchParams()
+  const selectedItemId = Number(searchParams.get("itemId") || 0)
+  const { currentUserRole } = useAuth()
 
-  const [request, setRequest] = useState<any | null>(null)
+  const [request, setRequest] = useState<AccessRequestDetailDto | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const accessReqId = Number(id)
+  const fetchRequest = useCallback(() => {
+    const accessReqId = Number(requestId)
+
     if (!accessReqId) {
+      setRequest(null)
+      setError("Invalid request id.")
       setLoading(false)
       return
     }
@@ -33,15 +30,18 @@ export const RequestDetailsPage = () => {
     let isMounted = true
 
     setLoading(true)
-    accessRequestApi
-      .getById(accessReqId)
+    setError(null)
+
+    accessRequestsApi
+      .getRequestDetail(accessReqId)
       .then((response) => {
         if (!isMounted) return
-        setRequest(response?.value ?? null)
+        setRequest(response)
       })
       .catch(() => {
         if (!isMounted) return
         setRequest(null)
+        setError("Unable to load request details.")
       })
       .finally(() => {
         if (isMounted) setLoading(false)
@@ -50,85 +50,147 @@ export const RequestDetailsPage = () => {
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [requestId])
 
-  const workflowSteps = useMemo<StepItem[]>(() => {
-    if (!request) {
-      return [
-        {
-          id: 1,
-          title: "Loading request",
-          sub: "Fetching live data…",
-          status: "inprogress",
-        },
-        { id: 2, title: "Workflow", sub: "Please wait", status: "idle" },
-      ]
+  useEffect(() => fetchRequest(), [fetchRequest])
+
+  const visibleRequest = useMemo(() => {
+    if (!request) return null
+    if (!selectedItemId) return request
+
+    const selectedItem = request.items.find(
+      (item) => item.itemId === selectedItemId
+    )
+
+    return selectedItem
+      ? {
+          ...request,
+          currentStatus: selectedItem.status,
+          items: [selectedItem],
+        }
+      : request
+  }, [request, selectedItemId])
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-2xl border bg-card p-8 text-sm text-muted-foreground">
+        Loading request details...
+      </div>
+    )
+  }
+
+  if (error || !visibleRequest) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-sm text-destructive">
+        {error || "Request details not found."}
+      </div>
+    )
+  }
+
+  const refreshAfterAction = async (
+    action: () => Promise<void>,
+    message: string
+  ) => {
+    try {
+      await action()
+      toast.success(message)
+      fetchRequest()
+    } catch (actionError) {
+      console.error(actionError)
+      toast.error("Action failed. Please try again.")
+    }
+  }
+
+  const handleApprove = (itemId: number) => {
+    const item = visibleRequest.items.find(
+      (candidate) => candidate.itemId === itemId
+    )
+
+    if (item?.status === "PendingWithHod") {
+      refreshAfterAction(
+        () => hodCartApi.approveItem(itemId, { reason: "Approved" }),
+        "Item approved."
+      )
+      return
     }
 
-    const statusLabel =
-      request.currentStatus === 1
-        ? "Submitted"
-        : request.currentStatus === 2
-          ? "Pending with HOD"
-          : request.currentStatus === 3
-            ? "Pending with IT"
-            : request.currentStatus === 4
-              ? "Approved"
-              : request.currentStatus === 5
-                ? "Expired"
-                : "In review"
+    refreshAfterAction(
+      () => operatorCartApi.approveItem(itemId, { reason: "Provisioned" }),
+      "Item provisioned."
+    )
+  }
 
-    return [
-      {
-        id: 1,
-        title: "Submission",
-        sub: `Requested by ${request.userName || "user"}`,
-        status: "completed",
-      },
-      {
-        id: 2,
-        title: "HOD Review",
-        sub: currentUser?.hod?.hodName || "Assigned HOD",
-        status: request.currentStatus >= 2 ? "completed" : "inprogress",
-      },
-      {
-        id: 3,
-        title: "IT Provisioning",
-        sub: statusLabel,
-        status: request.currentStatus >= 3 ? "completed" : "inprogress",
-      },
-      {
-        id: 4,
-        title: "Current State",
-        sub: request.items?.length
-          ? `${request.items.length} item(s)`
-          : "No items",
-        status: "idle",
-      },
-    ]
-  }, [currentUser?.hod?.hodName, request])
+  const handleReject = (itemId: number, reason: string) => {
+    const item = visibleRequest.items.find(
+      (candidate) => candidate.itemId === itemId
+    )
+
+    if (item?.status === "PendingWithHod") {
+      refreshAfterAction(
+        () => hodCartApi.rejectItem(itemId, { reason }),
+        "Item rejected."
+      )
+      return
+    }
+
+    refreshAfterAction(
+      () => operatorCartApi.rejectItem(itemId, { reason }),
+      "Item rejected."
+    )
+  }
+
+  const handleRevoke = (itemId: number) => {
+    refreshAfterAction(
+      () => operatorCartApi.revokeItem(itemId, { reason: "Revoked" }),
+      "Item revoked."
+    )
+  }
+
+  const handleResubmit = (itemId: number, reason: string) => {
+    refreshAfterAction(
+      () => accessRequestsApi.resubmitItem(itemId, { reason }),
+      "Item resubmitted."
+    )
+  }
+
+  const handleRenew = (itemId: number, reason: string) => {
+    refreshAfterAction(
+      () => accessRequestsApi.renewItem(itemId, { reason }),
+      "Renewal request submitted."
+    )
+  }
+
+  const handleExport = () => {
+    const fileName =
+      visibleRequest.items.length === 1
+        ? `${visibleRequest.items[0].ticketNumber}.json`
+        : `request-${visibleRequest.requestId}.json`
+    const blob = new Blob([JSON.stringify(visibleRequest, null, 2)], {
+      type: "application/json",
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+
+    link.href = url
+    link.download = fileName
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
-    <div className="sm:px-6 lg:px-2">
-      <div className="mx-auto max-w-full space-y-8">
-        <RequestDetailHeaders steps={workflowSteps} />
-
-        <main className="rounded-3xl border border-slate-900 bg-slate-900/20 p-1 shadow-2xl backdrop-blur-md">
-          {loading && !request ? (
-            <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-8 text-sm text-slate-300">
-              Loading live request details…
-            </div>
-          ) : (
-            <RequestDetails
-              currentUserRole={(currentUser?.user?.role || "USER") as any}
-              currentUserId={currentUser?.user?.userId ?? 0}
-              hodName={currentUser?.hod?.hodName ?? null}
-              requestPayload={{
-                data: request ? [request] : [],
-              }}
-            />
-          )}
-        </main>
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
+      <AccessRequestBpf status={visibleRequest.currentStatus} />
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <RequestDetails
+          request={visibleRequest}
+          currentUserRole={currentUserRole}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onRevoke={handleRevoke}
+          onResubmit={handleResubmit}
+          onRenew={handleRenew}
+          onExport={handleExport}
+        />
       </div>
     </div>
   )

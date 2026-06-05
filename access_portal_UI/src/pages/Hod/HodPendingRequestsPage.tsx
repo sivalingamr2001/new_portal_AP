@@ -1,5 +1,4 @@
 import { hodCartApi } from "@/api"
-import { normalizeHodCartItem } from "@/lib/api-result"
 import { RequestsPageFactory } from "../common/RequestsPageFactory"
 
 export const HodPendingRequestsPage = () => {
@@ -7,7 +6,7 @@ export const HodPendingRequestsPage = () => {
     <RequestsPageFactory
       fetchApiFn={async () => {
         const result = await hodCartApi.getCart()
-        return result.data.map(normalizeHodCartItem)
+        return result
       }}
       actionButtonLabel="Review"
       actionButtonRoutePrefix="/review"

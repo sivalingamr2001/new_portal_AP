@@ -15,10 +15,10 @@ import { useAuth } from "@/context/AuthContext"
 import { AgreementCheckbox } from "./AgreementsSection"
 import AccessDetailsSection, { type RequestItem } from "./AccessDetailsSection"
 import { UserSection, type UserSectionValue } from "./UserSection"
-import userApi from "@/api/userApi"
 import { toast } from "sonner"
-import accessRequestApi from "@/api/accessRequestApi"
 import type { SubmitAccessRequestDto } from "@/api/types"
+import { accessRequestsApi } from "@/api/accessRequestsApi"
+import { usersApi } from "@/api/usersApi"
 
 type CreateRequestModalProps = {
   isOpen: boolean
@@ -48,37 +48,35 @@ export const CreateRequestModal = ({
 
     if (!fieldValue) return
 
-    const response = await userApi.getById(
-      field === "userId" ? Number(fieldValue) : undefined,
-      field === "employeeId" ? String(fieldValue) : undefined,
-      field === "email" ? String(fieldValue) : undefined
+    const response = await usersApi.getPortalUser(
+      field === "userId" ? Number(fieldValue) : undefined
     )
 
-    if (!response.value) return
+    if (!response?.user) return
 
-    const user = response.value
+    const user = response
 
     setValue((prev) => ({
       ...prev,
-      userId: user.user.userId,
-      employeeId: user.cmplUser.empId ?? "",
-      name: user.cmplUser.cmplUserName ?? "",
-      email: user.cmplUser.mailId ?? "",
-      departmentName: user.department?.deptName ?? "",
-      hodName: user.hod?.hodName ?? "",
+      userId: user.user?.id ?? 0,
+      employeeId: user.user?.employeeId ?? "",
+      name: user.user?.name ?? "",
+      email: user.user?.email ?? "",
+      departmentName: user.department?.name ?? "",
+      hodName: user.headOfDepartment?.name ?? "",
     }))
   }
 
   const [value, setValue] = useState({
-    userId: currentUser?.user?.userId ?? 0,
-    employeeId: currentUser?.cmplUser?.empId ?? "",
-    name: currentUser?.cmplUser?.cmplUserName ?? "",
-    email: currentUser?.cmplUser?.mailId ?? "",
+    userId: currentUser?.user?.id ?? 0,
+    employeeId: currentUser?.user?.employeeId ?? "",
+    name: currentUser?.user?.name ?? "",
+    email: currentUser?.user?.email ?? "",
     itsrNumber: "",
-    departmentName: currentUser?.department?.deptName ?? "",
-    hodName: currentUser?.hod?.hodName ?? "",
+    departmentName: currentUser?.department?.name ?? "",
+    hodName: currentUser?.headOfDepartment?.name ?? "",
     location: currentUser?.user?.location ?? "",
-    mobile: currentUser?.cmplUser?.mobNo ?? "",
+    mobile: currentUser?.user?.mobileNumber ?? "",
     agreementAccepted: false,
   })
 
@@ -109,7 +107,6 @@ export const CreateRequestModal = ({
 
     try {
       const payload: SubmitAccessRequestDto = {
-        userId: value.userId,
         isAgreed: value.agreementAccepted,
         itsrNo: value.itsrNumber || null,
         items: requestItems.map((item) => ({
@@ -122,10 +119,23 @@ export const CreateRequestModal = ({
         })),
       }
 
-      const response = await accessRequestApi.submit(payload)
+      const requestId = await accessRequestsApi.submitRequest(payload)
 
-      if (response) {
+      if (requestId > 0) {
         toast.success("Access request submitted successfully!")
+        setRequestItems([
+          {
+            id: 1,
+            accessType: "not-applicable",
+            folderPath: "",
+            reason: "",
+          },
+        ])
+        setValue((prev) => ({
+          ...prev,
+          itsrNumber: "",
+          agreementAccepted: false,
+        }))
         onOpenChange(false)
       }
     } catch (error) {

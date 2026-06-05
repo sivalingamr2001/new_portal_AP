@@ -17,9 +17,9 @@ public sealed class AuthService(
 
         var cmplUser = isTestEnv
             ? await db.CmplUsers.FirstOrDefaultAsync(u =>
-                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier)
+                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier || u.Name == dto.Identifier)
             : await cmplDb.CmplUsers.FirstOrDefaultAsync(u =>
-                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier);
+                u.EmployeeId == dto.Identifier || u.Email == dto.Identifier || u.Name == dto.Identifier);
 
         if (cmplUser is null)
             return Result.Failure<LoginResponseDto>(
@@ -38,14 +38,19 @@ public sealed class AuthService(
         if (cmplUser.DepartmentId.HasValue)
         {
             department = await db.Departments
-                .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
+                .FirstOrDefaultAsync(d =>
+                    d.Id == cmplUser.DepartmentId.Value &&
+                    d.IsActive);
 
-            if (department?.HodId is not null
-                && int.TryParse(department.HodId, out var hodId))
+            if (department?.HodId != null)
             {
                 hod = isTestEnv
-                    ? await db.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0)
-                    : await hodDb.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0);
+                    ? await db.HodMasters.FirstOrDefaultAsync(h =>
+                        h.EmployeeId == department.HodId &&
+                        h.Deleted == 0)
+                    : await hodDb.HodMasters.FirstOrDefaultAsync(h =>
+                        h.EmployeeId == department.HodId &&
+                        h.Deleted == 0);
             }
         }
 

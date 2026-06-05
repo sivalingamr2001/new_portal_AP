@@ -1,4 +1,3 @@
-import folderMappingApi from "@/api/folderMappingApi"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronUp, FolderOpen, Plus, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
@@ -16,6 +15,8 @@ import {
 } from "../ui/select"
 import { Textarea } from "../ui/textarea"
 import { useAuth } from "@/context/AuthContext"
+import { folderMappingsApi } from "@/api"
+import { useLoader } from "@/hooks/useLoader"
 
 type FolderNode = {
   driveName: string
@@ -85,18 +86,27 @@ function AccessDetailsSection({
 
   const [activeItemId, setActiveItemId] = useState<number | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
+const { loading, withLoader } = useLoader();
 
-    folderMappingApi.getFolderHierarchy().then((result) => {
-      if (!isMounted || !result.isSuccess || !result.value) return
-      setFolders(result.value.map(mapFolderNode))
-    })
+useEffect(() => {
+  let cancelled = false;
 
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const loadFolders = async () => {
+    const result = await withLoader(() =>
+      folderMappingsApi.getFolderHierarchy()
+    );
+
+    if (cancelled || !result) return;
+
+    setFolders(result.map(mapFolderNode));
+  };
+
+  loadFolders();
+
+  return () => {
+    cancelled = true;
+  };
+}, [withLoader]);
 
   const updateItems = (nextItems: RequestItem[]) => {
     setItems(nextItems)
@@ -323,6 +333,7 @@ function AccessDetailsSection({
       </section>
 
       <FolderPathSheet
+      loading={loading}
         open={folderSheetOpen}
         onOpenChange={setFolderSheetOpen}
         folders={folders}

@@ -50,7 +50,7 @@ export const LoginPage = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-muted/40 p-4 md:p-8">
+      <div className="flex min-h-screen w-full items-center justify-center p-4 md:p-8">
         <div className="w-full max-w-sm md:max-w-md">
           <Loader />
         </div>

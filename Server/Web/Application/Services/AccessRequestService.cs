@@ -25,19 +25,28 @@ public sealed class AccessRequestService(
             ? await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId)
             : await cmplDb.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId);
 
+        if (user is null)
+            return Result.Failure<int>(Error.NotFound("REQ_004",
+                "Submitting user was not found."));
+
         if (!dto.IsAgreed)
             return Result.Failure<int>(Error.Validation("REQ_001",
                 "You must agree to the terms before submitting."));
 
+        var reqTo = await ResolveRequestHodUserIdAsync(dto.ReqTo, user, isTestEnv);
+        if (reqTo is null)
+            return Result.Failure<int>(Error.NotFound("REQ_005",
+                "HOD could not be resolved for the submitting user's department."));
+
         var request = new AccessRequestEntity
         {
-            UserId        = submittedByUserId,
-            ReqTo         = dto.ReqTo,
-            IsAgreed      = true,
+            UserId = submittedByUserId,
+            ReqTo = reqTo.Value,
+            IsAgreed = true,
             CurrentStatus = RequestStatus.PendingWithHod,
-            IsActive      = true,
-            CreatedOn     = DateTime.UtcNow,
-            CreatedBy     = submittedByUserId
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = submittedByUserId
         };
 
         db.AccessRequests.Add(request);
@@ -71,13 +80,13 @@ public sealed class AccessRequestService(
 
         var request = new AccessRequestEntity
         {
-            UserId        = hodUserId,
-            ReqTo         = dto.ReqTo,
-            IsAgreed      = true,
+            UserId = hodUserId,
+            ReqTo = dto.ReqTo ?? hodUserId,
+            IsAgreed = true,
             CurrentStatus = RequestStatus.PendingWithIt,
-            IsActive      = true,
-            CreatedOn     = DateTime.UtcNow,
-            CreatedBy     = hodUserId
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = hodUserId
         };
 
         db.AccessRequests.Add(request);
@@ -126,20 +135,25 @@ public sealed class AccessRequestService(
     public async Task<PagedResult<AccessRequestSummaryDto>> GetMyRequestsAsync(
         int userId, int page, int pageSize)
     {
-        var query = db.AccessRequests
-            .Where(r => r.UserId == userId)
-            .OrderByDescending(r => r.CreatedOn);
+        var query = db.AccessItems
+            .Include(i => i.AccessRequest)
+            .Where(i => i.AccessRequest.UserId == userId)
+            .OrderByDescending(i => i.AccessRequest.CreatedOn);
 
         var total = await query.CountAsync();
 
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Include(r => r.AccessItems)
-            .Select(r => MapToSummaryDto(r))
+            .Select(i => MapToSummaryDto(i))
             .ToListAsync();
 
-        return new PagedResult<AccessRequestSummaryDto>(items, total, page, pageSize);
+        return new PagedResult<AccessRequestSummaryDto>(
+            items,
+            total,
+            page,
+            pageSize
+        );
     }
 
     // ─── Resubmit Rejected Item ──────────────────────────────────────────────────
@@ -162,13 +176,13 @@ public sealed class AccessRequestService(
                 "Only rejected items can be resubmitted."));
 
         // Reset item back to PendingWithHod
-        item.Status           = RequestStatus.PendingWithHod;
-        item.Reason           = reason;
-        item.RejectionReason  = null;
-        item.HodApproverId    = null;
-        item.ItApproverId     = null;
-        item.ModifiedOn       = DateTime.UtcNow;
-        item.ModifiedBy       = userId;
+        item.Status = RequestStatus.PendingWithHod;
+        item.Reason = reason;
+        item.RejectionReason = null;
+        item.HodApproverId = null;
+        item.ItApproverId = null;
+        item.ModifiedOn = DateTime.UtcNow;
+        item.ModifiedBy = userId;
 
         db.AccessReqAudits.Add(BuildAudit(item.AccessReqId, item.AccessItemId,
             "Resubmitted", $"Item {item.TicketNumber} resubmitted by user.", userId));
@@ -203,15 +217,15 @@ public sealed class AccessRequestService(
                 "Only approved or expired items can be renewed."));
 
         // Reset for re-approval cycle
-        item.Status          = RequestStatus.PendingWithHod;
-        item.Reason          = reason;
+        item.Status = RequestStatus.PendingWithHod;
+        item.Reason = reason;
         item.RejectionReason = null;
-        item.ApprovedAtUtc   = null;
-        item.ExpiresAtUtc    = null;
-        item.HodApproverId   = null;
-        item.ItApproverId    = null;
-        item.ModifiedOn      = DateTime.UtcNow;
-        item.ModifiedBy      = userId;
+        item.ApprovedAtUtc = null;
+        item.ExpiresAtUtc = null;
+        item.HodApproverId = null;
+        item.ItApproverId = null;
+        item.ModifiedOn = DateTime.UtcNow;
+        item.ModifiedBy = userId;
 
         db.AccessReqAudits.Add(BuildAudit(item.AccessReqId, item.AccessItemId,
             "RenewalRequested", $"User requested renewal of ticket {item.TicketNumber}.", userId));
@@ -239,17 +253,17 @@ public sealed class AccessRequestService(
         {
             var item = new AccessItemEntity
             {
-                AccessReqId        = requestId,
-                TicketNumber       = TicketNumberGenerator.Generate(),
-                Status             = initialStatus,
-                FolderPath         = dto.FolderPath,
-                AccessType         = dto.AccessType,
-                ConfirmAccessType  = dto.AccessType,
-                Reason             = dto.Reason,
-                HodApproverId      = hodApproverId,
-                IsActive           = true,
-                CreatedOn          = DateTime.UtcNow,
-                CreatedBy          = createdBy
+                AccessReqId = requestId,
+                TicketNumber = TicketNumberGenerator.Generate(),
+                Status = initialStatus,
+                FolderPath = dto.FolderPath,
+                AccessType = dto.AccessType,
+                ConfirmAccessType = dto.AccessType,
+                Reason = dto.Reason,
+                HodApproverId = hodApproverId,
+                IsActive = true,
+                CreatedOn = DateTime.UtcNow,
+                CreatedBy = createdBy
             };
 
             db.AccessItems.Add(item);
@@ -258,6 +272,37 @@ public sealed class AccessRequestService(
 
         await db.SaveChangesAsync();
         return items;
+    }
+
+    private async Task<int?> ResolveRequestHodUserIdAsync(
+        int? requestedHodUserId,
+        CmplUser user,
+        bool isTestEnv)
+    {
+        if (requestedHodUserId is > 0)
+            return requestedHodUserId.Value;
+
+        if (user.DepartmentId is null or <= 0)
+            return null;
+
+        var department = await db.Departments
+            .FirstOrDefaultAsync(d => d.Id == user.DepartmentId.Value && d.IsActive);
+
+        if (string.IsNullOrWhiteSpace(department?.HodId))
+            return null;
+
+        var departmentHodId = department.HodId.Trim();
+        var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
+        var departmentHodUserId = int.TryParse(departmentHodId, out var parsedHodUserId)
+            ? parsedHodUserId
+            : (int?)null;
+
+        var hod = await hodContext.FirstOrDefaultAsync(h =>
+            h.Deleted == 0 &&
+            (h.EmployeeId == departmentHodId ||
+             (departmentHodUserId.HasValue && h.UserId == departmentHodUserId.Value)));
+
+        return hod?.UserId;
     }
 
     private async Task SendSubmissionNotificationsAsync(
@@ -343,19 +388,19 @@ public sealed class AccessRequestService(
 
     private static AccessReqAuditEntity BuildAudit(int requestId, int? itemId,
         string eventType, string message, int actorUserId) => new()
-    {
-        AccessReqId   = requestId,
-        AccessItemId  = itemId,
-        EventType     = eventType,
-        Message       = message,
-        ActorUserId   = actorUserId,
-        RecipientUserId = actorUserId,
-        RecipientName = string.Empty,
-        RecipientRole = string.Empty,
-        IsActive      = true,
-        CreatedOn     = DateTime.UtcNow,
-        CreatedBy     = actorUserId
-    };
+        {
+            AccessReqId = requestId,
+            AccessItemId = itemId,
+            EventType = eventType,
+            Message = message,
+            ActorUserId = actorUserId,
+            RecipientUserId = actorUserId,
+            RecipientName = string.Empty,
+            RecipientRole = string.Empty,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = actorUserId
+        };
 
     private static AccessRequestDetailDto MapToDetailDto(AccessRequestEntity r) => new(
         r.AccessReqId,
@@ -377,13 +422,24 @@ public sealed class AccessRequestService(
         )).ToList()
     );
 
-    private static AccessRequestSummaryDto MapToSummaryDto(AccessRequestEntity r) => new(
-        r.AccessReqId,
-        r.CurrentStatus,
-        r.ItsrNo,
-        r.CreatedOn,
-        r.AccessItems.Count,
-        r.AccessItems.Count(i => i.Status == RequestStatus.ItApproved),
-        r.AccessItems.Count(i => i.Status is RequestStatus.HodRejected or RequestStatus.ItRejected)
+    private static AccessRequestSummaryDto MapToSummaryDto(AccessItemEntity item) => new(
+        item.AccessReqId,
+        item.Status,
+        item.AccessRequest.ItsrNo,
+        item.AccessRequest.CreatedOn,
+        new AccessItemDto(
+            item.AccessItemId,
+            item.TicketNumber,
+            item.FolderPath,
+            item.AccessType,
+            item.ConfirmAccessType,
+            item.Status,
+            item.Reason,
+            item.RejectionReason,
+            item.ApprovedAtUtc,
+            item.ExpiresAtUtc
+        ),
+        item.Status == RequestStatus.ItApproved ? 1 : 0,
+        item.Status is RequestStatus.HodRejected or RequestStatus.ItRejected ? 1 : 0
     );
 }

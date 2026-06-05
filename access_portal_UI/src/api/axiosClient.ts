@@ -45,8 +45,7 @@ updateAxiosUserCache()
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: ENV_CONFIG?.BASE_API_URL ?? "/api",
   withCredentials: true,
-  headers: { "Content-Type": "application/json" },
-  timeout: 10_000,
+  headers: { "Content-Type": "application/json" }
 })
 
 axiosInstance.interceptors.request.use(

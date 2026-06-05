@@ -1,3 +1,8 @@
+import type {
+  AccessItemDto,
+  AccessRequestSummaryDto,
+  PagedResult,
+} from "@/api/types"
 import { CreateRequestModal } from "@/components/AccessRequests/create-request-modal"
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import { Button } from "@/components/ui/button"
@@ -5,20 +10,18 @@ import { useAuth } from "@/context/AuthContext"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import type { ColDef } from "ag-grid-community"
+import { Pen } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import {
-  accessTypeLabel,
-  type AccessRequestDto,
-  type AccessType,
-} from "@/lib/api-result"
 
 // ==========================================
 // 1. GENERIC BASE FACTORY COMPONENT
 // ==========================================
 
 interface RequestsPageFactoryProps {
-  fetchApiFn: (id?: string) => Promise<AccessRequestDto[]>
+  fetchApiFn: (
+    id?: string
+  ) => Promise<PagedResult<AccessRequestSummaryDto> | AccessRequestSummaryDto[]>
   actionButtonLabel?: string
   actionButtonRoutePrefix: string
   extraColumns?: (Omit<ColDef<any>, "field"> & { field?: string })[]
@@ -35,7 +38,7 @@ export const RequestsPageFactory = ({
   const location = useLocation()
   const { currentUser } = useAuth()
   const { loading, withLoader } = useLoader()
-  const [requests, setRequests] = useState<AccessRequestDto[]>([])
+  const [requests, setRequests] = useState<AccessRequestSummaryDto[]>([])
   const [createRequestModalOpen, setCreateRequestModalOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -47,15 +50,13 @@ export const RequestsPageFactory = ({
   const fetchRequests = useCallback(async () => {
     // Fallback checks for different user types
     const targetId =
-      currentUser?.user?.userId ??
-      currentUser?.cmplUser?.userId ??
-      currentUser?.departmentId
+      currentUser?.user?.id ?? ""
 
     try {
       const result = await withLoader(() =>
         fetchApiFn(targetId ? String(targetId) : undefined)
       )
-      setRequests(result)
+      setRequests(Array.isArray(result) ? result : result.data ?? [])
     } catch (error) {
       console.error("Error fetching requests:", error)
     }
@@ -66,32 +67,30 @@ export const RequestsPageFactory = ({
   }, [fetchRequests])
 
   const handleActionClick = (data: any): void => {
-    navigate(`${actionButtonRoutePrefix}/${data.accessReqId}`)
+    const itemQuery = data.itemId ? `?itemId=${data.itemId}` : ""
+    navigate(`${actionButtonRoutePrefix}/${data.requestId}${itemQuery}`)
   }
 
   const flattenedRowData = useMemo(() => {
-    return requests.flatMap((req) => {
-      if (!req.items || req.items.length === 0) {
-        return [
-          {
-            accessReqId: req.accessReqId,
-            ticketNumber: "-",
-            folderPath: "-",
-            accessType: "NotApplicable" as AccessType,
-            status: req.currentStatus,
-            requestedAtUtc: req.requestedAtUtc,
-          },
-        ]
-      }
+    return requests.flatMap((req: any) => {
+      const rawItems = req?.items
+      const items: AccessItemDto[] = Array.isArray(rawItems)
+        ? rawItems
+        : rawItems
+          ? [rawItems]
+          : req?.itemId
+            ? [req]
+            : []
 
-      return req.items.map((item) => ({
-        accessReqId: req.accessReqId,
+      return items.map((item) => ({
+        requestId: req.requestId,
         itemId: item.itemId,
         ticketNumber: item.ticketNumber,
         folderPath: item.folderPath,
-        accessType: item.accessType, // This already matches AccessType
-        status: item.status,
-        requestedAtUtc: item.requestedAtUtc,
+        accessType: item.accessType ?? item.accessType,
+        status: item.status ?? req.currentStatus,
+        requestedBy: req.requestedBy,
+        department: req.department,
       }))
     })
   }, [requests])
@@ -100,58 +99,44 @@ export const RequestsPageFactory = ({
     (Omit<ColDef<any>, "field"> & { field?: string })[]
   >(
     () => [
-      { headerName: "Ticket Number", field: "ticketNumber", width: 140 },
-      ...extraColumns, // Dynamically injects User Info / Dept Info based on role
-      { headerName: "Folder Path", field: "folderPath", width: 280 },
+      {
+        headerName: "Ticket Number",
+        field: "ticketNumber",
+        width: 220,
+      },
+      {
+        headerName: "Folder Path",
+        field: "folderPath",
+        flex: 1,
+      },
       {
         headerName: "Access Type",
         field: "accessType",
-        width: 120,
-        valueFormatter: (params) => accessTypeLabel(params.value),
+        width: 140,
       },
       {
         headerName: "Status",
         field: "status",
-        width: 120,
-        cellRenderer: (params: any) => {
-          const status = params.value === 2 ? "Pending" : params.value
-          const isPending = status === "Pending"
-
-          return (
-            <div className="flex h-full items-center">
-              <span
-                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                  isPending
-                    ? "border-amber-200 bg-amber-50 text-amber-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                }`}
-              >
-                <span
-                  className={`mr-1.5 h-1.5 w-1.5 rounded-full ${isPending ? "bg-amber-500" : "bg-emerald-500"}`}
-                />
-                {status}
-              </span>
-            </div>
-          )
-        },
+        width: 140,
       },
+      ...extraColumns,
       {
         headerName: "Actions",
         sortable: false,
         filter: false,
-        width: 100,
+        width: 90,
         cellRenderer: (params: any) => {
-          if (!params.data || params.data.__isDetailRow) return null
+          if (!params.data) return null
 
           return (
-            <div className="flex h-full items-center gap-2">
+            <div className="flex h-full justify-center mt-2 items-center">
               <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 text-xs font-medium shadow-sm transition-all hover:bg-secondary"
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
                 onClick={() => handleActionClick(params.data)}
               >
-                {actionButtonLabel}
+                <Pen />
               </Button>
             </div>
           )

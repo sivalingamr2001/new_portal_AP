@@ -1,126 +1,72 @@
-import React, { useMemo, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import { useState } from "react"
 import {
-  AlertTriangle,
   CalendarDays,
-  CheckCircle2,
-  ChevronRight,
+  Check,
   Clock,
   Download,
   Folder,
   Mail,
   RefreshCw,
   Shield,
+  Ticket,
   Trash2,
-  User as UserIcon,
-  XCircle,
+  X,
 } from "lucide-react"
-
-export type UserRole = "ADMIN" | "HOD" | "OPERATOR" | "USER"
-
-export interface AccessItem {
-  accessItemId: number
-  ticketNumber: string
-  folderPath: string
-  accessType: number
-  confirmAccessType: number
-  reason: string
-  rejectionReason: string | null
-  status: number
-  hodApproverId: number
-  itApproverId: number | null
-  requestedAtUtc: string
-  lastActionAtUtc: string
-  approvedAtUtc: string | null
-  expiresAtUtc: string | null
-  approvals: any[]
-}
-
-export interface RequestData {
-  accessReqId: number
-  userId: number
-  userName: string
-  userEmail: string
-  reqTo: number
-  isAgreed: boolean
-  itsrNo: string | null
-  currentStatus: number
-  currentApproverId: number
-  requestedAtUtc: string
-  lastActionAtUtc: string
-  items: AccessItem[]
-}
+import type {
+  AccessItemDto,
+  AccessRequestDetailDto,
+  AccessTypes,
+  RequestStatus,
+} from "@/api/types"
 
 interface RequestDetailsProps {
-  currentUserRole: UserRole
-  currentUserId: number
-  hodName?: string | null
-  requestPayload: {
-    data: RequestData[]
+  request: AccessRequestDetailDto
+  currentUserRole: string | null
+  onApprove?: (itemId: number) => void
+  onReject?: (itemId: number, reason: string) => void
+  onRevoke?: (itemId: number) => void
+  onResubmit?: (itemId: number, reason: string) => void
+  onRenew?: (itemId: number, reason: string) => void
+  onExport?: () => void
+}
+
+const statusLabels: Record<RequestStatus, string> = {
+  Submitted: "Submitted",
+  PendingWithHod: "Pending with HOD",
+  PendingWithIt: "Pending with IT",
+  HodApproved: "HOD Approved",
+  ItApproved: "IT Approved",
+  HodRejected: "HOD Rejected",
+  ItRejected: "IT Rejected",
+  Revoked: "Revoked",
+  Expired: "Expired",
+}
+
+const accessTypeLabels: Record<AccessTypes, string> = {
+  NotApplicable: "Not Applicable",
+  ReadOnly: "Read Only",
+  ReadandWrite: "Read & Write",
+}
+
+const getStatusClass = (status: RequestStatus) => {
+  if (status === "ItApproved") {
+    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
   }
-  onApprove?: (requestId: number, itemId: number, notes?: string) => void
-  onReject?: (requestId: number, itemId: number, reason: string) => void
-  onRevoke?: (requestId: number, itemId: number) => void
-  onResubmit?: (requestId: number, itemId: number, updatedData: any) => void
-  onRenew?: (requestId: number, itemId: number, duration: string) => void
-  onExport?: (requestId: number) => void
-}
 
-const getStatusDetails = (status: number) => {
-  switch (status) {
-    case 1:
-      return {
-        text: "Pending HOD",
-        bg: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-        icon: Clock,
-      }
-    case 2:
-      return {
-        text: "Pending IT Operator",
-        bg: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-        icon: Shield,
-      }
-    case 3:
-      return {
-        text: "Active / Approved",
-        bg: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-        icon: CheckCircle2,
-      }
-    case 4:
-      return {
-        text: "Rejected",
-        bg: "bg-rose-500/10 text-rose-600 border-rose-500/20",
-        icon: XCircle,
-      }
-    case 5:
-      return {
-        text: "Expired",
-        bg: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-        icon: AlertTriangle,
-      }
-    case 6:
-      return {
-        text: "Revoked",
-        bg: "bg-violet-500/10 text-violet-500 border-violet-500/20",
-        icon: Trash2,
-      }
-    default:
-      return {
-        text: "Unknown",
-        bg: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-        icon: AlertTriangle,
-      }
+  if (status === "HodRejected" || status === "ItRejected") {
+    return "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300"
   }
+
+  if (status === "Expired" || status === "Revoked") {
+    return "border-slate-500/20 bg-slate-500/10 text-slate-600 dark:text-slate-300"
+  }
+
+  return "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
 }
 
-const getAccessTypeLabel = (type: number) => {
-  if (type === 1) return "Read Only"
-  if (type === 2) return "Read & Write"
-  return "Full Control"
-}
-
-const formatDate = (dateStr: string | null) => {
+const formatDate = (dateStr: string | null | undefined) => {
   if (!dateStr) return "N/A"
+
   return new Date(dateStr).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
@@ -131,49 +77,13 @@ const formatDate = (dateStr: string | null) => {
   })
 }
 
-interface ModalProps {
-  isOpen: boolean
-  onClose: () => void
-  title: string
-  children: React.ReactNode
-}
+const getAccessTypeLabel = (type: AccessTypes) => accessTypeLabels[type] ?? type
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          onClick={(event) => event.stopPropagation()}
-          className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-          role="dialog"
-          aria-modal="true"
-        >
-          <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-50">
-            {title}
-          </h3>
-          {children}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
+const getStatusLabel = (status: RequestStatus) => statusLabels[status] ?? status
 
 export default function RequestDetails({
+  request,
   currentUserRole,
-  currentUserId,
-  hodName,
-  requestPayload,
   onApprove,
   onReject,
   onRevoke,
@@ -181,142 +91,66 @@ export default function RequestDetails({
   onRenew,
   onExport,
 }: RequestDetailsProps) {
-  const request = useMemo(() => requestPayload?.data?.[0], [requestPayload])
-  const [activeModal, setActiveModal] = useState<
-    "resubmit" | "renew" | "reject" | null
-  >(null)
-  const [selectedItemId, setSelectedItemId] = useState<number | null>(null)
-  const [rejectionReason, setRejectionReason] = useState("")
-  const [renewDuration, setRenewDuration] = useState("30")
-  const [resubmitReason, setResubmitReason] = useState("")
-
-  if (!request) {
-    return (
-      <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-slate-200 p-8 text-center dark:border-slate-800">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          No request data found.
-        </p>
-      </div>
-    )
-  }
-
-  const isHod = currentUserRole === "HOD" || currentUserRole === "ADMIN"
-  const isOperator =
-    currentUserRole === "OPERATOR" || currentUserRole === "ADMIN"
-  const isOwner = currentUserRole === "USER"
-
-  const handleOpenModal = (
-    type: "resubmit" | "renew" | "reject",
-    itemId: number
-  ) => {
-    setSelectedItemId(itemId)
-    setActiveModal(type)
-  }
-
-  const handleModalClose = () => {
-    setActiveModal(null)
-    setSelectedItemId(null)
-    setRejectionReason("")
-    setResubmitReason("")
-  }
+  const primaryTicketNumber =
+    request.items.length === 1 ? request.items[0]?.ticketNumber : null
+  const itemGridClass =
+    request.items.length === 1 ? "grid gap-3" : "grid gap-3 xl:grid-cols-2"
 
   return (
-    <div className="w-full space-y-6 rounded-3xl border border-border/70 bg-background/70 p-4 text-foreground shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)] md:p-6">
-      <div className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card p-5 shadow-sm md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-primary uppercase">
-            <span>Request Panel</span>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-muted-foreground">
-              #{request.accessReqId}
+    <div className="w-full space-y-4 rounded-2xl border border-border/70 bg-background/70 p-4 text-foreground shadow-sm">
+      <header className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-[0.18em] text-primary uppercase">
+            <Ticket className="h-3.5 w-3.5" />
+            <span>{primaryTicketNumber ? "Ticket" : "Request"}</span>
+            <span className="truncate text-muted-foreground">
+              {primaryTicketNumber ?? `#${request.requestId}`}
             </span>
           </div>
-          <h1 className="mt-2 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-            Access Request Overview
+          <h1 className="mt-1 text-lg font-semibold tracking-tight md:text-xl">
+            {primaryTicketNumber
+              ? primaryTicketNumber
+              : `Request #${request.requestId}`}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Live request details from the API.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {(currentUserRole === "ADMIN" || currentUserRole === "OPERATOR") && (
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onExport?.(request.accessReqId)}
-              className="inline-flex h-8 items-center gap-2 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-card-foreground shadow-sm transition-colors hover:bg-accent/10"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Export
-            </motion.button>
-          )}
           <button
             type="button"
-            onClick={() =>
-              onApprove?.(
-                request.accessReqId,
-                request.items[0]?.accessItemId ?? 0
-              )
-            }
-            className="inline-flex h-8 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:opacity-90"
+            onClick={onExport}
+            className="inline-flex h-8 items-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-accent"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
+            <Download className="h-3.5 w-3.5" />
+            Export
           </button>
         </div>
-      </div>
+      </header>
 
-      <section className="rounded-3xl border border-border/70 bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-              Requester & HOD Details
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Single card view with key/value details.
-            </p>
-          </div>
+      <section className="rounded-2xl border border-border/70 bg-card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+            Request Details
+          </h2>
           <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
             {request.items.length} item(s)
           </span>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <DetailRow
-            label="User Name"
-            value={request.userName}
-            icon={UserIcon}
+            label="Request ID"
+            value={String(request.requestId)}
+            icon={Shield}
           />
           <DetailRow
             label="User ID"
-            value={String(currentUserId || request.userId)}
-            icon={Shield}
-          />
-          <DetailRow
-            label="Email"
-            value={request.userEmail || "No email found"}
+            value={String(request.userId)}
             icon={Mail}
           />
           <DetailRow
-            label="HOD Name"
-            value={hodName || `Approver #${request.reqTo}`}
+            label="Created On"
+            value={formatDate(request.createdOn)}
             icon={CalendarDays}
-          />
-          <DetailRow
-            label="Requested On"
-            value={formatDate(request.requestedAtUtc)}
-            icon={CalendarDays}
-          />
-          <DetailRow
-            label="Last Updated"
-            value={formatDate(request.lastActionAtUtc)}
-            icon={Clock}
-          />
-          <DetailRow
-            label="Current Status"
-            value={getStatusDetails(request.currentStatus).text}
-            icon={Shield}
           />
           <DetailRow
             label="ITSR No."
@@ -326,296 +160,303 @@ export default function RequestDetails({
         </div>
       </section>
 
-      <section className="rounded-3xl border border-border/70 bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold tracking-[0.2em] text-muted-foreground uppercase">
-              Requested Access Items
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              Using the actual API response for each item.
-            </p>
-          </div>
-        </div>
+      <section className="rounded-2xl border border-border/70 bg-card p-4">
+        <h2 className="mb-3 text-sm font-semibold tracking-[0.18em] text-muted-foreground uppercase">
+          Requested Access Items
+        </h2>
 
-        <div className="space-y-4">
-          {request.items.map((item) => {
-            const status = getStatusDetails(item.status)
-            const StatusIcon = status.icon
-
-            return (
-              <article
-                key={item.accessItemId}
-                className="rounded-3xl border border-border/70 bg-background/90 p-4 shadow-sm"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-foreground">
-                        {item.ticketNumber}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.bg}`}
-                      >
-                        <StatusIcon className="h-3.5 w-3.5" />
-                        {status.text}
-                      </span>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <DetailRow
-                        label="Folder Path"
-                        value={item.folderPath}
-                        icon={Folder}
-                      />
-                      <DetailRow
-                        label="Access Type"
-                        value={getAccessTypeLabel(item.accessType)}
-                        icon={Shield}
-                      />
-                      <DetailRow
-                        label="Reason"
-                        value={item.reason || "No reason provided"}
-                        icon={Mail}
-                      />
-                      <DetailRow
-                        label="Valid Until"
-                        value={
-                          item.expiresAtUtc
-                            ? formatDate(item.expiresAtUtc)
-                            : "No expiry date set"
-                        }
-                        icon={CalendarDays}
-                      />
-                    </div>
-
-                    {item.rejectionReason && (
-                      <p className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-xs text-rose-700 dark:border-rose-950/60 dark:bg-rose-950/40 dark:text-rose-300">
-                        Rejection reason: {item.rejectionReason}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                    {isOwner &&
-                      (item.status === 4 ||
-                        item.status === 5 ||
-                        item.status === 6) && (
-                        <>
-                          <button
-                            onClick={() => {
-                              handleOpenModal("resubmit", item.accessItemId)
-                              onResubmit?.(
-                                request.accessReqId,
-                                item.accessItemId,
-                                { reason: resubmitReason }
-                              )
-                            }}
-                            className="inline-flex h-8 items-center rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-                          >
-                            Resubmit
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleOpenModal("renew", item.accessItemId)
-                              onRenew?.(
-                                request.accessReqId,
-                                item.accessItemId,
-                                renewDuration
-                              )
-                            }}
-                            className="inline-flex h-8 items-center rounded-xl border border-border bg-card px-3 text-xs font-semibold text-card-foreground shadow-sm hover:bg-accent/10"
-                          >
-                            Renew
-                          </button>
-                        </>
-                      )}
-                    {isHod && item.status === 1 && (
-                      <>
-                        <button
-                          onClick={() =>
-                            handleOpenModal("reject", item.accessItemId)
-                          }
-                          className="inline-flex h-8 items-center rounded-xl border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm hover:bg-rose-50 dark:border-rose-950 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/40"
-                        >
-                          Reject
-                        </button>
-                        <button
-                          onClick={() =>
-                            onApprove?.(request.accessReqId, item.accessItemId)
-                          }
-                          className="inline-flex h-8 items-center rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-90"
-                        >
-                          Approve
-                        </button>
-                      </>
-                    )}
-                    {isOperator && (
-                      <>
-                        {item.status === 2 && (
-                          <>
-                            <button
-                              onClick={() =>
-                                handleOpenModal("reject", item.accessItemId)
-                              }
-                              className="inline-flex h-8 items-center rounded-xl border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm hover:bg-rose-50 dark:border-rose-950 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/40"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={() =>
-                                onApprove?.(
-                                  request.accessReqId,
-                                  item.accessItemId
-                                )
-                              }
-                              className="inline-flex h-8 items-center rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500"
-                            >
-                              Provision
-                            </button>
-                          </>
-                        )}
-                        {item.status === 3 && (
-                          <button
-                            onClick={() =>
-                              onRevoke?.(request.accessReqId, item.accessItemId)
-                            }
-                            className="inline-flex h-8 items-center rounded-xl border border-violet-200 bg-white px-3 text-xs font-semibold text-violet-600 shadow-sm hover:bg-violet-50 dark:border-violet-900/40 dark:bg-slate-950 dark:text-violet-400 dark:hover:bg-violet-950/40"
-                          >
-                            Revoke
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              </article>
-            )
-          })}
+        <div className={itemGridClass}>
+          {request.items.map((item) => (
+            <AccessItemCard
+              key={item.itemId}
+              item={item}
+              currentUserRole={currentUserRole}
+              onApprove={onApprove}
+              onReject={onReject}
+              onRevoke={onRevoke}
+              onResubmit={onResubmit}
+              onRenew={onRenew}
+            />
+          ))}
         </div>
       </section>
+    </div>
+  )
+}
 
-      <Modal
-        isOpen={activeModal === "reject"}
-        onClose={handleModalClose}
-        title="Reject Access Request"
-      >
-        <div className="space-y-4">
-          <label className="block text-sm text-slate-700 dark:text-slate-200">
-            Reason for rejection
-          </label>
-          <textarea
-            rows={3}
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 transition-all outline-none focus:border-indigo-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:bg-slate-900"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleModalClose}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              disabled={!rejectionReason.trim()}
-              onClick={() => {
-                if (selectedItemId) {
-                  onReject?.(
-                    request.accessReqId,
-                    selectedItemId,
-                    rejectionReason
-                  )
-                  handleModalClose()
-                }
-              }}
-              className="rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-500 disabled:opacity-40"
-            >
-              Confirm Rejection
-            </button>
+function AccessItemCard({
+  item,
+  currentUserRole,
+  onApprove,
+  onReject,
+  onRevoke,
+  onResubmit,
+  onRenew,
+}: {
+  item: AccessItemDto
+  currentUserRole: string | null
+  onApprove?: (itemId: number) => void
+  onReject?: (itemId: number, reason: string) => void
+  onRevoke?: (itemId: number) => void
+  onResubmit?: (itemId: number, reason: string) => void
+  onRenew?: (itemId: number, reason: string) => void
+}) {
+  const [modal, setModal] = useState<"reject" | "resubmit" | "renew" | null>(
+    null
+  )
+  const [reason, setReason] = useState("")
+  const isAdmin = currentUserRole === "ADMIN"
+  const isHod = currentUserRole === "HOD" || isAdmin
+  const isOperator = currentUserRole === "OPERATOR" || isAdmin
+  const isUser = currentUserRole === "USER"
+  const canHodReview = isHod && item.status === "PendingWithHod"
+  const canOperatorReview =
+    isOperator &&
+    (item.status === "PendingWithIt" || item.status === "HodApproved")
+  const canRevoke = isOperator && item.status === "ItApproved"
+  const canResubmit =
+    isUser && (item.status === "HodRejected" || item.status === "ItRejected")
+  const canRenew =
+    isUser && (item.status === "ItApproved" || item.status === "Expired")
+  const showActions =
+    canHodReview || canOperatorReview || canRevoke || canResubmit || canRenew
+
+  const openModal = (nextModal: "reject" | "resubmit" | "renew") => {
+    setReason("")
+    setModal(nextModal)
+  }
+
+  const closeModal = () => {
+    setModal(null)
+    setReason("")
+  }
+
+  const submitModal = () => {
+    const trimmedReason = reason.trim()
+    if (!trimmedReason) return
+
+    if (modal === "reject") onReject?.(item.itemId, trimmedReason)
+    if (modal === "resubmit") onResubmit?.(item.itemId, trimmedReason)
+    if (modal === "renew") onRenew?.(item.itemId, trimmedReason)
+
+    closeModal()
+  }
+
+  return (
+    <article className="rounded-2xl border border-border/70 bg-background/90 p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+            Ticket Number
+          </div>
+          <div className="mt-1 text-sm font-semibold break-all">
+            {item.ticketNumber}
           </div>
         </div>
-      </Modal>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${getStatusClass(
+            item.status
+          )}`}
+        >
+          {getStatusLabel(item.status)}
+        </span>
+      </div>
 
-      <Modal
-        isOpen={activeModal === "renew"}
-        onClose={handleModalClose}
-        title="Renew Access Window"
-      >
-        <div className="space-y-4">
-          <label className="block text-sm text-slate-700 dark:text-slate-200">
-            Extended lifetime duration
-          </label>
-          <select
-            value={renewDuration}
-            onChange={(e) => setRenewDuration(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2 text-sm text-slate-900 transition-all outline-none focus:border-indigo-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:bg-slate-900"
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DetailRow label="Folder Path" value={item.folderPath} icon={Folder} />
+        <DetailRow
+          label="Access Type"
+          value={getAccessTypeLabel(item.accessType)}
+          icon={Shield}
+        />
+        <DetailRow
+          label="Confirm Access"
+          value={getAccessTypeLabel(item.confirmAccessType)}
+          icon={Shield}
+        />
+        <DetailRow
+          label="Valid Until"
+          value={
+            item.expiresAtUtc
+              ? formatDate(item.expiresAtUtc)
+              : "No expiry date set"
+          }
+          icon={Clock}
+        />
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <DetailRow
+          label="Reason"
+          value={item.reason || "No reason provided"}
+          icon={Mail}
+        />
+        {item.rejectionReason && (
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
+            {item.rejectionReason}
+          </div>
+        )}
+      </div>
+
+      {showActions && (
+        <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border/70 pt-4">
+          {canHodReview && (
+            <>
+              <ActionButton
+                label="Reject"
+                icon={X}
+                variant="danger"
+                onClick={() => openModal("reject")}
+              />
+              <ActionButton
+                label="Approve"
+                icon={Check}
+                variant="success"
+                onClick={() => onApprove?.(item.itemId)}
+              />
+            </>
+          )}
+
+          {canOperatorReview && (
+            <>
+              <ActionButton
+                label="Reject"
+                icon={X}
+                variant="danger"
+                onClick={() => openModal("reject")}
+              />
+              <ActionButton
+                label="Provision"
+                icon={Check}
+                variant="success"
+                onClick={() => onApprove?.(item.itemId)}
+              />
+            </>
+          )}
+
+          {canRevoke && (
+            <ActionButton
+              label="Revoke"
+              icon={Trash2}
+              variant="warning"
+              onClick={() => onRevoke?.(item.itemId)}
+            />
+          )}
+
+          {canResubmit && (
+            <ActionButton
+              label="Resubmit"
+              icon={RefreshCw}
+              onClick={() => openModal("resubmit")}
+            />
+          )}
+
+          {canRenew && (
+            <ActionButton
+              label="Renew"
+              icon={RefreshCw}
+              onClick={() => openModal("renew")}
+            />
+          )}
+        </div>
+      )}
+
+      <ReasonModal
+        isOpen={modal !== null}
+        title={
+          modal === "reject"
+            ? "Reject Access"
+            : modal === "renew"
+              ? "Renew Access"
+              : "Resubmit Access"
+        }
+        reason={reason}
+        onReasonChange={setReason}
+        onCancel={closeModal}
+        onSubmit={submitModal}
+      />
+    </article>
+  )
+}
+
+function ActionButton({
+  label,
+  icon: Icon,
+  variant = "default",
+  onClick,
+}: {
+  label: string
+  icon: React.ElementType
+  variant?: "default" | "danger" | "success" | "warning"
+  onClick?: () => void
+}) {
+  const variantClass =
+    variant === "danger"
+      ? "border-rose-500/30 bg-rose-500/10 text-rose-700 hover:bg-rose-500/15 dark:text-rose-300"
+      : variant === "success"
+        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
+        : variant === "warning"
+          ? "border-amber-500/30 bg-amber-500/10 text-amber-700 hover:bg-amber-500/15 dark:text-amber-300"
+          : "border-border bg-card text-card-foreground hover:bg-accent"
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-semibold shadow-sm transition-colors ${variantClass}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  )
+}
+
+function ReasonModal({
+  isOpen,
+  title,
+  reason,
+  onReasonChange,
+  onCancel,
+  onSubmit,
+}: {
+  isOpen: boolean
+  title: string
+  reason: string
+  onReasonChange: (reason: string) => void
+  onCancel: () => void
+  onSubmit: () => void
+}) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+        <h3 className="text-base font-semibold">{title}</h3>
+        <textarea
+          rows={4}
+          value={reason}
+          onChange={(event) => onReasonChange(event.target.value)}
+          placeholder="Enter reason"
+          className="mt-4 w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-9 rounded-xl border border-border px-3 text-xs font-semibold hover:bg-accent"
           >
-            <option value="7">Extend by 7 Days</option>
-            <option value="30">Extend by 30 Days</option>
-            <option value="90">Extend by 90 Days</option>
-          </select>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleModalClose}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => {
-                if (selectedItemId) {
-                  onRenew?.(request.accessReqId, selectedItemId, renewDuration)
-                  handleModalClose()
-                }
-              }}
-              className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500"
-            >
-              Request Renewal
-            </button>
-          </div>
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!reason.trim()}
+            onClick={onSubmit}
+            className="h-9 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            Submit
+          </button>
         </div>
-      </Modal>
-
-      <Modal
-        isOpen={activeModal === "resubmit"}
-        onClose={handleModalClose}
-        title="Resubmit Access Case"
-      >
-        <div className="space-y-4">
-          <label className="block text-sm text-slate-700 dark:text-slate-200">
-            Updated justification notes
-          </label>
-          <textarea
-            rows={3}
-            value={resubmitReason}
-            onChange={(e) => setResubmitReason(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 transition-all outline-none focus:border-indigo-500 focus:bg-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:bg-slate-900"
-          />
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={handleModalClose}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              disabled={!resubmitReason.trim()}
-              onClick={() => {
-                if (selectedItemId) {
-                  onResubmit?.(request.accessReqId, selectedItemId, {
-                    reason: resubmitReason,
-                  })
-                  handleModalClose()
-                }
-              }}
-              className="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-40"
-            >
-              Resubmit Request
-            </button>
-          </div>
-        </div>
-      </Modal>
+      </div>
     </div>
   )
 }
@@ -630,12 +471,14 @@ function DetailRow({
   icon: React.ElementType
 }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-background/90 p-3 shadow-sm">
-      <div className="mb-1 flex items-center gap-2 text-[11px] tracking-[0.18em] text-muted-foreground uppercase">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
+    <div className="min-w-0 rounded-xl border border-border/70 bg-background/90 p-3">
+      <div className="mb-1 flex items-center gap-2 text-[11px] tracking-[0.16em] text-muted-foreground uppercase">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span>{label}</span>
       </div>
-      <div className="text-sm font-medium text-foreground">{value}</div>
+      <div className="text-sm font-medium break-words text-foreground">
+        {value}
+      </div>
     </div>
   )
 }

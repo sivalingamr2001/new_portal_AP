@@ -1,4 +1,4 @@
-import { notificationsApi } from "@/api"
+import { notificationsApi, updateAxiosUserCache } from "@/api"
 import type { NotificationDto } from "@/api/types"
 import { NotificationSheet } from "@/components/NotificationSheet"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,7 @@ import {
   HubConnectionState,
   LogLevel,
 } from "@microsoft/signalr"
-import { Bell, LogOut, User, Building2 } from "lucide-react"
+import { Bell, LogOut, User } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
@@ -164,6 +164,7 @@ export function AppHeader() {
 
   const handleLogout = () => {
     logout()
+    updateAxiosUserCache()
     navigate("/login")
   }
 
@@ -173,8 +174,8 @@ export function AppHeader() {
         <SidebarTrigger className="h-9 w-9" />
         <div className="h-5 w-px bg-border" />
         <div className="flex items-center gap-3">
-          <span className="hidden text-xs font-medium text-muted-foreground sm:inline-block">
-            {currentUser?.department?.name || "Access Portal"}
+          <span className="hidden text-md font-medium text-muted-foreground sm:inline-block">
+            {"Folder Access Portal"}
           </span>
         </div>
       </div>
@@ -189,12 +190,12 @@ export function AppHeader() {
             >
               <Bell className="h-5 w-5" />
               {hasUnread && (
-                <span className="absolute top-2.5 right-2.5 h-2 w-2 animate-pulse rounded-full bg-destructive" />
+                <span className="absolute top-1 right-2 h-2 w-2 animate-pulse rounded-full bg-destructive" />
               )}
             </Button>
           </SheetTrigger>
 
-          <NotificationSheet
+            <NotificationSheet
             notifications={notifications}
             isLoading={isLoading}
             isError={isError}

@@ -10,5 +10,5 @@ public enum RequestStatus
     HodRejected = 6,
     ItRejected = 7,
     Revoked = 8,
-    Expired = 9 //Approved date from 90 calender days
+    Expired = 9
 }

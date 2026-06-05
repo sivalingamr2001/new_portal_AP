@@ -1,5 +1,4 @@
 import { accessRequestsApi } from "@/api"
-import { normalizeSummaryRequest } from "@/lib/api-result"
 import { RequestsPageFactory } from "../common/RequestsPageFactory"
 
 export const HodAllDepartmentRequestsPage = () => {
@@ -7,7 +6,7 @@ export const HodAllDepartmentRequestsPage = () => {
     <RequestsPageFactory
       fetchApiFn={async () => {
         const result = await accessRequestsApi.getMyRequests()
-        return result.data.map(normalizeSummaryRequest)
+        return result
       }}
       actionButtonLabel="View"
       actionButtonRoutePrefix="/request"

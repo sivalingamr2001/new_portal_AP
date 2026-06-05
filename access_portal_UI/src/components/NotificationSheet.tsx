@@ -1,4 +1,4 @@
-import type { AccessNotificationDto } from "@/api/types"
+import type { NotificationDto } from "@/api/types"
 import {
   SheetContent,
   SheetDescription,
@@ -9,7 +9,7 @@ import { Bell, Check, Circle } from "lucide-react"
 import React from "react"
 
 interface NotificationSheetProps {
-  notifications: AccessNotificationDto[]
+  notifications: NotificationDto[]
   isLoading: boolean
   isError: boolean
   onMarkAsRead: (auditId: number) => Promise<void>
@@ -24,7 +24,7 @@ export const NotificationSheet: React.FC<NotificationSheetProps> = ({
   const unreadCount = notifications.filter((n) => !n.isRead).length
 
   return (
-    <SheetContent side="right" className="flex h-full w-100 flex-col sm:w-135">
+    <SheetContent side="right" className="flex h-full flex-col">
       <SheetHeader className="border-b pb-4">
         <SheetTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
@@ -90,8 +90,8 @@ export const NotificationSheet: React.FC<NotificationSheetProps> = ({
                     {notification.eventType || "Log Update"}
                   </p>
                   <span className="text-xs whitespace-nowrap text-muted-foreground">
-                    {notification.createdAtUtc
-                      ? new Date(notification.createdAtUtc).toLocaleTimeString(
+                    {notification.createdOn
+                      ? new Date(notification.createdOn).toLocaleTimeString(
                           [],
                           { hour: "2-digit", minute: "2-digit" }
                         )

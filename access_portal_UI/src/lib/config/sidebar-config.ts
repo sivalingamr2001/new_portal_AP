@@ -70,12 +70,6 @@ export const sidebarItems: SidebarGroup[] = [
         roles: [2], // UserRole.It / Operator
       },
       {
-        label: "Active Access",
-        to: "/operator/active-access",
-        icon: Clock,
-        roles: [2], // UserRole.It / Operator
-      },
-      {
         label: "All Requests",
         to: "/operator/all-requests",
         icon: FileText,

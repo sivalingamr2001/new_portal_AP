@@ -1,10 +1,12 @@
 // SubmitAccessRequestDto.cs
+using System.Text.Json.Serialization;
 using Web.Domain.Enums;
 
 namespace Web.Domain.Dto;
 
 public sealed record SubmitAccessRequestDto(
-    int ReqTo,
+    [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    int? ReqTo,
     bool IsAgreed,
     IEnumerable<AccessItemRequestDto> Items
 );
@@ -44,7 +46,7 @@ public sealed record AccessRequestSummaryDto(
     RequestStatus CurrentStatus,
     string? ItsrNo,
     DateTime CreatedOn,
-    int TotalItems,
+    AccessItemDto Items,
     int ApprovedItems,
     int RejectedItems
 );

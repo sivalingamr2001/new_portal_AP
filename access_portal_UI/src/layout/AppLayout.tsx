@@ -12,8 +12,8 @@ export default function AppLayout() {
         <SidebarInset className="flex flex-col overflow-hidden">
           <AppHeader />
 
-          <main className="flex-1 overflow-y-auto p-4">
-            <div className="h-[89vh] rounded-4xl bg-sidebar p-6 shadow-lg">
+          <main className="min-h-0 flex-1 overflow-hidden p-4">
+            <div className="h-full min-h-0 overflow-hidden rounded-4xl bg-sidebar p-6 shadow-lg">
               <Outlet />
             </div>
           </main>

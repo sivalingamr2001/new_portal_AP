@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { folderMappingsApi } from "@/api"
 import { FolderMappingModal } from "@/components/FolderMapping/FolderMappingModal"
 import type { DynamicPageConfig } from "@/types"
@@ -47,6 +48,26 @@ const folderConfig: DynamicPageConfig<FolderMappingDto> = {
   ],
 }
 
-export const FolderMappingPage = () => (
-  <DynamicGridPage config={folderConfig} ModalComponent={FolderMappingModal} />
-)
+export const FolderMappingPage = () => {
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      setRefreshKey((prev) => prev + 1)
+    }
+
+    window.addEventListener("folder-mapping-refresh", handleRefresh)
+
+    return () => {
+      window.removeEventListener("folder-mapping-refresh", handleRefresh)
+    }
+  }, [])
+
+  return (
+    <DynamicGridPage
+      key={refreshKey}
+      config={folderConfig}
+      ModalComponent={FolderMappingModal}
+    />
+  )
+}

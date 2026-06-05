@@ -6,8 +6,7 @@ export interface AccessItemRequestDto {
 }
 
 export interface SubmitAccessRequestDto {
-  userId?: number
-  reqTo?: number
+  reqTo?: number | null
   isAgreed: boolean
   itsrNo?: string | null
   items: AccessItemRequestDto[]
@@ -41,7 +40,8 @@ export interface AccessRequestSummaryDto {
   currentStatus: RequestStatus
   itsrNo: string | null
   createdOn: string
-  totalItems: number
+  items: AccessItemDto
+  totalItems?: number
   approvedItems: number
   rejectedItems: number
 }

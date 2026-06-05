@@ -341,7 +341,7 @@ public sealed class UserService(
 
                 // 4. Case-Insensitive Check: If the target role is changed to "Hod"
                 if (!string.IsNullOrWhiteSpace(user.Role) &&
-                    user.Role.Equals("Hod", StringComparison.OrdinalIgnoreCase))
+                    user.Role.Trim().ToLowerInvariant() == "hod")
                 {
                     if (!cmplUser.DepartmentId.HasValue || string.IsNullOrWhiteSpace(cmplUser.EmployeeId))
                     {
@@ -361,7 +361,10 @@ public sealed class UserService(
                     var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
 
                     var hodExists = await hodContext
-                        .AnyAsync(h => h.EmployeeId == cmplUser.EmployeeId && h.Deleted == 0);
+                        .AnyAsync(h =>
+                            h.EmployeeId != null &&
+                            h.EmployeeId.ToLower() == cmplUser.EmployeeId!.ToLower() &&
+                            h.Deleted == 0);
 
                     if (!hodExists)
                     {
@@ -372,7 +375,7 @@ public sealed class UserService(
 
                     // If a different user was previously managing this department slot, demote them to "User"
                     if (!string.IsNullOrWhiteSpace(assignedDept.HodId) &&
-                        !assignedDept.HodId.Equals(cmplUser.EmployeeId, StringComparison.OrdinalIgnoreCase))
+                        assignedDept.HodId.Trim().ToLowerInvariant() != cmplUser.EmployeeId!.Trim().ToLowerInvariant())
                     {
                         var oldHodCmpl = await db.CmplUsers
                             .FirstOrDefaultAsync(c => c.EmployeeId == assignedDept.HodId);
@@ -383,7 +386,7 @@ public sealed class UserService(
                                 .FirstOrDefaultAsync(u => u.Id == oldHodCmpl.Id);
 
                             if (oldHodPortalUser != null &&
-                                oldHodPortalUser.Role.Equals("Hod", StringComparison.OrdinalIgnoreCase))
+                                oldHodPortalUser.Role.Trim().ToLowerInvariant() == "hod")
                             {
                                 oldHodPortalUser.Role = "User"; // Automatic structural demotion tracking
                                 oldHodPortalUser.ModifiedOn = DateTime.UtcNow;
@@ -402,7 +405,7 @@ public sealed class UserService(
 
                 // 5. Cleanup Demotion Path: If the user is being changed AWAY from HOD, clear the department slot
                 else if (!string.IsNullOrWhiteSpace(oldRole) &&
-                         oldRole.Equals("Hod", StringComparison.OrdinalIgnoreCase) &&
+                         oldRole.Trim().ToLowerInvariant() == "hod" &&
                          cmplUser.DepartmentId.HasValue)
                 {
                     var originalDept = await db.Departments
@@ -410,7 +413,7 @@ public sealed class UserService(
 
                     if (originalDept != null &&
                         !string.IsNullOrWhiteSpace(originalDept.HodId) &&
-                        originalDept.HodId.Equals(cmplUser.EmployeeId, StringComparison.OrdinalIgnoreCase))
+                        originalDept.HodId.Trim().ToLowerInvariant() == cmplUser.EmployeeId!.Trim().ToLowerInvariant())
                     {
                         originalDept.HodId = null; // Free up the HOD field
                         originalDept.ModifiedOn = DateTime.UtcNow;

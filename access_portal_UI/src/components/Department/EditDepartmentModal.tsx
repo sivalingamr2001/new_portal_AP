@@ -1,4 +1,3 @@
-import { usersApi } from "@/api/usersApi"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -8,15 +7,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { HodSelect } from "../Hod/HodSelect"
 
 export interface UpdateDepartmentRequest {
   deptName?: string | null
@@ -36,9 +29,6 @@ export const EditDepartmentModal = ({
   departmentData,
   onSave,
 }: EditDepartmentModalProps) => {
-  const [hodList, setHodList] = useState<any[]>([])
-  const [loadingHods, setLoadingHods] = useState(false)
-
   const {
     register,
     handleSubmit,
@@ -51,29 +41,6 @@ export const EditDepartmentModal = ({
       hodId: null,
     },
   })
-
-  useEffect(() => {
-    const fetchHods = async () => {
-      if (!isOpen) return
-      try {
-        setLoadingHods(true)
-        const result: any = await usersApi.getHods()
-
-        if (result) {
-          const extractedArray = Array.isArray(result)
-            ? result
-            : result.data || result.value || []
-          setHodList(extractedArray)
-        }
-      } catch (error) {
-        console.error("Failed to fetch HOD list:", error)
-        setHodList([])
-      } finally {
-        setLoadingHods(false)
-      }
-    }
-    fetchHods()
-  }, [isOpen])
 
   useEffect(() => {
     if (isOpen && departmentData) {
@@ -96,7 +63,7 @@ export const EditDepartmentModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] w-[30vw]! max-w-5xl! overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[30vw]! max-w-5xl!">
         <DialogHeader>
           <DialogTitle className="text-3xl text-primary">
             Edit Department
@@ -140,31 +107,26 @@ export const EditDepartmentModal = ({
                 name="hodId"
                 rules={{ required: "Please select an HOD" }}
                 render={({ field }) => (
-                  <Select
-                    onValueChange={(val) => field.onChange(val)}
-                    value={field.value ? String(field.value) : ""}
-                    disabled={loadingHods}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={
-                          loadingHods ? "Loading HODs..." : "Select HOD"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hodList.map((hod: any) => {
-                        const uniqueId = hod.hodId || hod.userId || hod.id
-
-                        return (
-                          <SelectItem key={uniqueId} value={String(uniqueId)}>
-                            {hod.hodName || hod.name || "N/A"} (
-                            {hod.emailId || hod.email || "No Email"})
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
+                  <HodSelect
+                    value={
+                      field.value
+                        ? {
+                            employeeId: String(field.value),
+                            hodName:
+                              departmentData?.hodName ||
+                              departmentData?.assignedHodName ||
+                              "",
+                            emailId:
+                              departmentData?.emailId ||
+                              departmentData?.hodEmail ||
+                              "",
+                          }
+                        : null
+                    }
+                    onChange={(hod) => {
+                      field.onChange(hod.employeeId)
+                    }}
+                  />
                 )}
               />
               {errors.hodId && (
