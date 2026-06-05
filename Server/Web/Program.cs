@@ -14,11 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 // =========================================================================
 var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
 var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
-
 var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
 
 // =========================================================================
-// 2. CORE SYSTEM SERVICES
+// 2. CORE SYSTEM SERVICES (DI Framework Foundations Must Load First!)
 // =========================================================================
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -28,7 +27,11 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 
-// Configured Swagger to accept and inject the X-User-Id header globally using modern Swashbuckle v10 signatures
+// ✅ CRITICAL FIX: SignalR must be registered BEFORE custom scoped services try to request its HubContext
+builder.Services.AddSignalR();
+builder.Services.AddProblemDetails();
+
+// Configured Swagger to accept and inject the X-User-Id header globally
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Web API", Version = "v1" });
@@ -55,22 +58,21 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddSignalR();
-builder.Services.AddProblemDetails();
-
-
-builder.Services.AddSignalR();
-builder.Services.AddProblemDetails();
-
 // =========================================================================
 // 3. CORS CONFIGURATION
 // =========================================================================
-builder.Services.AddCors(opts =>
-    opts.AddDefaultPolicy(p => p
-        .WithOrigins("http://localhost:5173")
-        .AllowAnyHeader()
-        .AllowAnyMethod()
-        .AllowCredentials()));
+const string CorsPolicyName = "SignalRAndApiPolicy";
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(CorsPolicyName, policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 // =========================================================================
 // 4. DATABASE CONTEXTS
@@ -107,10 +109,10 @@ else
         options.UseSqlite(sqliteConnection));
 }
 
-
 // =========================================================================
 // 5. APPLICATION SERVICES (DI REGISTRATION)
 // =========================================================================
+// ✅ These services can now cleanly resolve IHubContext<NotificationHub> because AddSignalR() has executed above!
 builder.Services.AddScoped<IAccessRequestService, AccessRequestService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHodCartService, HodCartService>();
@@ -127,45 +129,39 @@ builder.Services.AddScoped<FolderService>();
 // =========================================================================
 var app = builder.Build();
 
-// using (var scope = app.Services.CreateScope())
-// {
-//     var services = scope.ServiceProvider;
-//     var env = services.GetRequiredService<IWebHostEnvironment>();
-//     var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
-//     var db = services.GetRequiredService<AppDbContext>();
+//using (var scope = app.Services.CreateScope())
+//{
+//    var services = scope.ServiceProvider;
+//    var env = services.GetRequiredService<IWebHostEnvironment>();
+//    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
+//    var db = services.GetRequiredService<AppDbContext>();
 
-//     if (!isMySql || env.IsDevelopment())
-//     {
-//         try
-//         {
-//             // builder.Services.AddSingleton<DailyUserDeptSyncService>();
-//             // builder.Services.AddHostedService(provider => provider.GetRequiredService<F>());
+//    if (!isMySql || env.IsDevelopment())
+//    {
+//        try
+//        {
+//            var cmplDb = services.GetRequiredService<CmplDbContext>();
+//            var hodDb = services.GetRequiredService<HodDbContext>();
 
-//             var cmplDb = services.GetRequiredService<CmplDbContext>();
-//             var hodDb = services.GetRequiredService<HodDbContext>();
-
-//             await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
-
-//             // var syncService = services.GetRequiredService<DailyUserDeptSyncService>();
-//             // await syncService.TriggerSyncAsync(CancellationToken.None);
-//         }
-//         catch (Exception ex)
-//         {
-//             logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
-//         }
-//     }
-//     else
-//     {
-//         try
-//         {
-//             await db.Database.EnsureCreatedAsync();
-//         }
-//         catch (Exception ex)
-//         {
-//             logger.LogError(ex, "An error occurred while initializing the primary database tables.");
-//         }
-//     }
-// }
+//            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+//        }
+//        catch (Exception ex)
+//        {
+//            logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
+//        }
+//    }
+//    else
+//    {
+//        try
+//        {
+//            await db.Database.EnsureCreatedAsync();
+//        }
+//        catch (Exception ex)
+//        {
+//            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
+//        }
+//    }
+//}
 
 if (app.Environment.IsDevelopment())
 {
@@ -180,7 +176,8 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseHttpsRedirection();
-app.UseCors();
+
+app.UseCors(CorsPolicyName);
 
 // =========================================================================
 // 7. ENDPOINT MAPPINGS

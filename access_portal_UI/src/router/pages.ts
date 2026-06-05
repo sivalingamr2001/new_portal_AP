@@ -5,7 +5,7 @@ export const LoginPage = lazy(() =>
   import("@/pages/Auth/LoginPage").then((m) => ({ default: m.LoginPage }))
 )
 export const RootRedirect = lazy(() =>
-  import("@/pages/RootRedirect").then((m) => ({ default: m.RootRedirect }))
+  import("@/pages/common/RootRedirect").then((m) => ({ default: m.RootRedirect }))
 )
 
 export const UserProfilePage = lazy(() =>
@@ -27,57 +27,53 @@ export const RequestDetailsPage = lazy(() =>
 
 // HOD Group
 export const PendingApprovalsPage = lazy(() =>
-  import("@/pages/PendingApprovalsPage").then((m) => ({
-    default: m.PendingApprovalsPage,
+  import("@/pages/Hod/HodPendingRequestsPage").then((m) => ({
+    default: m.HodPendingRequestsPage,
   }))
 )
 export const HodAllRequestsPage = lazy(() =>
-  import("@/pages/HodAllRequestsPage").then((m) => ({
-    default: m.HodAllRequestsPage,
+  import("@/pages/Hod/HodPendingRequestsPage").then((m) => ({
+    default: m.HodPendingRequestsPage,
   }))
 )
 
 // Operator Group
 export const DashboardPage = lazy(() =>
-  import("@/pages/Dashboard").then((m) => ({ default: m.Dashboard }))
+  import("@/pages/Admin/Dashboard").then((m) => ({ default: m.Dashboard }))
 )
 export const ApprovalQueuePage = lazy(() =>
-  import("@/pages/ApprovalQueuePage").then((m) => ({
-    default: m.ApprovalQueuePage,
+  import("@/pages/Operator/OperatorPendingRequestsPage").then((m) => ({
+    default: m.OperatorPendingRequestsPage,
   }))
 )
-export const ActiveAccessPage = lazy(() =>
-  import("@/pages/ActiveAccessPage").then((m) => ({
-    default: m.ActiveAccessPage,
-  }))
-)
+
 export const OperatorAllRequestsPage = lazy(() =>
-  import("@/pages/OperatorAllRequestsPage").then((m) => ({
+  import("@/pages/Operator/OperatorAllRequestsPage").then((m) => ({
     default: m.OperatorAllRequestsPage,
   }))
 )
 
 // Admin Group
 export const UsersPage = lazy(() =>
-  import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage }))
+  import("@/pages/Admin/UsersPage").then((m) => ({ default: m.UsersPage }))
 )
 export const DepartmentsPage = lazy(() =>
-  import("@/pages/DepartmentsPage").then((m) => ({
+  import("@/pages/Admin/DepartmentsPage").then((m) => ({
     default: m.DepartmentsPage,
   }))
 )
 export const FolderMappingPage = lazy(() =>
-  import("@/pages/FolderMappingPage").then((m) => ({
+  import("@/pages/Admin/FolderMappingPage").then((m) => ({
     default: m.FolderMappingPage,
   }))
 )
 export const AuditLogsPage = lazy(() =>
-  import("@/pages/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage }))
+  import("@/pages/common/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage }))
 )
 
 // Fallback Utilities
 export const UnauthorizedPage = lazy(() =>
-  import("@/pages/UnauthorizedPage").then((m) => ({
+  import("@/pages/common/UnauthorizedPage").then((m) => ({
     default: m.UnauthorizedPage,
   }))
 )

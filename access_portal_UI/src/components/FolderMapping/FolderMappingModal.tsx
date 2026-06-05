@@ -1,10 +1,10 @@
-import { userApi } from "@/api"
-import folderMappingApi from "@/api/folderMappingApi"
-import type { FolderMappingDto } from "@/api/types"
+import type { FolderMappingDto, UpsertFolderMappingRequest, FolderResponse } from "@/api/types"
+import { folderMappingsApi } from "@/api/folderMappingsApi"
+import { usersApi } from "@/api/usersApi"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { useEffect, useState } from "react"
+import { useEffect, useState, startTransition } from "react"
 
 export interface HodDto {
   idRow?: number
@@ -24,36 +24,52 @@ export interface FolderResponseDto {
 interface FolderMappingModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: () => void
   initialData: FolderMappingDto | null
+  onSave: (payload: UpsertFolderMappingRequest) => Promise<void> // Fully matches DynamicGridPage contract
 }
 
-export const FolderMappingModal = ({ isOpen, onClose, onSuccess, initialData }: FolderMappingModalProps) => {
+export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: FolderMappingModalProps) => {
   const [loading, setLoading] = useState(false)
   const [folders, setFolders] = useState<FolderResponseDto[]>([])
   const [hods, setHods] = useState<HodDto[]>([])
 
-  // Form States - Guaranteed strict strings
   const [folderPath, setFolderPath] = useState<string>("")
   const [primaryHod, setPrimaryHod] = useState<HodDto | null>(null)
   const [secondaryHod, setSecondaryHod] = useState<HodDto | null>(null)
 
+  // 1. Data Lookups aligned with non-wrapped raw endpoints context
   useEffect(() => {
     if (!isOpen) return
 
     const loadDropdownData = async () => {
       try {
         const [foldersRes, hodsRes] = await Promise.all([
-          folderMappingApi.getFolderParents(),
-          userApi.getHods()
+          folderMappingsApi.getParentFolders(),
+          usersApi.getHods()
         ])
         
-        if (foldersRes.isSuccess && foldersRes.value) {
-          setFolders(foldersRes.value)
+        if (foldersRes) {
+          // Normalize Drive/Path structure if needed from FolderResponse
+          const transformedFolders = (foldersRes as any[]).map((f, idx) => ({
+            id: String(idx),
+            name: f.name || "",
+            path: f.driveName ? `${f.driveName}:\\${f.name}` : f.name || ""
+          }))
+          setFolders(transformedFolders)
         }
         
-        if (hodsRes.isSuccess && hodsRes.value) {
-          setHods(hodsRes.value)
+        if (hodsRes) {
+          const extractedHods = Array.isArray(hodsRes) 
+            ? hodsRes 
+            : ((hodsRes as any).data || (hodsRes as any).value || [])
+          
+          // Map backend attributes cleanly onto client UI dropdown models
+          const normalizedHods = extractedHods.map((h: any) => ({
+            id: String(h.employeeId || h.hodId || h.userId || h.id || ""),
+            hodName: h.hodName || h.name || "N/A",
+            emailId: h.emailId || h.email || ""
+          }))
+          setHods(normalizedHods)
         }
       } catch (err) {
         console.error("Failed to load modal dropdown data", err)
@@ -63,9 +79,9 @@ export const FolderMappingModal = ({ isOpen, onClose, onSuccess, initialData }: 
     loadDropdownData()
   }, [isOpen])
 
+  // 2. Clear or set form parameters on lifecycle visibility change mutations
   useEffect(() => {
     if (isOpen && initialData) {
-      // Fallback with '|| ""' prevents string | null | undefined errors
       setFolderPath(initialData.folderPath || "")
       
       setPrimaryHod({
@@ -73,49 +89,44 @@ export const FolderMappingModal = ({ isOpen, onClose, onSuccess, initialData }: 
         hodName: initialData.primaryHodName || "",
         emailId: initialData.primaryHodEmail || ""
       })
-      setSecondaryHod({
+      setSecondaryHod(initialData.secondaryHodId ? {
         id: initialData.secondaryHodId || "",
         hodName: initialData.secondaryHodName || "",
         emailId: initialData.secondaryHodEmail || ""
-      })
-    } else if (isOpen) {
+      } : null)
+    } else if (!isOpen) {
       setFolderPath("")
       setPrimaryHod(null)
       setSecondaryHod(null)
     }
   }, [isOpen, initialData])
 
+  // 3. Delegation pipeline hand-off execution routing
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    const payload = {
+    const payload: UpsertFolderMappingRequest = {
       folderPath,
-      primaryHodId: primaryHod?.id || "",
-      primaryHodName: primaryHod?.hodName || "",
-      primaryHodEmail: primaryHod?.emailId || "",
-      secondaryHodId: secondaryHod?.id || "",
-      secondaryHodName: secondaryHod?.hodName || "",
-      secondaryHodEmail: secondaryHod?.emailId || ""
+      primaryHodId: primaryHod?.id || null,
+      primaryHodName: primaryHod?.hodName || null,
+      primaryHodEmail: primaryHod?.emailId || null,
+      secondaryHodId: secondaryHod?.id || null,
+      secondaryHodName: secondaryHod?.hodName || null,
+      secondaryHodEmail: secondaryHod?.emailId || null
     }
 
     try {
-      if (initialData?.id) {
-        await folderMappingApi.update(initialData.id, payload)
-      } else {
-        await folderMappingApi.create(payload)
-      }
-      onSuccess()
-      onClose()
+      await onSave(payload) // Orchestrated directly by the shared parent component
     } catch (err) {
-      console.error("Failed to save folder mapping", err)
+      console.error("Failed to save folder mapping inside modular boundary:", err)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{initialData ? "Update" : "Create"} Folder Mapping</DialogTitle>
@@ -171,7 +182,7 @@ export const FolderMappingModal = ({ isOpen, onClose, onSuccess, initialData }: 
               value={secondaryHod?.id || ""}
               onChange={(e) => {
                 const selected = hods.find(h => h.id === e.target.value)
-                setSecondaryHod(selected || null)
+                startTransition(() => setSecondaryHod(selected || null))
               }}
               className="w-full p-2 border rounded-md bg-background text-sm"
             >

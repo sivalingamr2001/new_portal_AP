@@ -1,5 +1,4 @@
 import React, { useState } from "react"
-import { loginApi } from "@/api/loginApi"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,6 +14,7 @@ import { useLoader } from "@/hooks/useLoader"
 import { useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
+import { authApi } from "@/api"
 
 export const LoginPage = () => {
   const { login } = useAuth()
@@ -34,11 +34,11 @@ export const LoginPage = () => {
       }
 
       // TypeScript now infers 'data' as LoginResponse
-      const data = await withLoader(() => loginApi.login(values))
+      const data = await withLoader(() => authApi.login(values))
 
-      if (data && data.isSuccess) {
+      if (data) {
 
-        login(data.value, 30)
+        login(data, 30)
 
         navigate("/", {
           replace: true,

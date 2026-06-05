@@ -60,6 +60,7 @@ export interface DataGridProps<
   loadingMessage?: string
   onRefresh?: () => void | Promise<void>
   onGridReady?: (api: GridApi<TData>) => void
+  onSearchChange?: (value: string) => void
   onRowClicked?: (event: RowClickedEvent<TData>) => void
   onSelectionChanged?: (selectedRows: TData[]) => void
   onFilterChanged?: (event: FilterChangedEvent<TData>) => void
@@ -114,6 +115,7 @@ export interface GridToolbarProps {
   showRefresh: boolean
   showClearFilters: boolean
   onQuickFilterChange: (value: string) => void
+  onSearchChange?: (value: string) => void
   onRefresh: () => void
   onClearFilters: () => void
   customActions?: ActionButtonProps[]

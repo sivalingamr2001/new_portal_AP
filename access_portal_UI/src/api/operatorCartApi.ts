@@ -1,26 +1,5 @@
-import { apiService, ApiException, type PaginationParams, type PagedResult, type AccessTypes } from "./axiosClient"
-import type { ItemActionDto } from "./accessRequestsApi"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface OperatorCartItemDto {
-  itemId: number
-  requestId: number
-  ticketNumber: string
-  folderPath: string
-  requestedAccessType: AccessTypes
-  confirmedAccessType: AccessTypes
-  reason: string
-  hodApproverId: number | null
-  requesterUserId: number
-  submittedAt: string
-}
-
-export interface OverrideAccessTypeDto {
-  accessType: AccessTypes
-}
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import { apiService, ApiException } from "./axiosClient"
+import type { PaginationParams, PagedResult, OperatorCartItemDto, ItemActionDto, OverrideAccessTypeDto } from "./types"
 
 export const operatorCartApi = {
   getCart: async (params?: PaginationParams): Promise<PagedResult<OperatorCartItemDto>> => {

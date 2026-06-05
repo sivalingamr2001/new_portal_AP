@@ -6,8 +6,8 @@ import { useAuth } from "@/context/AuthContext"
 
 import AppLayout from "@/layout/AppLayout"
 import { AuthLayout } from "@/layout/AuthLayout"
-import ErrorBountry from "@/pages/ErrorBountry"
-import { ProtectedRoute } from "@/pages/ProtectedRoute"
+import ErrorBountry from "@/pages/common/ErrorBountry"
+import { ProtectedRoute } from "@/pages/common/ProtectedRoute"
 
 import * as Pages from "./pages"
 import { withSuspense } from "./withSuspense"
@@ -95,10 +95,6 @@ export const routesConfig: RouteObject[] = [
               {
                 path: "/operator/approval-queue",
                 element: withSuspense(Pages.ApprovalQueuePage),
-              },
-              {
-                path: "/operator/active-access",
-                element: withSuspense(Pages.ActiveAccessPage),
               },
               {
                 path: "/operator/all-requests",

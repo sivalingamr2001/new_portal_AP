@@ -1,44 +1,5 @@
 import { apiService, ApiException } from "./axiosClient"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface LoginValues {
-  identifier: string
-  password: string
-}
-
-export interface UserProfile {
-  id: number
-  name: string | null
-  role: string
-  location: string
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-}
-
-export interface DepartmentDto {
-  id: number
-  name: string | null
-  hodId: string | null
-}
-
-export interface HodDto {
-  id: number
-  name: string | null
-  employeeId: string | null
-  email: string | null
-  mobileNumber: string | null
-}
-
-export interface LoginResponse {
-  user: UserProfile | null
-  department: DepartmentDto | null
-  headOfDepartment: HodDto | null
-}
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import type { LoginValues, LoginResponse } from "./types"
 
 export const authApi = {
   /**

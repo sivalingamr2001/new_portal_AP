@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { usersApi } from "@/api/usersApi";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -10,7 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import userApi from "@/api/userApi"; // Adjust this import based on where your getHods api is located
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 
 export interface UpdateDepartmentRequest {
     deptName?: string | null;
@@ -46,18 +46,22 @@ export const EditDepartmentModal = ({
         },
     });
 
-    // Fetch HOD dropdown options
     useEffect(() => {
         const fetchHods = async () => {
             if (!isOpen) return;
             try {
                 setLoadingHods(true);
-                const result = await userApi.getHods();
-                if (result.isSuccess && result.value) {
-                    setHodList(result.value);
+                const result: any = await usersApi.getHods();
+
+                if (result) {
+                    const extractedArray = Array.isArray(result)
+                        ? result
+                        : (result.data || result.value || []);
+                    setHodList(extractedArray);
                 }
             } catch (error) {
                 console.error("Failed to fetch HOD list:", error);
+                setHodList([]);
             } finally {
                 setLoadingHods(false);
             }
@@ -65,12 +69,11 @@ export const EditDepartmentModal = ({
         fetchHods();
     }, [isOpen]);
 
-    // Handle form dynamic initialization on open
     useEffect(() => {
         if (isOpen && departmentData) {
             reset({
-                deptName: departmentData.department?.deptName || "",
-                hodId: departmentData.hod?.hodId ? departmentData.hod.hodId : null,
+                deptName: departmentData.name || "",
+                hodId: departmentData.hodId ? String(departmentData.hodId) : null,
             });
         } else if (!isOpen) {
             reset({ deptName: "", hodId: null });
@@ -78,10 +81,9 @@ export const EditDepartmentModal = ({
     }, [departmentData, isOpen, reset]);
 
     const onSubmit = async (data: UpdateDepartmentRequest) => {
-        // Form states keep inputs as strings; safely cast back to a number or null for API
         const payload: UpdateDepartmentRequest = {
             deptName: data.deptName?.trim() || null,
-            hodId: data.hodId ? (data.hodId).toString() : null,
+            hodId: data.hodId ? data.hodId.toString() : null,
         };
         await onSave(payload);
     };
@@ -92,17 +94,15 @@ export const EditDepartmentModal = ({
                 <DialogHeader>
                     <DialogTitle className="text-3xl text-primary">Edit Department</DialogTitle>
                     <DialogDescription>
-                        Update the department details for{" "}
+                        Update the department details for {""}
                         <span className="font-semibold text-foreground">
-                            {departmentData?.department?.deptName || "Department"}
+                            {departmentData?.name || departmentData?.id}
                         </span>.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 py-2">
                     <div className="grid grid-cols-1 gap-5 rounded-md border border-border bg-card p-4">
-
-                        {/* Department Name Input Field */}
                         <div className="space-y-2">
                             <label className="text-sm font-medium text-foreground">Department Name</label>
                             <Input
@@ -133,17 +133,15 @@ export const EditDepartmentModal = ({
                                         </SelectTrigger>
                                         <SelectContent>
                                             {hodList.map((hod: any) => {
-                                                // Fallback chain to find the actual unique ID property from your API response
                                                 const uniqueId = hod.hodId || hod.userId || hod.id;
 
                                                 return (
                                                     <SelectItem key={uniqueId} value={String(uniqueId)}>
-                                                        {hod.hodName || hod.name} ({hod.emailId || hod.email})
+                                                        {hod.hodName || hod.name || "N/A"} ({hod.emailId || hod.email || "No Email"})
                                                     </SelectItem>
                                                 );
                                             })}
                                         </SelectContent>
-
                                     </Select>
                                 )}
                             />
@@ -151,7 +149,6 @@ export const EditDepartmentModal = ({
                                 <p className="text-xs text-destructive">{errors.hodId.message}</p>
                             )}
                         </div>
-
                     </div>
 
                     {/* Form Actions */}
@@ -168,3 +165,4 @@ export const EditDepartmentModal = ({
         </Dialog>
     );
 };
+

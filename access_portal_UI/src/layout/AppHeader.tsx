@@ -1,5 +1,5 @@
-import accessRequestApi from "@/api/accessRequestApi"
-import type { AccessNotificationDto } from "@/api/types"
+import { notificationsApi } from "@/api"
+import type { NotificationDto } from "@/api/types"
 import { NotificationSheet } from "@/components/NotificationSheet"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,29 +13,28 @@ import {
 import { Sheet, SheetTrigger } from "@/components/ui/sheet"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/context/AuthContext"
-import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr"
-import { Bell, LogOut, User } from "lucide-react"
+import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from "@microsoft/signalr"
+import { Bell, LogOut, User, Building2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 export function AppHeader() {
-  const { currentUser, logout } = useAuth()
+  const { currentUser, logout } = useAuth() // currentUser matches PortalUserDetails structure
   const navigate = useNavigate()
 
-  const [notifications, setNotifications] = useState<AccessNotificationDto[]>([])
+  const [notifications, setNotifications] = useState<NotificationDto[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isError, setIsError] = useState<boolean>(false)
 
-  const userId = currentUser?.user?.userId || currentUser?.cmplUser?.cmplUserId || 0
+  const userId = currentUser?.user?.id || 0
 
-  // 2. Fetch notifications in the parent
   useEffect(() => {
     const fetchNotifications = async () => {
       if (!userId) return
       try {
         setIsLoading(true)
         setIsError(false)
-        const data = await accessRequestApi.getNotifications(userId)
+        const data = await notificationsApi.getNotifications()
         setNotifications(data || [])
       } catch (error) {
         console.error("Failed to fetch notifications:", error)
@@ -51,41 +50,98 @@ export function AppHeader() {
   useEffect(() => {
     if (!userId) return
 
-    const hubUrl = `${import.meta.env.VITE_SIGNALR_URL || "http://localhost:5067"}/hubs/notifications?userId=${userId}`
-    const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl, {
-        withCredentials: true,
+    let isMounted = true
+    let connection: HubConnection | null = null
+
+    const initializeNotifications = async () => {
+      // 1. Fetch initial historical notifications
+      try {
+        setIsLoading(true)
+        setIsError(false)
+        const data = await notificationsApi.getNotifications()
+        if (isMounted) {
+          setNotifications(data || [])
+        }
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error)
+        if (isMounted) setIsError(true)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+
+      // Guard against immediate unmounts before starting negotiation
+      if (!isMounted) return
+
+      // 2. Resolve target Hub Base Endpoint URL safely
+      const hubBaseUrl = (
+        import.meta.env.VITE_SIGNALR_URL ||
+        import.meta.env.VITE_BASE_API_URL ||
+        "http://localhost:5067"
+      )
+        .replace(/\/api\/?$/, "")
+        .replace(/\/hubs\/notifications\/?$/, "")
+
+      const hubUrl = `${hubBaseUrl}/hubs/notifications?userId=${userId}`
+
+      // 3. Construct Hub Connection with strict transport specifications
+      connection = new HubConnectionBuilder()
+        .withUrl(hubUrl, {
+          withCredentials: true,
+          // CRITICAL FIX: Explicitly skip negotiation if using pure WebSockets, 
+          // or let it negotiate without thread blocking collisions
+          skipNegotiation: false
+        })
+        .configureLogging(LogLevel.Warning) // Suppress noisy info logs during negotiation
+        .withAutomaticReconnect()
+        .build()
+
+      connection.on("ReceiveNotification", (notification: NotificationDto) => {
+        if (isMounted) {
+          setNotifications((prev) => [notification, ...prev])
+          setIsError(false)
+        }
       })
-      .configureLogging(LogLevel.Information)
-      .withAutomaticReconnect()
-      .build()
 
-    connection.on("ReceiveNotification", (notification: AccessNotificationDto) => {
-      setNotifications((prev) => [notification, ...prev])
-      setIsError(false)
-    })
+      // 4. Start Live Stream Connection with explicit Abort Handling guards
+      try {
+        if (connection.state === HubConnectionState.Disconnected) {
+          await connection.start()
+        }
+      } catch (error: unknown) {
+        // Catch and completely ignore expected abort handshakes
+        if (!isMounted) return
 
-    connection
-      .start()
-      .catch((error: unknown) => {
+        const errMsg = String(error)
+        if (errMsg.includes("stopped during negotiation") || errMsg.includes("AbortError")) {
+          return
+        }
+
         console.error("Failed to connect to notifications hub:", error)
-        setIsError(true)
-      })
-
-    return () => {
-      connection.off("ReceiveNotification")
-      connection.stop().catch((error: unknown) => {
-        console.error("Failed to stop notifications hub:", error)
-      })
+        if (isMounted) setIsError(true)
+      }
     }
-  }, [userId])
+
+    initializeNotifications()
+
+    // Clean-up context wrapper routine
+    return () => {
+      isMounted = false
+      if (connection) {
+        connection.off("ReceiveNotification")
+        // Only call stop if it's not already dead or disconnecting
+        if (connection.state === HubConnectionState.Connected) {
+          connection.stop().catch(() => { /* Silent discard */ })
+        }
+      }
+    }
+  }, [userId]) // Depend STRICTLY on userId stability
 
   const handleMarkAsRead = async (auditId: number) => {
     try {
       setNotifications((prev) =>
         prev.map((n) => (n.auditId === auditId ? { ...n, isRead: true } : n))
       )
-      await accessRequestApi.markNotificationAsRead(auditId, userId)
+      await notificationsApi.markRead(auditId)
     } catch (error) {
       console.error("Failed to mark notification as read:", error)
       setNotifications((prev) =>
@@ -94,7 +150,6 @@ export function AppHeader() {
     }
   }
 
-  // 4. Calculate unread count to show/hide the red dot indicator
   const hasUnread = notifications.some((n) => !n.isRead)
 
   const handleLogout = () => {
@@ -109,7 +164,7 @@ export function AppHeader() {
         <div className="h-5 w-px bg-border" />
         <div className="flex items-center gap-3">
           <span className="hidden text-xs font-medium text-muted-foreground sm:inline-block">
-            Access Portal
+            {currentUser?.department?.name || "Access Portal"}
           </span>
         </div>
       </div>
@@ -123,15 +178,13 @@ export function AppHeader() {
               className="relative h-9 w-9 text-muted-foreground hover:text-foreground"
             >
               <Bell className="h-5 w-5" />
-              {/* The red circle now conditionally updates based on live array data */}
               {hasUnread && (
                 <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
               )}
             </Button>
           </SheetTrigger>
-          
-          {/* Pass data down to the child view layer */}
-          <NotificationSheet 
+
+          <NotificationSheet
             notifications={notifications}
             isLoading={isLoading}
             isError={isError}
@@ -154,10 +207,10 @@ export function AppHeader() {
 
               <div className="hidden flex-col text-left md:flex">
                 <span className="text-sm leading-none font-semibold text-foreground">
-                  {currentUser?.cmplUser?.cmplUserName || "User Name"}
+                  {currentUser?.user?.name || "User Name"}
                 </span>
                 <span className="mt-1 text-xs leading-none font-normal text-muted-foreground">
-                  {currentUser?.cmplUser?.mailId || "N/A"}
+                  {currentUser?.user?.email || "N/A"}
                 </span>
               </div>
             </Button>
@@ -167,10 +220,10 @@ export function AppHeader() {
             <DropdownMenuLabel className="font-normal md:hidden">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm leading-none font-medium">
-                  {currentUser?.cmplUser?.cmplUserName || "User Name"}
+                  {currentUser?.user?.name || "User Name"}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.cmplUser?.mailId || "user@example.com"}
+                  {currentUser?.user?.email || "user@example.com"}
                 </p>
               </div>
             </DropdownMenuLabel>

@@ -1,6 +1,6 @@
 import { themeQuartz, type ColDef, type GridOptions } from "ag-grid-community"
 import { AgGridReact } from "ag-grid-react"
-import { useMemo, useCallback } from "react"
+import { useMemo, useCallback, useState } from "react"
 import { useDataGrid } from "./useDataGrid"
 import { useVirtualScroll } from "./useVirtualScroll"
 import { GridToolbar } from "./GridToolbar"
@@ -47,7 +47,8 @@ export function DataGrid<TData extends object>(
   } = props
 
   const {theme} = useTheme()
-  const { gridApiRef, state, handlers } = useDataGrid(props)
+  const [gridApi, setGridApi] = useState<any>(null)
+  const { state, handlers } = useDataGrid(props)
   const { setGridApi: setVirtualScrollGridApi, state: virtualScrollState } =
     useVirtualScroll({
       pageSize: virtualScroll?.pageSize ?? pageSize,
@@ -214,6 +215,7 @@ export function DataGrid<TData extends object>(
   const onGridReady = useCallback(
     (event: any) => {
       handlers.onGridReady(event)
+      setGridApi(event.api)
       if (virtualScroll?.enabled) {
         setVirtualScrollGridApi(event.api)
       }
@@ -234,8 +236,9 @@ export function DataGrid<TData extends object>(
         showRefresh={showRefreshButton}
         showClearFilters={showClearFiltersButton}
         onQuickFilterChange={handlers.onQuickFilterChange}
+        onSearchChange={props.onSearchChange}
         onRefresh={handlers.onRefresh}
-        gridApi={gridApiRef.current}
+        gridApi={gridApi}
         customActions={customActions}
         onClearFilters={async () => {
           handlers.onClearFilters()

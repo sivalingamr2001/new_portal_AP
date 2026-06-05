@@ -64,23 +64,29 @@ export function useDataGrid<TData extends object>(
   )
 
   const onQuickFilterChange = useCallback((value: string) => {
-    if (!gridApiRef.current) return
-    gridApiRef.current.setGridOption("quickFilterText", value)
     setState((prev) => ({ ...prev, quickFilter: value }))
-  }, [])
+
+    if (gridApiRef.current) {
+      gridApiRef.current.setGridOption("quickFilterText", value)
+    }
+
+    props.onSearchChange?.(value)
+  }, [props])
 
   const onClearFilters = useCallback(() => {
-    if (!gridApiRef.current) return
-
-    // API Fix: Replaced deprecated `.setSortModel(null)` with standard `applyColumnState` call sequence
-    gridApiRef.current.setFilterModel(null)
-    gridApiRef.current.setGridOption("quickFilterText", "")
-    gridApiRef.current.applyColumnState({
-      defaultState: { sort: null },
-    })
-
     setState((prev) => ({ ...prev, quickFilter: "", activeFiltersCount: 0 }))
-  }, [])
+
+    if (gridApiRef.current) {
+      // API Fix: Replaced deprecated `.setSortModel(null)` with standard `applyColumnState` call sequence
+      gridApiRef.current.setFilterModel(null)
+      gridApiRef.current.setGridOption("quickFilterText", "")
+      gridApiRef.current.applyColumnState({
+        defaultState: { sort: null },
+      })
+    }
+
+    props.onSearchChange?.("")
+  }, [props])
 
   const onRefresh = useCallback(async () => {
     if (props.onRefresh) {

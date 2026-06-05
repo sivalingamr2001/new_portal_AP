@@ -12,44 +12,56 @@ public sealed class DepartmentService(
     HodDbContext hodDb) : IDepartmentService
 {
     public async Task<PagedResult<DepartmentDetailDto>> GetAllAsync(
-        int page, int pageSize, string? search)
+    int page, int pageSize, string? search)
     {
         bool isTestEnv = db.Database.IsSqlite();
+
         var query = db.Departments.Where(d => d.IsActive);
 
+        // 1. Fixed Case-Insensitive Server Searching Matching
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(d => d.Name != null && d.Name.Contains(search));
+        {
+            var lowerTerm = search.Trim().ToLower();
+            query = query.Where(d => d.Name != null && d.Name.ToLower().Contains(lowerTerm));
+        }
 
         var total = await query.CountAsync();
         var depts = await query
-            .OrderBy(d => d.Name)
+            .OrderBy(d => d.Id) // ID 101 will always load first on Page 1
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        // Enrich with HOD names in bulk
-        var hodIds = depts
-            .Where(d => d.HodId != null && int.TryParse(d.HodId, out _))
-            .Select(d => int.Parse(d.HodId!))
+        // 2. FIX: Extract HodId values cleanly as STRINGS rather than parsing to integers
+        var hodEmployeeIds = depts
+            .Where(d => !string.IsNullOrWhiteSpace(d.HodId))
+            .Select(d => d.HodId!)
             .Distinct()
             .ToList();
 
-        var hods = isTestEnv
-            ? await db.HodMasters.Where(h => hodIds.Contains(h.UserId) && h.Deleted == 0).ToDictionaryAsync(h => h.UserId)
-            : await hodDb.HodMasters.Where(h => hodIds.Contains(h.UserId) && h.Deleted == 0).ToDictionaryAsync(h => h.UserId);
+        // 3. FIX: Query HodMasters using EmployeeId and index them into a string-keyed Dictionary
+        var hodsList = isTestEnv
+            ? await db.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId) && h.Deleted == 0).ToListAsync()
+            : await hodDb.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId) && h.Deleted == 0).ToListAsync();
 
+        // Materialize using local memory lookup routing safely
+        var hods = hodsList.ToDictionary(h => h.EmployeeId, StringComparer.OrdinalIgnoreCase);
+
+        // 4. Map the collection with clean, type-safe string-key lookups
         var data = depts.Select(d =>
         {
             HodMaster? hod = null;
-            if (d.HodId is not null && int.TryParse(d.HodId, out var hodId))
-                hods.TryGetValue(hodId, out hod);
+            if (!string.IsNullOrWhiteSpace(d.HodId))
+            {
+                hods.TryGetValue(d.HodId, out hod);
+            }
 
             return new DepartmentDetailDto(
                 d.Id,
                 d.Name,
                 d.HodId,
-                hod?.Name,
-                hod?.Email,
+                hod?.Name,     // Will resolve to "SIVALINGAM R"
+                hod?.Email,    // Will resolve to "it-dev25.g@janatics.co.in"
                 d.IsActive,
                 d.CreatedOn);
         }).ToList();

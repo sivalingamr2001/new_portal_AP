@@ -1,6 +1,6 @@
-// ─── Barrel Export ────────────────────────────────────────────────────────────
-// Import everything from one place: import { authApi, usersApi, ... } from "@/api"
+import type { Result } from "./types"
 
+// ─── Barrel Export ────────────────────────────────────────────────────────────
 export * from "./axiosClient"
 export * from "./authApi"
 export * from "./usersApi"

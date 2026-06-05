@@ -1,43 +1,5 @@
-import { apiService, ApiException, type PaginationParams, type PagedResult } from "./axiosClient"
-import type { UserProfile, DepartmentDto, HodDto } from "./authApi"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface CmplUserDto {
-  id: number
-  name: string | null
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-}
-
-export interface PortalUserDto {
-  id: number
-  name: string
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-  role: string
-  location: string
-  isActive: boolean
-  createdOn: string
-}
-
-export interface PortalUserDetails {
-  user: UserProfile | null
-  department: DepartmentDto | null
-  headOfDepartment: HodDto | null
-}
-
-export interface UpsertPortalUserDto {
-  cmplUserId: number
-  role: string
-  location: string
-}
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import { ApiException, apiService } from "./axiosClient"
+import type { PaginationParams, PagedResult, CmplUserDto, HodDto, PortalUserDetails, UpsertPortalUserDto } from "./types"
 
 export const usersApi = {
   getCmplUsers: async (

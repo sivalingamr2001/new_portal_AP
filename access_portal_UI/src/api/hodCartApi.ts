@@ -1,20 +1,5 @@
-import { apiService, ApiException, type PaginationParams, type PagedResult, type AccessTypes } from "./axiosClient"
-import type { ItemActionDto } from "./accessRequestsApi"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface HodCartItemDto {
-  itemId: number
-  requestId: number
-  ticketNumber: string
-  folderPath: string
-  accessType: AccessTypes
-  reason: string
-  requesterUserId: number
-  submittedAt: string
-}
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import { ApiException, apiService } from "./axiosClient"
+import type { PaginationParams, PagedResult, HodCartItemDto, ItemActionDto } from "./types"
 
 export const hodCartApi = {
   getCart: async (params?: PaginationParams): Promise<PagedResult<HodCartItemDto>> => {

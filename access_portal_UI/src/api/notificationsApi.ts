@@ -1,20 +1,5 @@
 import { apiService, ApiException } from "./axiosClient"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface NotificationDto {
-  auditId: number
-  eventType: string
-  message: string
-  ticketNumber: string | null
-  accessReqId: number
-  accessItemId: number | null
-  isRead: boolean
-  readAtUtc: string | null
-  createdOn: string
-}
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import type { NotificationDto } from "./types"
 
 export const notificationsApi = {
   getNotifications: async (unreadOnly = false): Promise<NotificationDto[]> => {

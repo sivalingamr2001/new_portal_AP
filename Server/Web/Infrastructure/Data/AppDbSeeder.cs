@@ -106,7 +106,7 @@ public static class AppDataSeeder
 
         var demoUsers = new[]
         {
-            new { Id = 1, EmpId = "E001", Name = "Demo Admin", Role = "ADMIN" },
+            new { Id = 1, EmpId = "E001", Name = "Demo Admin", Role = "Admin" },
             new { Id = 2, EmpId = "E002", Name = "Demo Operator", Role = "Operator" },
             new { Id = 5, EmpId = "E003", Name = "Demo HOD", Role = "Hod" },
             new { Id = 6, EmpId = "E004", Name = "Demo User", Role = "User" }

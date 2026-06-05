@@ -104,21 +104,21 @@ public sealed class UserService(
         bool isTestEnv = db.Database.IsSqlite();
         List<int>? matchedCmplIds = null;
 
-        // 1. Handle cross-database keyword search if query is provided
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim();
+            var lowerTerm = search.Trim().ToLower();
+
             matchedCmplIds = isTestEnv
                 ? await db.CmplUsers
-                    .Where(c => (c.Name != null && c.Name.Contains(term)) ||
-                                (c.Email != null && c.Email.Contains(term)) ||
-                                (c.EmployeeId != null && c.EmployeeId.Contains(term)))
+                    .Where(c => (c.Name != null && c.Name.ToLower().Contains(lowerTerm)) ||
+                                (c.Email != null && c.Email.ToLower().Contains(lowerTerm)) ||
+                                (c.EmployeeId != null && c.EmployeeId.ToLower().Contains(lowerTerm)))
                     .Select(c => c.Id)
                     .ToListAsync()
                 : await cmplDb.CmplUsers
-                    .Where(c => (c.Name != null && c.Name.Contains(term)) ||
-                                (c.Email != null && c.Email.Contains(term)) ||
-                                (c.EmployeeId != null && c.EmployeeId.Contains(term)))
+                    .Where(c => (c.Name != null && c.Name.ToLower().Contains(lowerTerm)) ||
+                                (c.Email != null && c.Email.ToLower().Contains(lowerTerm)) ||
+                                (c.EmployeeId != null && c.EmployeeId.ToLower().Contains(lowerTerm)))
                     .Select(c => c.Id)
                     .ToListAsync();
         }
@@ -162,7 +162,7 @@ public sealed class UserService(
         {
             if (isTestEnv)
             {
-                var masters = await hodDb.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId)).ToListAsync();
+                var masters = await db.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId)).ToListAsync();
                 batchHods = masters.Select(h => new HodDto(h.UserId, h.Name, h.EmployeeId, h.Email, h.MobileNumber)).ToList();
             }
             else
@@ -309,17 +309,128 @@ public sealed class UserService(
     public async Task<Result> UpdatePortalUserAsync(
         int id, UpsertPortalUserDto dto, int updatedBy)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
-        if (user is null)
-            return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
+        // 1. Establish structural cross-table execution tracking strategy safeguards
+        var strategy = db.Database.CreateExecutionStrategy();
 
-        user.Role = dto.Role;
-        user.Location = dto.Location;
-        user.ModifiedOn = DateTime.UtcNow;
-        user.ModifiedBy = updatedBy;
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var transaction = await db.Database.BeginTransactionAsync();
+            try
+            {
+                // 2. Fetch the target core Access Portal User record
+                var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+                if (user is null)
+                    return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
 
-        await db.SaveChangesAsync();
-        return Result.Success();
+                // 3. Extract matching profile columns from the underlying Compliance User entity
+                var cmplUser = await db.CmplUsers
+                    .FirstOrDefaultAsync(c => c.Id == dto.CmplUserId);
+
+                if (cmplUser is null)
+                    return Result.Failure(Error.NotFound("USR_003", "Associated compliance user metadata records not found."));
+
+                // Mirror driver detection patterns used in DepartmentService
+                bool isTestEnv = db.Database.IsSqlite();
+                string oldRole = user.Role;
+
+                // Commit basic property mapping modifications
+                user.Role = dto.Role;
+                user.Location = dto.Location;
+                user.ModifiedOn = DateTime.UtcNow;
+                user.ModifiedBy = updatedBy;
+
+                // 4. Case-Insensitive Check: If the target role is changed to "Hod"
+                if (!string.IsNullOrWhiteSpace(user.Role) &&
+                    user.Role.Equals("Hod", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!cmplUser.DepartmentId.HasValue || string.IsNullOrWhiteSpace(cmplUser.EmployeeId))
+                    {
+                        return Result.Failure(Error.Validation(
+                            "USR_004",
+                            "Cannot assign HOD role. User lacks an assigned DepartmentId or valid EmployeeId."));
+                    }
+
+                    // Locate the active department record
+                    var assignedDept = await db.Departments
+                        .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
+
+                    if (assignedDept is null)
+                        return Result.Failure(Error.NotFound("DEPT_001", "Associated active department not found."));
+
+                    // Secure Validation Guard: Confirm this user exists in the proper HodMasters context before assigning them
+                    var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
+
+                    var hodExists = await hodContext
+                        .AnyAsync(h => h.EmployeeId == cmplUser.EmployeeId && h.Deleted == 0);
+
+                    if (!hodExists)
+                    {
+                        return Result.Failure(Error.NotFound(
+                            "DEPT_003",
+                            $"The specified HOD record (EmployeeId: {cmplUser.EmployeeId}) does not exist in HodMasters."));
+                    }
+
+                    // If a different user was previously managing this department slot, demote them to "User"
+                    if (!string.IsNullOrWhiteSpace(assignedDept.HodId) &&
+                        !assignedDept.HodId.Equals(cmplUser.EmployeeId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var oldHodCmpl = await db.CmplUsers
+                            .FirstOrDefaultAsync(c => c.EmployeeId == assignedDept.HodId);
+
+                        if (oldHodCmpl != null)
+                        {
+                            var oldHodPortalUser = await db.Users
+                                .FirstOrDefaultAsync(u => u.Id == oldHodCmpl.Id);
+
+                            if (oldHodPortalUser != null &&
+                                oldHodPortalUser.Role.Equals("Hod", StringComparison.OrdinalIgnoreCase))
+                            {
+                                oldHodPortalUser.Role = "User"; // Automatic structural demotion tracking
+                                oldHodPortalUser.ModifiedOn = DateTime.UtcNow;
+                                oldHodPortalUser.ModifiedBy = updatedBy;
+                                db.Users.Update(oldHodPortalUser);
+                            }
+                        }
+                    }
+
+                    // Sync the department's HodId with the new manager's EmployeeId
+                    assignedDept.HodId = cmplUser.EmployeeId;
+                    assignedDept.ModifiedOn = DateTime.UtcNow;
+                    assignedDept.ModifiedBy = updatedBy;
+                    db.Departments.Update(assignedDept);
+                }
+
+                // 5. Cleanup Demotion Path: If the user is being changed AWAY from HOD, clear the department slot
+                else if (!string.IsNullOrWhiteSpace(oldRole) &&
+                         oldRole.Equals("Hod", StringComparison.OrdinalIgnoreCase) &&
+                         cmplUser.DepartmentId.HasValue)
+                {
+                    var originalDept = await db.Departments
+                        .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
+
+                    if (originalDept != null &&
+                        !string.IsNullOrWhiteSpace(originalDept.HodId) &&
+                        originalDept.HodId.Equals(cmplUser.EmployeeId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        originalDept.HodId = null; // Free up the HOD field
+                        originalDept.ModifiedOn = DateTime.UtcNow;
+                        originalDept.ModifiedBy = updatedBy;
+                        db.Departments.Update(originalDept);
+                    }
+                }
+
+                // Commit atomic updates across tables
+                await db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Result.Success();
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
     }
 
     public async Task<Result> DeletePortalUserAsync(int id, int deletedBy)

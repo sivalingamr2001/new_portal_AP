@@ -1,33 +1,5 @@
-import { apiService, ApiException, type PaginationParams, type PagedResult } from "./axiosClient"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface FolderMappingDto {
-  id: number
-  folderPath: string
-  primaryHodId: string | null
-  primaryHodName: string | null
-  primaryHodEmail: string | null
-  secondaryHodId: string | null
-  secondaryHodName: string | null
-  secondaryHodEmail: string | null
-}
-
-export interface UpsertFolderMappingRequest {
-  folderPath: string
-  primaryHodId?: string | null
-  primaryHodName?: string | null
-  primaryHodEmail?: string | null
-  secondaryHodId?: string | null
-  secondaryHodName?: string | null
-  secondaryHodEmail?: string | null
-}
-
-export interface FolderResponse {
-  driveName: string
-  name: string
-  children: FolderResponse[]
-}
+import { apiService, ApiException } from "./axiosClient"
+import type { PaginationParams, PagedResult, FolderMappingDto, UpsertFolderMappingRequest, FolderResponse } from "./types"
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 

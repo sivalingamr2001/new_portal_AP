@@ -8,51 +8,12 @@ import {
 } from "react"
 
 import useSessionStorage from "@/hooks/useSessionStorage"
+import type { PortalUserDetails } from "@/api/types"
 
 const STORAGE_KEY = "jan_AP_user"
 
-type cmplUser = {
-  cmplUserId: number
-  userId?: number
-  cmplUserName: string
-  empId: string
-  mailId: string
-  mobNo: string
-  deptId: number
-}
-
-type user = {
-  userId: number
-  role: string
-  location: string
-}
-
-type department = {
-  deptId: number
-  deptName: string
-  hodId: string
-}
-
-type hod = {
-  idRow: number
-  hodName: string
-  id: string
-  emailId: string
-  mobNo: string
-}
-
-type currentUser = {
-  user: user
-  cmplUser: cmplUser
-  department: department
-  hod: hod
-  name?: string
-  email?: string
-  departmentId?: number
-}
-
 type AuthContextType = {
-  currentUser: currentUser | null
+  currentUser: PortalUserDetails | null
   currentUserRole: string | null
   isAuthenticated: boolean
   login: (user: any, expireInMinutes?: number) => void

@@ -1,21 +1,5 @@
-import { apiService, ApiException, type PaginationParams, type PagedResult } from "./axiosClient"
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface DepartmentDetailDto {
-  id: number
-  name: string | null
-  hodId: string | null
-  hodName: string | null
-  hodEmail: string | null
-  isActive: boolean
-  createdOn: string
-}
-
-export interface UpsertDepartmentDto {
-  name: string
-  hodId?: string | null
-}
+import { apiService, ApiException } from "./axiosClient"
+import type { DepartmentDetailDto, PagedResult, PaginationParams, UpsertDepartmentDto } from "./types"
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
