@@ -5,7 +5,9 @@ export const LoginPage = lazy(() =>
   import("@/pages/Auth/LoginPage").then((m) => ({ default: m.LoginPage }))
 )
 export const RootRedirect = lazy(() =>
-  import("@/pages/common/RootRedirect").then((m) => ({ default: m.RootRedirect }))
+  import("@/pages/common/RootRedirect").then((m) => ({
+    default: m.RootRedirect,
+  }))
 )
 
 export const UserProfilePage = lazy(() =>
@@ -16,13 +18,17 @@ export const UserProfilePage = lazy(() =>
 
 // User Group
 export const MyRequestsPage = lazy(() =>
-  import("@/pages/Users/MyRequests").then((m) => ({ default: m.MyRequestsPage }))
+  import("@/pages/Users/MyRequests").then((m) => ({
+    default: m.MyRequestsPage,
+  }))
 )
 
 export const RequestDetailsPage = lazy(() =>
-  import("@/components/AccessRequests/Details/RequestDetailsPage").then((m) => ({
-    default: m.RequestDetailsPage,
-  }))
+  import("@/components/AccessRequests/Details/RequestDetailsPage").then(
+    (m) => ({
+      default: m.RequestDetailsPage,
+    })
+  )
 )
 
 // HOD Group
@@ -68,7 +74,9 @@ export const FolderMappingPage = lazy(() =>
   }))
 )
 export const AuditLogsPage = lazy(() =>
-  import("@/pages/common/AuditLogsPage").then((m) => ({ default: m.AuditLogsPage }))
+  import("@/pages/common/AuditLogsPage").then((m) => ({
+    default: m.AuditLogsPage,
+  }))
 )
 
 // Fallback Utilities

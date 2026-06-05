@@ -13,7 +13,10 @@ interface DynamicGridPageProps<T> {
   ModalComponent: React.ComponentType<any>
 }
 
-export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPageProps<T>) {
+export function DynamicGridPage<T>({
+  config,
+  ModalComponent,
+}: DynamicGridPageProps<T>) {
   const location = useLocation()
   const [expandedRowIds, setExpandedRowIds] = useState<any[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -23,27 +26,47 @@ export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPagePr
   const debouncedSearch = useDebounce(searchValue, 500)
 
   const { showLoader, hideLoader, loading: manualLoading } = useLoader()
-  const { title } = useMemo(() => getTitleFromSidebar(location.pathname), [location.pathname])
+  const { title } = useMemo(
+    () => getTitleFromSidebar(location.pathname),
+    [location.pathname]
+  )
 
-  const handleFetchPage = useCallback(async (targetPage: number, size: number): Promise<PagedResult<T>> => {
-    const response = await config.fetchData(targetPage, size, debouncedSearch)
+  const handleFetchPage = useCallback(
+    async (targetPage: number, size: number): Promise<PagedResult<T>> => {
+      const response = await config.fetchData(targetPage, size, debouncedSearch)
 
-    const totalCount = ('totalCount' in response && response.totalCount) ? response.totalCount : response.data.length
-    const totalPages = ('totalPages' in response && response.totalPages) ? response.totalPages : Math.ceil(totalCount / size)
-    const page = ('page' in response && response.page) ? response.page : targetPage
+      const totalCount =
+        "totalCount" in response && response.totalCount
+          ? response.totalCount
+          : response.data.length
+      const totalPages =
+        "totalPages" in response && response.totalPages
+          ? response.totalPages
+          : Math.ceil(totalCount / size)
+      const page =
+        "page" in response && response.page ? response.page : targetPage
 
-    return {
-      data: response.data || [],
-      totalCount,
-      page,
-      pageSize: size,
-      totalPages: totalPages || 1,
-      hasNextPage: page < (totalPages || 1),
-      hasPreviousPage: page > 1,
-    }
-  }, [config, debouncedSearch])
+      return {
+        data: response.data || [],
+        totalCount,
+        page,
+        pageSize: size,
+        totalPages: totalPages || 1,
+        hasNextPage: page < (totalPages || 1),
+        hasPreviousPage: page > 1,
+      }
+    },
+    [config, debouncedSearch]
+  )
 
-  const { rowData: items, totalPages, page, loading: gridLoading, loadData, loadMore } = useInfiniteScroll<T>({
+  const {
+    rowData: items,
+    totalPages,
+    page,
+    loading: gridLoading,
+    loadData,
+    loadMore,
+  } = useInfiniteScroll<T>({
     pageSize: config.defaultPageSize || 20,
     fetchRequest: handleFetchPage,
     onError: (err) => console.error("Grid transaction failure context:", err),
@@ -59,7 +82,9 @@ export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPagePr
   }, [])
 
   const toggleRowExpansion = useCallback((id: any) => {
-    setExpandedRowIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+    setExpandedRowIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
   }, [])
 
   const computedRowData = useMemo(() => {
@@ -89,13 +114,23 @@ export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPagePr
     setIsModalOpen(true)
   }, [])
 
-  const columns = useMemo(() => config.columns({
-    openEditModal: handleOpenEditModal,
-    toggleRowExpansion,
-    expandedRowIds,
-  }), [config, handleOpenEditModal, toggleRowExpansion, expandedRowIds])
+  const columns = useMemo(
+    () =>
+      config.columns({
+        openEditModal: handleOpenEditModal,
+        toggleRowExpansion,
+        expandedRowIds,
+      }),
+    [config, handleOpenEditModal, toggleRowExpansion, expandedRowIds]
+  )
 
-  const customActions = useMemo(() => config.globalActions ? config.globalActions({ openCreateModal: handleOpenCreateModal }) : [], [config, handleOpenCreateModal])
+  const customActions = useMemo(
+    () =>
+      config.globalActions
+        ? config.globalActions({ openCreateModal: handleOpenCreateModal })
+        : [],
+    [config, handleOpenCreateModal]
+  )
 
   const handleSaveOrUpdate = async (modalPayload: any) => {
     try {
@@ -115,7 +150,11 @@ export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPagePr
 
   const handleRefresh = useCallback(async () => {
     showLoader()
-    try { await loadData(1, false) } finally { hideLoader() }
+    try {
+      await loadData(1, false)
+    } finally {
+      hideLoader()
+    }
   }, [loadData, showLoader, hideLoader])
 
   return (
@@ -140,15 +179,21 @@ export function DynamicGridPage<T>({ config, ModalComponent }: DynamicGridPagePr
           detailSections={config.detailSectionsConfig as any}
           gridHeight="520px"
           onClearFilters={() => setSearchValue("")}
-          virtualScroll={config.enableInfiniteScroll ? {
-            enabled: true,
-            pageSize: config.defaultPageSize || 20,
-            bufferSize: 3,
-            currentPage: page,
-            totalPages,
-            hasMore: page < totalPages,
-            onLoadMore: async (nextPage: number) => { await loadMore(nextPage) },
-          } : undefined}
+          virtualScroll={
+            config.enableInfiniteScroll
+              ? {
+                  enabled: true,
+                  pageSize: config.defaultPageSize || 20,
+                  bufferSize: 3,
+                  currentPage: page,
+                  totalPages,
+                  hasMore: page < totalPages,
+                  onLoadMore: async (nextPage: number) => {
+                    await loadMore(nextPage)
+                  },
+                }
+              : undefined
+          }
         />
       </div>
 

@@ -14,7 +14,11 @@ const folderConfig: DynamicPageConfig<FolderMappingDto> = {
     return { data: res.data }
   },
   globalActions: ({ openCreateModal }) => [
-    { label: "Create Folder Mapping", onClick: openCreateModal, variant: "default" },
+    {
+      label: "Create Folder Mapping",
+      onClick: openCreateModal,
+      variant: "default",
+    },
   ],
   columns: ({ openEditModal }) => [
     { headerName: "ID", field: "id", width: 80 },
@@ -22,15 +26,27 @@ const folderConfig: DynamicPageConfig<FolderMappingDto> = {
     { headerName: "Primary HOD Name", field: "primaryHodName", width: 150 },
     { headerName: "Primary HOD Email", field: "primaryHodEmail", width: 200 },
     { headerName: "Secondary HOD Name", field: "secondaryHodName", width: 150 },
-    { headerName: "Secondary HOD Email", field: "secondaryHodEmail", width: 200 },
+    {
+      headerName: "Secondary HOD Email",
+      field: "secondaryHodEmail",
+      width: 200,
+    },
     {
       headerName: "Actions",
       width: 100,
-      cellRenderer: (params: any) => params.data && (
-        <button onClick={() => openEditModal(params.data)} className="text-blue-600 hover:underline text-sm font-medium">Edit</button>
-      ),
+      cellRenderer: (params: any) =>
+        params.data && (
+          <button
+            onClick={() => openEditModal(params.data)}
+            className="text-sm font-medium text-blue-600 hover:underline"
+          >
+            Edit
+          </button>
+        ),
     },
   ],
 }
 
-export const FolderMappingPage = () => <DynamicGridPage config={folderConfig} ModalComponent={FolderMappingModal} />
+export const FolderMappingPage = () => (
+  <DynamicGridPage config={folderConfig} ModalComponent={FolderMappingModal} />
+)

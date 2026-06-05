@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type {
-  BodyScrollEvent,
-  GridApi,
-} from "ag-grid-community"
+import type { BodyScrollEvent, GridApi } from "ag-grid-community"
 
 export interface VirtualScrollConfig {
   pageSize?: number
@@ -54,12 +51,7 @@ export function useVirtualScroll(config: VirtualScrollConfig = {}) {
       totalPages: externalTotalPages,
       hasMore: externalHasMore,
     }
-  }, [
-    onLoadMore,
-    externalCurrentPage,
-    externalTotalPages,
-    externalHasMore,
-  ])
+  }, [onLoadMore, externalCurrentPage, externalTotalPages, externalHasMore])
 
   const handleBodyScroll = useCallback(
     async (event: BodyScrollEvent) => {
@@ -75,43 +67,28 @@ export function useVirtualScroll(config: VirtualScrollConfig = {}) {
       const api = gridApiRef.current
       const rowCount = api.getDisplayedRowCount()
 
-      if (rowCount === 0)
-        return
+      if (rowCount === 0) return
 
-      const lastRow = api.getDisplayedRowAtIndex(
-        rowCount - 1
-      )
+      const lastRow = api.getDisplayedRowAtIndex(rowCount - 1)
 
-      if (!lastRow)
-        return
+      if (!lastRow) return
 
-      const verticalRange =
-        api.getVerticalPixelRange()
+      const verticalRange = api.getVerticalPixelRange()
       const lastRowBottom =
-        (lastRow.rowTop ?? 0) +
-        (lastRow.rowHeight ?? pageSize * 2)
-      const distanceFromBottom =
-        lastRowBottom - verticalRange.bottom
-      const thresholdPx = Math.max(
-        200,
-        pageSize * bufferSize * 10
-      )
+        (lastRow.rowTop ?? 0) + (lastRow.rowHeight ?? pageSize * 2)
+      const distanceFromBottom = lastRowBottom - verticalRange.bottom
+      const thresholdPx = Math.max(200, pageSize * bufferSize * 10)
       const isNearBottom =
-        event.direction === "vertical" &&
-        distanceFromBottom <= thresholdPx
+        event.direction === "vertical" && distanceFromBottom <= thresholdPx
 
       if (
         isNearBottom &&
-        configRef.current.currentPage <
-          configRef.current.totalPages
+        configRef.current.currentPage < configRef.current.totalPages
       ) {
         setState((prev) => ({ ...prev, isLoading: true }))
         try {
-          const nextPage =
-            configRef.current.currentPage + 1
-          await configRef.current.onLoadMore(
-            nextPage
-          )
+          const nextPage = configRef.current.currentPage + 1
+          await configRef.current.onLoadMore(nextPage)
           setState((prev) => ({
             ...prev,
             currentPage: nextPage,
@@ -123,19 +100,12 @@ export function useVirtualScroll(config: VirtualScrollConfig = {}) {
         }
       }
     },
-    [
-      state.isLoading,
-      pageSize,
-      bufferSize,
-    ]
+    [state.isLoading, pageSize, bufferSize]
   )
 
   const setGridApi = useCallback(
     (api: GridApi | null) => {
-      if (
-        gridApiRef.current &&
-        bodyScrollHandlerRef.current
-      ) {
+      if (gridApiRef.current && bodyScrollHandlerRef.current) {
         gridApiRef.current.removeEventListener(
           "bodyScroll",
           bodyScrollHandlerRef.current
@@ -163,10 +133,7 @@ export function useVirtualScroll(config: VirtualScrollConfig = {}) {
 
   useEffect(() => {
     return () => {
-      if (
-        gridApiRef.current &&
-        bodyScrollHandlerRef.current
-      ) {
+      if (gridApiRef.current && bodyScrollHandlerRef.current) {
         gridApiRef.current.removeEventListener(
           "bodyScroll",
           bodyScrollHandlerRef.current

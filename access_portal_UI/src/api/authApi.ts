@@ -8,12 +8,19 @@ export const authApi = {
    */
   login: async (values: LoginValues): Promise<LoginResponse> => {
     try {
-      const response = await apiService.post<LoginResponse>("/Auth/login", values)
+      const response = await apiService.post<LoginResponse>(
+        "/Auth/login",
+        values
+      )
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "LOGIN_FAILED", message: "Login request failed unexpectedly.", type: "Failure" },
+        {
+          code: "LOGIN_FAILED",
+          message: "Login request failed unexpectedly.",
+          type: "Failure",
+        },
         0
       )
     }
@@ -24,12 +31,18 @@ export const authApi = {
    */
   logout: async (): Promise<{ message: string }> => {
     try {
-      const response = await apiService.post<{ message: string }>("/Auth/logout")
+      const response = await apiService.post<{ message: string }>(
+        "/Auth/logout"
+      )
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "LOGOUT_FAILED", message: "Logout request failed unexpectedly.", type: "Failure" },
+        {
+          code: "LOGOUT_FAILED",
+          message: "Logout request failed unexpectedly.",
+          type: "Failure",
+        },
         0
       )
     }

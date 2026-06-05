@@ -13,7 +13,12 @@ import {
 import { Sheet, SheetTrigger } from "@/components/ui/sheet"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { useAuth } from "@/context/AuthContext"
-import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from "@microsoft/signalr"
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+} from "@microsoft/signalr"
 import { Bell, LogOut, User, Building2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
@@ -87,9 +92,9 @@ export function AppHeader() {
       connection = new HubConnectionBuilder()
         .withUrl(hubUrl, {
           withCredentials: true,
-          // CRITICAL FIX: Explicitly skip negotiation if using pure WebSockets, 
+          // CRITICAL FIX: Explicitly skip negotiation if using pure WebSockets,
           // or let it negotiate without thread blocking collisions
-          skipNegotiation: false
+          skipNegotiation: false,
         })
         .configureLogging(LogLevel.Warning) // Suppress noisy info logs during negotiation
         .withAutomaticReconnect()
@@ -112,7 +117,10 @@ export function AppHeader() {
         if (!isMounted) return
 
         const errMsg = String(error)
-        if (errMsg.includes("stopped during negotiation") || errMsg.includes("AbortError")) {
+        if (
+          errMsg.includes("stopped during negotiation") ||
+          errMsg.includes("AbortError")
+        ) {
           return
         }
 
@@ -130,7 +138,9 @@ export function AppHeader() {
         connection.off("ReceiveNotification")
         // Only call stop if it's not already dead or disconnecting
         if (connection.state === HubConnectionState.Connected) {
-          connection.stop().catch(() => { /* Silent discard */ })
+          connection.stop().catch(() => {
+            /* Silent discard */
+          })
         }
       }
     }
@@ -179,7 +189,7 @@ export function AppHeader() {
             >
               <Bell className="h-5 w-5" />
               {hasUnread && (
-                <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                <span className="absolute top-2.5 right-2.5 h-2 w-2 animate-pulse rounded-full bg-destructive" />
               )}
             </Button>
           </SheetTrigger>

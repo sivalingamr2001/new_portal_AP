@@ -65,7 +65,7 @@ export const routesConfig: RouteObject[] = [
               {
                 path: "/request/:requestId",
                 element: withSuspense(Pages.RequestDetailsPage),
-              }
+              },
             ],
           },
 

@@ -14,32 +14,19 @@ export type UserSectionValue = {
 
 type UserSectionProps = {
   value: UserSectionValue
-  onChange: (
-    field: keyof UserSectionValue,
-    value: string | number
-  ) => void
+  onChange: (field: keyof UserSectionValue, value: string | number) => void
 }
 
-export function UserSection({
-  value,
-  onChange,
-}: UserSectionProps) {
+export function UserSection({ value, onChange }: UserSectionProps) {
   return (
     <section className="space-y-4 rounded-md border border-border bg-card p-4">
-      <h3 className="text-sm font-semibold">
-        Employee Information
-      </h3>
+      <h3 className="text-sm font-semibold">Employee Information</h3>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Employee ID">
           <Input
             value={value.employeeId}
-            onChange={(e) =>
-              onChange(
-                "employeeId",
-                e.target.value
-              )
-            }
+            onChange={(e) => onChange("employeeId", e.target.value)}
             placeholder="Enter employee id"
           />
         </Field>
@@ -47,53 +34,32 @@ export function UserSection({
         <Field label="Email">
           <Input
             value={value.email ?? ""}
-            onChange={(e) =>
-              onChange(
-                "email",
-                e.target.value
-              )
-            }
+            onChange={(e) => onChange("email", e.target.value)}
             placeholder="Enter email"
           />
         </Field>
 
         <Field label="Employee Name">
-          <Input
-            value={value.name}
-          />
+          <Input value={value.name} />
         </Field>
 
         <Field label="Department">
-          <Input
-          readOnly
-            value={value.departmentName ?? ""}
-          />
+          <Input readOnly value={value.departmentName ?? ""} />
         </Field>
 
         <Field label="Department HOD">
-          <Input
-          readOnly
-            value={value.hodName ?? ""}
-          />
+          <Input readOnly value={value.hodName ?? ""} />
         </Field>
 
         <Field label="ITSR Number">
-          <Input
-            value={value.itsrNumber ?? ""}
-          />
+          <Input value={value.itsrNumber ?? ""} />
         </Field>
       </div>
     </section>
   )
 }
 
-function Field({
-  children,
-  label,
-}: {
-  children: ReactNode
-  label: string
-}) {
+function Field({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="space-y-2">
       <Label className="text-xs font-semibold text-muted-foreground">

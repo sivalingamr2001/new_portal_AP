@@ -37,7 +37,6 @@ export const LoginPage = () => {
       const data = await withLoader(() => authApi.login(values))
 
       if (data) {
-
         login(data, 30)
 
         navigate("/", {

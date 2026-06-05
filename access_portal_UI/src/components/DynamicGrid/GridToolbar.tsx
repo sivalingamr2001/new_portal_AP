@@ -22,12 +22,8 @@ export const GridToolbar = memo(
       <div className="flex flex-col gap-4 pb-2">
         {/* Top Row: Title and Description */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl leading-6 font-semibold ">
-            {title}
-          </h1>
-          {description && (
-            <span className="text-xs">{description}</span>
-          )}
+          <h1 className="text-2xl leading-6 font-semibold">{title}</h1>
+          {description && <span className="text-xs">{description}</span>}
         </div>
 
         {/* Bottom Row: Left Search, Right Actions */}

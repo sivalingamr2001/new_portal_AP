@@ -11,18 +11,17 @@ import { ENV_CONFIG } from "@/lib/constants"
 export type { PagedResult, PaginationParams } from "./types"
 
 export class ApiException extends Error {
-  public readonly apiError: ApiError;
-  public readonly httpStatus: number;
+  public readonly apiError: ApiError
+  public readonly httpStatus: number
 
   constructor(apiError: ApiError, httpStatus: number) {
-    super(apiError.message);
-    this.name = "ApiException";
-    
-    this.apiError = apiError;
-    this.httpStatus = httpStatus;
+    super(apiError.message)
+    this.name = "ApiException"
+
+    this.apiError = apiError
+    this.httpStatus = httpStatus
   }
 }
-
 
 let cachedUserId: string | null = null
 

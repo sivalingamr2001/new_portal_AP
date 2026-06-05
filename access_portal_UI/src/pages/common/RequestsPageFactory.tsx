@@ -8,9 +8,9 @@ import type { ColDef } from "ag-grid-community"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
-    accessTypeLabel,
-    type AccessRequestDto,
-    type AccessType,
+  accessTypeLabel,
+  type AccessRequestDto,
+  type AccessType,
 } from "@/lib/api-result"
 
 // ==========================================
@@ -18,173 +18,182 @@ import {
 // ==========================================
 
 interface RequestsPageFactoryProps {
-    fetchApiFn: (id?: string) => Promise<AccessRequestDto[]>
-    actionButtonLabel?: string
-    actionButtonRoutePrefix: string
-    extraColumns?: (Omit<ColDef<any>, "field"> & { field?: string })[]
-    showCreateButton?: boolean
+  fetchApiFn: (id?: string) => Promise<AccessRequestDto[]>
+  actionButtonLabel?: string
+  actionButtonRoutePrefix: string
+  extraColumns?: (Omit<ColDef<any>, "field"> & { field?: string })[]
+  showCreateButton?: boolean
 }
 
 export const RequestsPageFactory = ({
-    fetchApiFn,
-    actionButtonLabel = "View",
-    actionButtonRoutePrefix,
-    extraColumns = [],
-    showCreateButton = false
+  fetchApiFn,
+  actionButtonLabel = "View",
+  actionButtonRoutePrefix,
+  extraColumns = [],
+  showCreateButton = false,
 }: RequestsPageFactoryProps) => {
-    const location = useLocation()
-    const { currentUser } = useAuth()
-    const { loading, withLoader } = useLoader()
-    const [requests, setRequests] = useState<AccessRequestDto[]>([])
-    const [createRequestModalOpen, setCreateRequestModalOpen] = useState(false)
-    const navigate = useNavigate()
+  const location = useLocation()
+  const { currentUser } = useAuth()
+  const { loading, withLoader } = useLoader()
+  const [requests, setRequests] = useState<AccessRequestDto[]>([])
+  const [createRequestModalOpen, setCreateRequestModalOpen] = useState(false)
+  const navigate = useNavigate()
 
-    const { title } = useMemo(
-        () => getTitleFromSidebar(location.pathname),
-        [location.pathname]
-    )
+  const { title } = useMemo(
+    () => getTitleFromSidebar(location.pathname),
+    [location.pathname]
+  )
 
-    const fetchRequests = useCallback(async () => {
-        // Fallback checks for different user types
-        const targetId = currentUser?.user?.userId ?? 
-                         currentUser?.cmplUser?.userId ?? 
-                         currentUser?.departmentId
+  const fetchRequests = useCallback(async () => {
+    // Fallback checks for different user types
+    const targetId =
+      currentUser?.user?.userId ??
+      currentUser?.cmplUser?.userId ??
+      currentUser?.departmentId
 
-        try {
-            const result = await withLoader(() =>
-                fetchApiFn(targetId ? String(targetId) : undefined)
-            )
-            setRequests(result)
-        } catch (error) {
-            console.error("Error fetching requests:", error)
-        }
-    }, [currentUser, fetchApiFn, withLoader, location.pathname])
-
-    useEffect(() => {
-        fetchRequests()
-    }, [fetchRequests])
-
-    const handleActionClick = (data: any): void => {
-        navigate(`${actionButtonRoutePrefix}/${data.accessReqId}`)
+    try {
+      const result = await withLoader(() =>
+        fetchApiFn(targetId ? String(targetId) : undefined)
+      )
+      setRequests(result)
+    } catch (error) {
+      console.error("Error fetching requests:", error)
     }
+  }, [currentUser, fetchApiFn, withLoader, location.pathname])
 
-    const flattenedRowData = useMemo(() => {
-        return requests.flatMap((req) => {
-            if (!req.items || req.items.length === 0) {
-                return [{
-                    accessReqId: req.accessReqId,
-                    ticketNumber: "-",
-                    folderPath: "-",
-                    accessType: "NotApplicable" as AccessType,
-                    status: req.currentStatus,
-                    requestedAtUtc: req.requestedAtUtc
-                }]
-            }
+  useEffect(() => {
+    fetchRequests()
+  }, [fetchRequests])
 
-            return req.items.map((item) => ({
-                accessReqId: req.accessReqId,
-                itemId: item.itemId,
-                ticketNumber: item.ticketNumber,
-                folderPath: item.folderPath,
-                accessType: item.accessType, // This already matches AccessType
-                status: item.status,
-                requestedAtUtc: item.requestedAtUtc
-            }))
-        })
-    }, [requests])
+  const handleActionClick = (data: any): void => {
+    navigate(`${actionButtonRoutePrefix}/${data.accessReqId}`)
+  }
 
-    const coreColumns = useMemo<(Omit<ColDef<any>, "field"> & { field?: string })[]>(
-        () => [
-            { headerName: "Ticket Number", field: "ticketNumber", width: 140 },
-            ...extraColumns, // Dynamically injects User Info / Dept Info based on role
-            { headerName: "Folder Path", field: "folderPath", width: 280 },
-            {
-                headerName: "Access Type", 
-                field: "accessType", 
-                width: 120,
-                valueFormatter: (params) => accessTypeLabel(params.value)
-            },
-            {
-                headerName: "Status", 
-                field: "status", 
-                width: 120,
-                cellRenderer: (params: any) => {
-                    const status = params.value === 2 ? "Pending" : params.value;
-                    const isPending = status === "Pending";
-                    
-                    return (
-                        <div className="flex h-full items-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                                isPending 
-                                    ? "bg-amber-50 text-amber-700 border-amber-200" 
-                                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            }`}>
-                                <span className={`w-1.5 h-1.5 mr-1.5 rounded-full ${isPending ? "bg-amber-500" : "bg-emerald-500"}`} />
-                                {status}
-                            </span>
-                        </div>
-                    );
-                }
-            },
-            {
-                headerName: "Actions",
-                sortable: false,
-                filter: false,
-                width: 100,
-                cellRenderer: (params: any) => {
-                    if (!params.data || params.data.__isDetailRow) return null
-
-                    return (
-                        <div className="flex h-full items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-3 text-xs font-medium shadow-sm transition-all hover:bg-secondary"
-                                onClick={() => handleActionClick(params.data)}
-                            >
-                                {actionButtonLabel}
-                            </Button>
-                        </div>
-                    )
-                },
-            },
-        ],
-        [extraColumns, actionButtonLabel, actionButtonRoutePrefix]
-    )
-
-    const customActions = useMemo(() => {
-        if (!showCreateButton) return []
+  const flattenedRowData = useMemo(() => {
+    return requests.flatMap((req) => {
+      if (!req.items || req.items.length === 0) {
         return [
-            {
-                label: "Create New Request",
-                onClick: () => setCreateRequestModalOpen(true),
-            },
+          {
+            accessReqId: req.accessReqId,
+            ticketNumber: "-",
+            folderPath: "-",
+            accessType: "NotApplicable" as AccessType,
+            status: req.currentStatus,
+            requestedAtUtc: req.requestedAtUtc,
+          },
         ]
-    }, [showCreateButton])
+      }
 
-    return (
-        <div className="space-y-4">
-            <DataGrid
-                rowData={flattenedRowData}
-                columnDefs={coreColumns}
-                title={title}
-                loading={loading}
-                onRefresh={fetchRequests}
-                showRefreshButton
-                showSearch
-                showClearFiltersButton
-                customActions={customActions}
-                noRowsMessage="No access requests found"
-                pageSize={10}
-                rowSelection="none"
-            />
+      return req.items.map((item) => ({
+        accessReqId: req.accessReqId,
+        itemId: item.itemId,
+        ticketNumber: item.ticketNumber,
+        folderPath: item.folderPath,
+        accessType: item.accessType, // This already matches AccessType
+        status: item.status,
+        requestedAtUtc: item.requestedAtUtc,
+      }))
+    })
+  }, [requests])
 
-            {showCreateButton && (
-                <CreateRequestModal
-                    isOpen={createRequestModalOpen}
-                    onOpenChange={setCreateRequestModalOpen}
+  const coreColumns = useMemo<
+    (Omit<ColDef<any>, "field"> & { field?: string })[]
+  >(
+    () => [
+      { headerName: "Ticket Number", field: "ticketNumber", width: 140 },
+      ...extraColumns, // Dynamically injects User Info / Dept Info based on role
+      { headerName: "Folder Path", field: "folderPath", width: 280 },
+      {
+        headerName: "Access Type",
+        field: "accessType",
+        width: 120,
+        valueFormatter: (params) => accessTypeLabel(params.value),
+      },
+      {
+        headerName: "Status",
+        field: "status",
+        width: 120,
+        cellRenderer: (params: any) => {
+          const status = params.value === 2 ? "Pending" : params.value
+          const isPending = status === "Pending"
+
+          return (
+            <div className="flex h-full items-center">
+              <span
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  isPending
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                <span
+                  className={`mr-1.5 h-1.5 w-1.5 rounded-full ${isPending ? "bg-amber-500" : "bg-emerald-500"}`}
                 />
-            )}
-        </div>
-    )
+                {status}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
+        headerName: "Actions",
+        sortable: false,
+        filter: false,
+        width: 100,
+        cellRenderer: (params: any) => {
+          if (!params.data || params.data.__isDetailRow) return null
+
+          return (
+            <div className="flex h-full items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-3 text-xs font-medium shadow-sm transition-all hover:bg-secondary"
+                onClick={() => handleActionClick(params.data)}
+              >
+                {actionButtonLabel}
+              </Button>
+            </div>
+          )
+        },
+      },
+    ],
+    [extraColumns, actionButtonLabel, actionButtonRoutePrefix]
+  )
+
+  const customActions = useMemo(() => {
+    if (!showCreateButton) return []
+    return [
+      {
+        label: "Create New Request",
+        onClick: () => setCreateRequestModalOpen(true),
+      },
+    ]
+  }, [showCreateButton])
+
+  return (
+    <div className="space-y-4">
+      <DataGrid
+        rowData={flattenedRowData}
+        columnDefs={coreColumns}
+        title={title}
+        loading={loading}
+        onRefresh={fetchRequests}
+        showRefreshButton
+        showSearch
+        showClearFiltersButton
+        customActions={customActions}
+        noRowsMessage="No access requests found"
+        pageSize={10}
+        rowSelection="none"
+      />
+
+      {showCreateButton && (
+        <CreateRequestModal
+          isOpen={createRequestModalOpen}
+          onOpenChange={setCreateRequestModalOpen}
+        />
+      )}
+    </div>
+  )
 }

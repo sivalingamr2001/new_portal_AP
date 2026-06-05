@@ -176,7 +176,7 @@ export type RequestStatus =
   | "Revoked"
   | "Expired"
 
-  // ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface RecentRequestDto {
   requestId: number

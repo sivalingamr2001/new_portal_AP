@@ -9,7 +9,11 @@ export const dashboardApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "FETCH_DASHBOARD_FAILED", message: "Failed to fetch dashboard data.", type: "Failure" },
+        {
+          code: "FETCH_DASHBOARD_FAILED",
+          message: "Failed to fetch dashboard data.",
+          type: "Failure",
+        },
         0
       )
     }

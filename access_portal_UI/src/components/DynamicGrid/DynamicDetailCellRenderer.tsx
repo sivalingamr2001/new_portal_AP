@@ -8,8 +8,6 @@ interface DynamicDetailCellRendererProps {
 
 export const DynamicDetailCellRenderer = memo(
   ({ data, sections = [] }: DynamicDetailCellRendererProps) => {
-   
-
     return (
       <div className="space-y-4 border-y bg-slate-50/60 p-5 text-sm select-text dark:bg-slate-900/40">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">

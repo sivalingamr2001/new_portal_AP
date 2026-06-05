@@ -21,9 +21,7 @@ const BASE_COL_DEF: ColDef = {
   minWidth: 100,
 }
 
-export function DataGrid<TData extends object>(
-  props: DataGridProps<TData>
-) {
+export function DataGrid<TData extends object>(props: DataGridProps<TData>) {
   const {
     rowData,
     columnDefs,
@@ -46,7 +44,7 @@ export function DataGrid<TData extends object>(
     virtualScroll,
   } = props
 
-  const {theme} = useTheme()
+  const { theme } = useTheme()
   const [gridApi, setGridApi] = useState<any>(null)
   const { state, handlers } = useDataGrid(props)
   const { setGridApi: setVirtualScrollGridApi, state: virtualScrollState } =

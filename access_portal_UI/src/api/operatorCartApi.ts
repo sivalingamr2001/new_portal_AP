@@ -1,15 +1,30 @@
 import { apiService, ApiException } from "./axiosClient"
-import type { PaginationParams, PagedResult, OperatorCartItemDto, ItemActionDto, OverrideAccessTypeDto } from "./types"
+import type {
+  PaginationParams,
+  PagedResult,
+  OperatorCartItemDto,
+  ItemActionDto,
+  OverrideAccessTypeDto,
+} from "./types"
 
 export const operatorCartApi = {
-  getCart: async (params?: PaginationParams): Promise<PagedResult<OperatorCartItemDto>> => {
+  getCart: async (
+    params?: PaginationParams
+  ): Promise<PagedResult<OperatorCartItemDto>> => {
     try {
-      const response = await apiService.get<PagedResult<OperatorCartItemDto>>("/operator-cart", { params })
+      const response = await apiService.get<PagedResult<OperatorCartItemDto>>(
+        "/operator-cart",
+        { params }
+      )
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "FETCH_OPERATOR_CART_FAILED", message: "Failed to fetch operator cart.", type: "Failure" },
+        {
+          code: "FETCH_OPERATOR_CART_FAILED",
+          message: "Failed to fetch operator cart.",
+          type: "Failure",
+        },
         0
       )
     }
@@ -21,7 +36,11 @@ export const operatorCartApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "OPERATOR_APPROVE_ITEM_FAILED", message: `Failed to approve item ${itemId}.`, type: "Failure" },
+        {
+          code: "OPERATOR_APPROVE_ITEM_FAILED",
+          message: `Failed to approve item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }
@@ -33,7 +52,11 @@ export const operatorCartApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "OPERATOR_REJECT_ITEM_FAILED", message: `Failed to reject item ${itemId}.`, type: "Failure" },
+        {
+          code: "OPERATOR_REJECT_ITEM_FAILED",
+          message: `Failed to reject item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }
@@ -45,19 +68,33 @@ export const operatorCartApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "OPERATOR_REVOKE_ITEM_FAILED", message: `Failed to revoke item ${itemId}.`, type: "Failure" },
+        {
+          code: "OPERATOR_REVOKE_ITEM_FAILED",
+          message: `Failed to revoke item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }
   },
 
-  overrideAccessType: async (itemId: number, dto: OverrideAccessTypeDto): Promise<void> => {
+  overrideAccessType: async (
+    itemId: number,
+    dto: OverrideAccessTypeDto
+  ): Promise<void> => {
     try {
-      await apiService.patch<void>(`/operator-cart/items/${itemId}/access-type`, dto)
+      await apiService.patch<void>(
+        `/operator-cart/items/${itemId}/access-type`,
+        dto
+      )
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "OVERRIDE_ACCESS_TYPE_FAILED", message: `Failed to override access type for item ${itemId}.`, type: "Failure" },
+        {
+          code: "OVERRIDE_ACCESS_TYPE_FAILED",
+          message: `Failed to override access type for item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }

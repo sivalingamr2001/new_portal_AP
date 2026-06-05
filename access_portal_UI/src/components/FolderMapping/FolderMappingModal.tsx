@@ -1,8 +1,18 @@
-import type { FolderMappingDto, UpsertFolderMappingRequest, FolderResponse } from "@/api/types"
+import type {
+  FolderMappingDto,
+  UpsertFolderMappingRequest,
+  FolderResponse,
+} from "@/api/types"
 import { folderMappingsApi } from "@/api/folderMappingsApi"
 import { usersApi } from "@/api/usersApi"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { useEffect, useState, startTransition } from "react"
 
@@ -18,7 +28,7 @@ export interface FolderResponseDto {
   id?: string | null
   name?: string
   path?: string
-  [key: string]: any 
+  [key: string]: any
 }
 
 interface FolderMappingModalProps {
@@ -28,7 +38,12 @@ interface FolderMappingModalProps {
   onSave: (payload: UpsertFolderMappingRequest) => Promise<void> // Fully matches DynamicGridPage contract
 }
 
-export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: FolderMappingModalProps) => {
+export const FolderMappingModal = ({
+  isOpen,
+  onClose,
+  initialData,
+  onSave,
+}: FolderMappingModalProps) => {
   const [loading, setLoading] = useState(false)
   const [folders, setFolders] = useState<FolderResponseDto[]>([])
   const [hods, setHods] = useState<HodDto[]>([])
@@ -45,29 +60,29 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
       try {
         const [foldersRes, hodsRes] = await Promise.all([
           folderMappingsApi.getParentFolders(),
-          usersApi.getHods()
+          usersApi.getHods(),
         ])
-        
+
         if (foldersRes) {
           // Normalize Drive/Path structure if needed from FolderResponse
           const transformedFolders = (foldersRes as any[]).map((f, idx) => ({
             id: String(idx),
             name: f.name || "",
-            path: f.driveName ? `${f.driveName}:\\${f.name}` : f.name || ""
+            path: f.driveName ? `${f.driveName}:\\${f.name}` : f.name || "",
           }))
           setFolders(transformedFolders)
         }
-        
+
         if (hodsRes) {
-          const extractedHods = Array.isArray(hodsRes) 
-            ? hodsRes 
-            : ((hodsRes as any).data || (hodsRes as any).value || [])
-          
+          const extractedHods = Array.isArray(hodsRes)
+            ? hodsRes
+            : (hodsRes as any).data || (hodsRes as any).value || []
+
           // Map backend attributes cleanly onto client UI dropdown models
           const normalizedHods = extractedHods.map((h: any) => ({
             id: String(h.employeeId || h.hodId || h.userId || h.id || ""),
             hodName: h.hodName || h.name || "N/A",
-            emailId: h.emailId || h.email || ""
+            emailId: h.emailId || h.email || "",
           }))
           setHods(normalizedHods)
         }
@@ -83,17 +98,21 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
   useEffect(() => {
     if (isOpen && initialData) {
       setFolderPath(initialData.folderPath || "")
-      
+
       setPrimaryHod({
         id: initialData.primaryHodId || "",
         hodName: initialData.primaryHodName || "",
-        emailId: initialData.primaryHodEmail || ""
+        emailId: initialData.primaryHodEmail || "",
       })
-      setSecondaryHod(initialData.secondaryHodId ? {
-        id: initialData.secondaryHodId || "",
-        hodName: initialData.secondaryHodName || "",
-        emailId: initialData.secondaryHodEmail || ""
-      } : null)
+      setSecondaryHod(
+        initialData.secondaryHodId
+          ? {
+              id: initialData.secondaryHodId || "",
+              hodName: initialData.secondaryHodName || "",
+              emailId: initialData.secondaryHodEmail || "",
+            }
+          : null
+      )
     } else if (!isOpen) {
       setFolderPath("")
       setPrimaryHod(null)
@@ -113,13 +132,16 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
       primaryHodEmail: primaryHod?.emailId || null,
       secondaryHodId: secondaryHod?.id || null,
       secondaryHodName: secondaryHod?.hodName || null,
-      secondaryHodEmail: secondaryHod?.emailId || null
+      secondaryHodEmail: secondaryHod?.emailId || null,
     }
 
     try {
       await onSave(payload) // Orchestrated directly by the shared parent component
     } catch (err) {
-      console.error("Failed to save folder mapping inside modular boundary:", err)
+      console.error(
+        "Failed to save folder mapping inside modular boundary:",
+        err
+      )
     } finally {
       setLoading(false)
     }
@@ -129,17 +151,18 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
     <Dialog open={isOpen} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Update" : "Create"} Folder Mapping</DialogTitle>
+          <DialogTitle>
+            {initialData ? "Update" : "Create"} Folder Mapping
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          
           <div className="space-y-2">
             <Label htmlFor="folderPath">Folder Path</Label>
             <select
               id="folderPath"
               value={folderPath}
               onChange={(e) => setFolderPath(e.target.value)}
-              className="w-full p-2 border rounded-md bg-background text-sm"
+              className="w-full rounded-md border bg-background p-2 text-sm"
               required
             >
               <option value="">Select Folder</option>
@@ -160,10 +183,10 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
               id="primaryHod"
               value={primaryHod?.id || ""}
               onChange={(e) => {
-                const selected = hods.find(h => h.id === e.target.value)
+                const selected = hods.find((h) => h.id === e.target.value)
                 setPrimaryHod(selected || null)
               }}
-              className="w-full p-2 border rounded-md bg-background text-sm"
+              className="w-full rounded-md border bg-background p-2 text-sm"
               required
             >
               <option value="">Select Primary HOD</option>
@@ -181,10 +204,10 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
               id="secondaryHod"
               value={secondaryHod?.id || ""}
               onChange={(e) => {
-                const selected = hods.find(h => h.id === e.target.value)
+                const selected = hods.find((h) => h.id === e.target.value)
                 startTransition(() => setSecondaryHod(selected || null))
               }}
-              className="w-full p-2 border rounded-md bg-background text-sm"
+              className="w-full rounded-md border bg-background p-2 text-sm"
             >
               <option value="">Select Secondary HOD (Optional)</option>
               {hods.map((h, idx) => (
@@ -196,7 +219,12 @@ export const FolderMappingModal = ({ isOpen, onClose, initialData, onSave }: Fol
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>

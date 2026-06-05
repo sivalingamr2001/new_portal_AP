@@ -23,8 +23,10 @@ export function useInfiniteScroll<T>({
       try {
         // Safe Execution: Always points to the current active functional layer pass
         const payload = await fetchRequest(targetPage, pageSize)
-        
-        setRowData((prev) => (isAppend ? [...prev, ...payload.data] : payload.data))
+
+        setRowData((prev) =>
+          isAppend ? [...prev, ...payload.data] : payload.data
+        )
         setPage(payload.page)
         setTotalPages(payload.totalPages)
       } catch (error) {

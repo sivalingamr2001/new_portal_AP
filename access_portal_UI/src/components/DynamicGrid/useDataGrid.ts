@@ -63,15 +63,18 @@ export function useDataGrid<TData extends object>(
     [props.gridId, props.pageSize, props.onGridReady, syncGridState]
   )
 
-  const onQuickFilterChange = useCallback((value: string) => {
-    setState((prev) => ({ ...prev, quickFilter: value }))
+  const onQuickFilterChange = useCallback(
+    (value: string) => {
+      setState((prev) => ({ ...prev, quickFilter: value }))
 
-    if (gridApiRef.current) {
-      gridApiRef.current.setGridOption("quickFilterText", value)
-    }
+      if (gridApiRef.current) {
+        gridApiRef.current.setGridOption("quickFilterText", value)
+      }
 
-    props.onSearchChange?.(value)
-  }, [props])
+      props.onSearchChange?.(value)
+    },
+    [props]
+  )
 
   const onClearFilters = useCallback(() => {
     setState((prev) => ({ ...prev, quickFilter: "", activeFiltersCount: 0 }))

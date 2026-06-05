@@ -40,9 +40,7 @@ export interface VirtualScrollProps {
   hasMore?: boolean
 }
 
-export interface DataGridProps<
-  TData extends object = object,
-> {
+export interface DataGridProps<TData extends object = object> {
   rowData: TData[]
   columnDefs: (Omit<ColDef<TData>, "field"> & { field?: string })[]
   title?: string

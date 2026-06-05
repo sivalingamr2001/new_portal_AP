@@ -1,15 +1,29 @@
 import { ApiException, apiService } from "./axiosClient"
-import type { PaginationParams, PagedResult, HodCartItemDto, ItemActionDto } from "./types"
+import type {
+  PaginationParams,
+  PagedResult,
+  HodCartItemDto,
+  ItemActionDto,
+} from "./types"
 
 export const hodCartApi = {
-  getCart: async (params?: PaginationParams): Promise<PagedResult<HodCartItemDto>> => {
+  getCart: async (
+    params?: PaginationParams
+  ): Promise<PagedResult<HodCartItemDto>> => {
     try {
-      const response = await apiService.get<PagedResult<HodCartItemDto>>("/hod-cart", { params })
+      const response = await apiService.get<PagedResult<HodCartItemDto>>(
+        "/hod-cart",
+        { params }
+      )
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "FETCH_HOD_CART_FAILED", message: "Failed to fetch HOD cart.", type: "Failure" },
+        {
+          code: "FETCH_HOD_CART_FAILED",
+          message: "Failed to fetch HOD cart.",
+          type: "Failure",
+        },
         0
       )
     }
@@ -21,7 +35,11 @@ export const hodCartApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "HOD_APPROVE_ITEM_FAILED", message: `Failed to approve item ${itemId}.`, type: "Failure" },
+        {
+          code: "HOD_APPROVE_ITEM_FAILED",
+          message: `Failed to approve item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }
@@ -33,7 +51,11 @@ export const hodCartApi = {
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "HOD_REJECT_ITEM_FAILED", message: `Failed to reject item ${itemId}.`, type: "Failure" },
+        {
+          code: "HOD_REJECT_ITEM_FAILED",
+          message: `Failed to reject item ${itemId}.`,
+          type: "Failure",
+        },
         0
       )
     }
@@ -41,11 +63,18 @@ export const hodCartApi = {
 
   approveAll: async (requestId: number, dto: ItemActionDto): Promise<void> => {
     try {
-      await apiService.post<void>(`/hod-cart/requests/${requestId}/approve-all`, dto)
+      await apiService.post<void>(
+        `/hod-cart/requests/${requestId}/approve-all`,
+        dto
+      )
     } catch (error) {
       if (error instanceof ApiException) throw error
       throw new ApiException(
-        { code: "HOD_APPROVE_ALL_FAILED", message: `Failed to approve all items for request ${requestId}.`, type: "Failure" },
+        {
+          code: "HOD_APPROVE_ALL_FAILED",
+          message: `Failed to approve all items for request ${requestId}.`,
+          type: "Failure",
+        },
         0
       )
     }

@@ -1,44 +1,48 @@
-import type { ColDef } from "ag-grid-community";
-import { Button } from "../ui/button";
-import { ChevronUp, Pencil, RefreshCw, TextQuote, Eye } from "lucide-react"; // Added Eye icon
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import type { ColDef } from "ag-grid-community"
+import { Button } from "../ui/button"
+import { ChevronUp, Pencil, RefreshCw, TextQuote, Eye } from "lucide-react" // Added Eye icon
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
 
 // Types for your cell renderer parameters
 interface AccessRequestColumnParams {
   data?: {
-    __isItemRow?: boolean;
-    __parentData?: any;
-    accessReqId?: string;
-    userName?: string;
-    userEmail?: string;
-    currentStatus?: string;
-    items?: any[];
-    requestedAtUtc?: string;
-    lastActionAtUtc?: string;
-    itsrNo?: string;
+    __isItemRow?: boolean
+    __parentData?: any
+    accessReqId?: string
+    userName?: string
+    userEmail?: string
+    currentStatus?: string
+    items?: any[]
+    requestedAtUtc?: string
+    lastActionAtUtc?: string
+    itsrNo?: string
     item?: {
-      ticketNumber?: string;
-      folderPath?: string;
-      status?: string;
-      accessType?: string;
-      requestedAtUtc?: string;
-      lastActionAtUtc?: string;
-      reason?: string;
-    };
-  };
+      ticketNumber?: string
+      folderPath?: string
+      status?: string
+      accessType?: string
+      requestedAtUtc?: string
+      lastActionAtUtc?: string
+      reason?: string
+    }
+  }
 }
 
 // Helper types for the function-based definition
 interface ColumnConfigDependencies {
-  expandedRowIds: string[];
-  toggleRowExpansion: (id: string) => void;
+  expandedRowIds: string[]
+  toggleRowExpansion: (id: string) => void
   // Added "view" type to the modal actions
-  openItemModal: (action: "resubmit" | "renew" | "view", request: any, item?: any) => void;
-  formatStatus: (status?: string) => string;
-  formatAccessType: (type?: string) => string;
-  formatDate: (date?: string) => string;
-  isRejected: (status?: string) => boolean;
-  isRenewable: (status?: string) => boolean;
+  openItemModal: (
+    action: "resubmit" | "renew" | "view",
+    request: any,
+    item?: any
+  ) => void
+  formatStatus: (status?: string) => string
+  formatAccessType: (type?: string) => string
+  formatDate: (date?: string) => string
+  isRejected: (status?: string) => boolean
+  isRenewable: (status?: string) => boolean
 }
 
 export const getAccessRequestColumns = ({
@@ -50,7 +54,9 @@ export const getAccessRequestColumns = ({
   formatDate,
   isRejected,
   isRenewable,
-}: ColumnConfigDependencies): (Omit<ColDef<object>, "field"> & { field?: string })[] => [
+}: ColumnConfigDependencies): (Omit<ColDef<object>, "field"> & {
+  field?: string
+})[] => [
   {
     headerName: "",
     width: 72,
@@ -58,10 +64,10 @@ export const getAccessRequestColumns = ({
     filter: false,
     sortable: false,
     cellRenderer: (params: AccessRequestColumnParams) => {
-      if (params.data?.__isItemRow) return null;
-      if (!params.data?.accessReqId) return null;
+      if (params.data?.__isItemRow) return null
+      if (!params.data?.accessReqId) return null
 
-      const isExpanded = expandedRowIds.includes(params.data.accessReqId);
+      const isExpanded = expandedRowIds.includes(params.data.accessReqId)
 
       return (
         <Tooltip>
@@ -83,7 +89,7 @@ export const getAccessRequestColumns = ({
             {isExpanded ? "Collapse Items" : "Show Items"}
           </TooltipContent>
         </Tooltip>
-      );
+      )
     },
   },
   {
@@ -91,7 +97,9 @@ export const getAccessRequestColumns = ({
     field: "accessReqId",
     width: 100,
     valueGetter: (params: AccessRequestColumnParams) =>
-      params.data?.__isItemRow ? params.data.item?.ticketNumber : params.data?.accessReqId,
+      params.data?.__isItemRow
+        ? params.data.item?.ticketNumber
+        : params.data?.accessReqId,
   },
   {
     headerName: "User Name",
@@ -105,7 +113,9 @@ export const getAccessRequestColumns = ({
     field: "userEmail",
     width: 240,
     valueGetter: (params: AccessRequestColumnParams) =>
-      params.data?.__isItemRow ? params.data.item?.folderPath : params.data?.userEmail,
+      params.data?.__isItemRow
+        ? params.data.item?.folderPath
+        : params.data?.userEmail,
   },
   {
     headerName: "Status",
@@ -154,7 +164,9 @@ export const getAccessRequestColumns = ({
     field: "itsrNo",
     width: 220,
     valueGetter: (params: AccessRequestColumnParams) =>
-      params.data?.__isItemRow ? params.data.item?.reason : params.data?.itsrNo ?? "-",
+      params.data?.__isItemRow
+        ? params.data.item?.reason
+        : (params.data?.itsrNo ?? "-"),
   },
   {
     headerName: "Actions",
@@ -162,7 +174,7 @@ export const getAccessRequestColumns = ({
     sortable: false,
     filter: false,
     cellRenderer: (params: AccessRequestColumnParams) => {
-      if (!params.data) return null;
+      if (!params.data) return null
 
       // Case 1: Parent Request Row Actions
       if (!params.data.__isItemRow) {
@@ -176,14 +188,14 @@ export const getAccessRequestColumns = ({
             <Eye className="mr-1 h-3.5 w-3.5" />
             View
           </Button>
-        );
+        )
       }
 
       // Case 2: Sub-item Row Actions
-      const item = params.data.item;
-      const request = params.data.__parentData;
+      const item = params.data.item
+      const request = params.data.__parentData
 
-      if (!item) return null;
+      if (!item) return null
 
       if (isRejected(item.status)) {
         return (
@@ -196,7 +208,7 @@ export const getAccessRequestColumns = ({
             <Pencil className="mr-1 h-3.5 w-3.5" />
             Resubmit
           </Button>
-        );
+        )
       }
 
       if (isRenewable(item.status)) {
@@ -210,10 +222,10 @@ export const getAccessRequestColumns = ({
             <RefreshCw className="mr-1 h-3.5 w-3.5" />
             Renew
           </Button>
-        );
+        )
       }
 
-      return null;
+      return null
     },
   },
-];
+]
