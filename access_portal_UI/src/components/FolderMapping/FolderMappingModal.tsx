@@ -1,9 +1,8 @@
+import { folderMappingsApi } from "@/api/folderMappingsApi"
 import type {
   FolderMappingDto,
-  UpsertFolderMappingRequest,
-  FolderResponse,
+  UpsertFolderMappingRequest
 } from "@/api/types"
-import { folderMappingsApi } from "@/api/folderMappingsApi"
 import { usersApi } from "@/api/usersApi"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { useEffect, useState, startTransition } from "react"
+import { startTransition, useEffect, useState } from "react"
 
 export interface HodDto {
   idRow?: number
@@ -149,7 +148,7 @@ export const FolderMappingModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-106.25">
         <DialogHeader>
           <DialogTitle>
             {initialData ? "Update" : "Create"} Folder Mapping
