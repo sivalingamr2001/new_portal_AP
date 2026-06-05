@@ -1,11 +1,14 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import accessRequestApi from "@/api/accessRequestApi"
-import type { AccessRequestDto } from "@/api/types"
+import { accessRequestsApi } from "@/api"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
+import {
+  normalizeSummaryRequest,
+  type AccessRequestDto,
+} from "@/lib/api-result"
 
 export const ActiveAccessPage = () => {
   const location = useLocation()
@@ -19,12 +22,12 @@ export const ActiveAccessPage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const result = await withLoader(() => accessRequestApi.getAll())
-      if (!result.isSuccess || !result.value) {
-        console.error("Failed to load active access:", result.error?.message)
-        return
-      }
-      setRequests(result.value.data)
+      const result = await withLoader(() => accessRequestsApi.getMyRequests())
+      setRequests(
+        result.data
+          .filter((request) => request.currentStatus === "ItApproved")
+          .map(normalizeSummaryRequest)
+      )
     } catch (error) {
       console.error("Failed to load active access:", error)
     }

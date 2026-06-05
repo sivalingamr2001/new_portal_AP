@@ -1,4 +1,4 @@
-import data from "@/api/data.json"
+import folderMappingApi from "@/api/folderMappingApi"
 import { cn } from "@/lib/utils"
 import {
     ChevronDown,
@@ -7,7 +7,7 @@ import {
     Plus,
     Trash2,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { FolderPathSheet } from "./FolderPathSheet"
 
@@ -57,7 +57,15 @@ const requestTypes = [
     },
 ]
 
-const folders: FolderNode[] = data
+function mapFolderNode(folder: any): FolderNode {
+    const children = folder.Children ?? folder.children ?? []
+
+    return {
+        driveName: folder.DriveName ?? folder.driveName ?? "",
+        name: folder.Name ?? folder.name ?? folder.path ?? "",
+        children: children.map(mapFolderNode),
+    }
+}
 
 function AccessDetailsSection({
     items: controlledItems,
@@ -75,6 +83,7 @@ function AccessDetailsSection({
     )
 
     const { currentUserRole } = useAuth()
+    const [folders, setFolders] = useState<FolderNode[]>([])
 
     const [expandedId, setExpandedId] =
         useState<number | null>(1)
@@ -84,6 +93,19 @@ function AccessDetailsSection({
 
     const [activeItemId, setActiveItemId] =
         useState<number | null>(null)
+
+    useEffect(() => {
+        let isMounted = true
+
+        folderMappingApi.getFolderHierarchy().then((result) => {
+            if (!isMounted || !result.isSuccess || !result.value) return
+            setFolders(result.value.map(mapFolderNode))
+        })
+
+        return () => {
+            isMounted = false
+        }
+    }, [])
 
     const updateItems = (nextItems: RequestItem[]) => {
         setItems(nextItems)

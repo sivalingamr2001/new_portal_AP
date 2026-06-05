@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Server.Shared.Helpers;
 using Web.Application.Interfaces;
 using Web.Application.Services;
 using Web.Infrastructure.Data;
@@ -13,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 // =========================================================================
 var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
 var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
-var serverVersion = ServerVersion.AutoDetect(connectionStringCmpl);
+
 var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
 
 // =========================================================================
@@ -77,27 +78,35 @@ builder.Services.AddCors(opts =>
 var providerName = dbProvider?.Trim();
 bool isMySql = !string.IsNullOrEmpty(providerName) && providerName.Equals("MySQL", StringComparison.OrdinalIgnoreCase);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+var sqliteConnection = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
+
+if (isMySql)
 {
-    if (isMySql)
-    {
-        var conn = builder.Configuration.GetConnectionString("DefaultConnection");
-        options.UseMySql(conn, ServerVersion.AutoDetect(conn));
-    }
-    else
-    {
-        var conn = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
-        options.UseSqlite(conn);
-    }
-});
+    var appServerVersion = ServerVersion.AutoDetect(defaultConnection);
+    var externalServerVersion = ServerVersion.AutoDetect(connectionStringCmpl);
 
-// Always register secondary contexts in the main container line
-// AppDbContext handles conditional masking internally via OnModelCreating
-builder.Services.AddDbContext<CmplDbContext>(options =>
-    options.UseMySql(connectionStringCmpl, serverVersion));
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseMySql(defaultConnection, appServerVersion));
 
-builder.Services.AddDbContext<HodDbContext>(options =>
-    options.UseMySql(connectionStringHod, serverVersion));
+    builder.Services.AddDbContext<CmplDbContext>(options =>
+        options.UseMySql(connectionStringCmpl, externalServerVersion));
+
+    builder.Services.AddDbContext<HodDbContext>(options =>
+        options.UseMySql(connectionStringHod, externalServerVersion));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite(sqliteConnection));
+
+    builder.Services.AddDbContext<CmplDbContext>(options =>
+        options.UseSqlite(sqliteConnection));
+
+    builder.Services.AddDbContext<HodDbContext>(options =>
+        options.UseSqlite(sqliteConnection));
+}
+
 
 // =========================================================================
 // 5. APPLICATION SERVICES (DI REGISTRATION)
@@ -111,51 +120,52 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IFolderMappingService, FolderMappingService>();
-
-builder.Services.AddSingleton<DailyUserDeptSyncService>();
-builder.Services.AddHostedService(provider => provider.GetRequiredService<DailyUserDeptSyncService>());
+builder.Services.AddScoped<FolderService>();
 
 // =========================================================================
 // 6. PIPELINE & MIDDLEWARE BUILD
 // =========================================================================
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var env = services.GetRequiredService<IWebHostEnvironment>();
-    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
-    var db = services.GetRequiredService<AppDbContext>();
+// using (var scope = app.Services.CreateScope())
+// {
+//     var services = scope.ServiceProvider;
+//     var env = services.GetRequiredService<IWebHostEnvironment>();
+//     var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
+//     var db = services.GetRequiredService<AppDbContext>();
 
-    if (!isMySql || env.IsDevelopment())
-    {
-        try
-        {
-            var cmplDb = services.GetRequiredService<CmplDbContext>();
-            var hodDb = services.GetRequiredService<HodDbContext>();
+//     if (!isMySql || env.IsDevelopment())
+//     {
+//         try
+//         {
+//             // builder.Services.AddSingleton<DailyUserDeptSyncService>();
+//             // builder.Services.AddHostedService(provider => provider.GetRequiredService<F>());
 
-            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+//             var cmplDb = services.GetRequiredService<CmplDbContext>();
+//             var hodDb = services.GetRequiredService<HodDbContext>();
 
-            var syncService = services.GetRequiredService<DailyUserDeptSyncService>();
-            await syncService.TriggerSyncAsync(CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
-        }
-    }
-    else
-    {
-        try
-        {
-            await db.Database.EnsureCreatedAsync();
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
-        }
-    }
-}
+//             await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+
+//             // var syncService = services.GetRequiredService<DailyUserDeptSyncService>();
+//             // await syncService.TriggerSyncAsync(CancellationToken.None);
+//         }
+//         catch (Exception ex)
+//         {
+//             logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
+//         }
+//     }
+//     else
+//     {
+//         try
+//         {
+//             await db.Database.EnsureCreatedAsync();
+//         }
+//         catch (Exception ex)
+//         {
+//             logger.LogError(ex, "An error occurred while initializing the primary database tables.");
+//         }
+//     }
+// }
 
 if (app.Environment.IsDevelopment())
 {

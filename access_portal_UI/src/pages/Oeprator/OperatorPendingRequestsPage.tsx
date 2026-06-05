@@ -1,10 +1,14 @@
-import accessRequestApi from "@/api/accessRequestApi"
+import { operatorCartApi } from "@/api"
+import { normalizeOperatorCartItem } from "@/lib/api-result"
 import { RequestsPageFactory } from "../common/RequestsPageFactory"
 
 export const OperatorPendingRequestsPage = () => {
     return (
         <RequestsPageFactory 
-            fetchApiFn={() => accessRequestApi.getAllPendingGlobal()}
+            fetchApiFn={async () => {
+                const result = await operatorCartApi.getCart()
+                return result.data.map(normalizeOperatorCartItem)
+            }}
             actionButtonLabel="Process"
             actionButtonRoutePrefix="/process"
             extraColumns={[

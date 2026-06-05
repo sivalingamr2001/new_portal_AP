@@ -1,8 +1,7 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import folderMappingApi from "@/api/folderMappingApi"
-import type { FolderMappingDto } from "@/api/types"
+import { folderMappingsApi, type FolderMappingDto } from "@/api"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
@@ -22,12 +21,8 @@ export const FolderMappingPage = () => {
 
   const fetchFolderMappings = useCallback(async () => {
     try {
-      const result = await withLoader(() => folderMappingApi.getAll())
-      if (!result.isSuccess || !result.value) {
-        console.error("Failed to load folder mappings:", result.error?.message)
-        return
-      }
-      setFolderMappings(result.value.data)
+      const result = await withLoader(() => folderMappingsApi.getFolderMappings())
+      setFolderMappings(result.data)
     } catch (error) {
       console.error("Failed to load folder mappings:", error)
     }

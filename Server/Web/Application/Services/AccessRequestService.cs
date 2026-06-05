@@ -317,7 +317,7 @@ public sealed class AccessRequestService(
             hodUserIds.Add(foldSecondHodId);
 
         // User's department HOD
-        var user = await cmplDb.CmplUsers.FirstOrDefaultAsync(u => u.Id == actorUserId);
+        var user = await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == actorUserId);
         if (user?.DepartmentId is not null)
         {
             var dept = await db.Departments.FirstOrDefaultAsync(d => d.Id == user.DepartmentId);

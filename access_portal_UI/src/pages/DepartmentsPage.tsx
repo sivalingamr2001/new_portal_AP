@@ -1,13 +1,17 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import departmentApi, { type UpdateDepartmentRequest } from "@/api/departmentApi"
-import type { DepartmentResponseDto } from "@/api/types"
+import { departmentsApi } from "@/api"
+import type { UpdateDepartmentRequest } from "@/components/Department/EditDepartmentModal"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { EditDepartmentModal } from "@/components/Department/EditDepartmentModal"
+import {
+  normalizeDepartment,
+  type DepartmentResponseDto,
+} from "@/lib/api-result"
 
 export const DepartmentsPage = () => {
   const location = useLocation()
@@ -25,12 +29,8 @@ export const DepartmentsPage = () => {
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const result = await withLoader(() => departmentApi.getAll())
-      if (!result.isSuccess || !result.value) {
-        console.error("Failed to load departments:", result.error?.message)
-        return
-      }
-      setDepartments(result.value.data)
+      const result = await withLoader(() => departmentsApi.getDepartments())
+      setDepartments(result.data.map(normalizeDepartment))
     } catch (error) {
       console.error("Failed to load departments:", error)
     }
@@ -44,14 +44,14 @@ export const DepartmentsPage = () => {
     if (!selectedDepartment?.department?.deptId) return;
     try {
       const targetId = selectedDepartment.department.deptId;
-      const result = await departmentApi.update(targetId, payload);
-
-      if (result.isSuccess) {
-        setIsEditModalOpen(false);
-        fetchDepartments();
-      } else {
-        console.error("Failed updating department information:", result.error?.message);
-      }
+      await withLoader(() =>
+        departmentsApi.updateDepartment(targetId, {
+          name: payload.deptName ?? "",
+          hodId: payload.hodId,
+        })
+      );
+      setIsEditModalOpen(false);
+      fetchDepartments();
     } catch (err) {
       console.error("Save error encountered:", err);
     }

@@ -13,6 +13,7 @@ const STORAGE_KEY = "jan_AP_user"
 
 type cmplUser = {
   cmplUserId: number
+  userId?: number
   cmplUserName: string
   empId: string
   mailId: string
@@ -21,6 +22,7 @@ type cmplUser = {
 }
 
 type user = {
+  userId: number
   role: string
   location: string
 }
@@ -44,6 +46,9 @@ type currentUser = {
   cmplUser: cmplUser
   department: department
   hod: hod
+  name?: string
+  email?: string
+  departmentId?: number
 }
 
 type AuthContextType = {

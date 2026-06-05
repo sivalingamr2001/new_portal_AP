@@ -59,28 +59,37 @@ public sealed class DepartmentService(
 
     public async Task<Result<DepartmentDetailDto>> GetByIdAsync(int id)
     {
+        bool isTestEnv = db.Database.IsSqlite();
+
         var dept = await db.Departments
             .FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
 
         if (dept is null)
+        {
             return Result.Failure<DepartmentDetailDto>(
                 Error.NotFound("DEPT_001", "Department not found."));
+        }
 
-        bool isTestEnv = db.Database.IsSqlite();
+        var hodContext = isTestEnv
+            ? db.HodMasters
+            : hodDb.HodMasters;
+
         HodMaster? hod = null;
-        if (dept.HodId is not null && int.TryParse(dept.HodId, out var hodId))
-            hod = isTestEnv
-                ? await db.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0)
-                : await hodDb.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodId && h.Deleted == 0);
 
-        return Result.Success(new DepartmentDetailDto(
-            dept.Id,
-            dept.Name,
-            dept.HodId,
-            hod?.Name,
-            hod?.Email,
-            dept.IsActive,
-            dept.CreatedOn));
+        hod = await hodContext
+            .FirstOrDefaultAsync(h =>
+                h.EmployeeId == dept.HodId &&
+                h.Deleted == 0);
+
+        return Result.Success(
+            new DepartmentDetailDto(
+                dept.Id,
+                dept.Name,
+                dept.HodId,
+                hod?.Name,
+                hod?.Email,
+                dept.IsActive,
+                dept.CreatedOn));
     }
 
     public async Task<Result<int>> CreateAsync(UpsertDepartmentDto dto, int createdBy)
@@ -115,24 +124,34 @@ public sealed class DepartmentService(
 
     public async Task<Result> UpdateAsync(int id, UpsertDepartmentDto dto, int updatedBy)
     {
+        bool isTestEnv = db.Database.IsSqlite();
         var dept = await db.Departments
             .FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
 
         if (dept is null)
-            return Result.Failure(Error.NotFound("DEPT_001", "Department not found."));
+        {
+            return Result.Failure(
+                Error.NotFound("DEPT_001", "Department not found."));
+        }
+
+        var hodContext = isTestEnv
+            ? db.HodMasters
+            : hodDb.HodMasters;
 
         if (!string.IsNullOrWhiteSpace(dto.HodId))
         {
-            if (!int.TryParse(dto.HodId, out var hodId))
-                return Result.Failure(
-                    Error.Validation("DEPT_002", "HodId must be a valid integer."));
-
-            var hodExists = await hodDb.HodMasters
-                .AnyAsync(h => h.UserId == hodId && h.Deleted == 0);
+            var hodExists = await hodContext
+                .AnyAsync(h =>
+                    h.EmployeeId == dto.HodId &&
+                    h.Deleted == 0);
 
             if (!hodExists)
+            {
                 return Result.Failure(
-                    Error.NotFound("DEPT_003", "The specified HOD does not exist."));
+                    Error.NotFound(
+                        "DEPT_003",
+                        "The specified HOD does not exist."));
+            }
         }
 
         dept.Name = dto.Name;
@@ -141,6 +160,7 @@ public sealed class DepartmentService(
         dept.ModifiedBy = updatedBy;
 
         await db.SaveChangesAsync();
+
         return Result.Success();
     }
 

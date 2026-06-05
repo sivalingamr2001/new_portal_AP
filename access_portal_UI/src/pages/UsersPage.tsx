@@ -10,15 +10,18 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import userApi from "@/api/userApi"
+import { usersApi } from "@/api"
 import { useLoader } from "@/hooks/useLoader"
 import { useLocation } from "react-router-dom"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { usePaginatedDataGrid } from "@/hooks/usePaginatedDataGrid"
-import type {
-  PagedResult,
-  Result,
-} from "@/api/types"
+import type { PagedResult } from "@/api"
+import {
+  normalizeUserDetails,
+  toFailure,
+  toResult,
+  type Result,
+} from "@/lib/api-result"
 import { EditUsersModal } from "@/components/Users/EditUsersModal"
 
 const USERS_PAGE_CHUNK_SIZE = 20
@@ -53,77 +56,19 @@ export const UsersPage = () => {
 
   const fetchUsersPage = useCallback(
     async (page: number, pageSize: number) => {
-      const result = await userApi.getAll({
-        page,
-        pageSize,
-      })
+      try {
+        const result = await usersApi.getPortalUsers({
+          page,
+          pageSize,
+        })
 
-      if (
-        !result.isSuccess ||
-        !result.value
-      ) {
-        return {
-          isSuccess: result.isSuccess,
-          isFailure: result.isFailure,
-          error: result.error,
-          value: undefined,
-        } as Result<
-          PagedResult<UserRowPayload>
-        >
+        return toResult({
+          ...result,
+          data: result.data.map(normalizeUserDetails),
+        } satisfies PagedResult<UserRowPayload>)
+      } catch (error) {
+        return toFailure<PagedResult<UserRowPayload>>(error)
       }
-
-      const normalizedResult: Result<
-        PagedResult<UserRowPayload>
-      > = {
-        ...result,
-        value: {
-          ...result.value,
-          data: result.value.data.map(
-            (item) => ({
-              cmplUser: {
-                cmplUserId:
-                  item.cmplUser.cmplUserId,
-                cmplUserName:
-                  item.cmplUser.cmplUserName,
-                empId:
-                  item.cmplUser.empId ??
-                  null,
-                mailId:
-                  item.cmplUser.mailId ??
-                  "",
-                mobNo:
-                  item.cmplUser.mobNo ??
-                  "",
-                deptId:
-                  item.cmplUser.deptId ?? 0,
-              },
-              user: {
-                userId: item.user.userId,
-                role: item.user.role,
-                location:
-                  item.user.location,
-              },
-              department: {
-                deptId:
-                  item.department?.deptId ??
-                  0,
-                deptName:
-                  item.department?.deptName ??
-                  null,
-              },
-              hod: item.hod
-                ? {
-                  hodId:
-                    item.hod.idRow ?? 0,
-                  name: item.hod.hodName,
-                }
-                : null,
-            })
-          ),
-        },
-      }
-
-      return normalizedResult
     },
     []
   )
@@ -254,7 +199,8 @@ export const UsersPage = () => {
     try {
       showLoader()
       if (!selectedUser) return
-      await userApi.update(selectedUser.cmplUser.cmplUserId, {
+      await usersApi.updatePortalUser(selectedUser.cmplUser.cmplUserId, {
+        cmplUserId: selectedUser.cmplUser.cmplUserId,
         role: updatedData.role,
         location: updatedData.location,
       })

@@ -1,4 +1,3 @@
-import type { AccessRequestDto, AccessType } from "@/api/types"
 import { CreateRequestModal } from "@/components/AccessRequests/create-request-modal"
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import { Button } from "@/components/ui/button"
@@ -8,13 +7,18 @@ import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import {
+    accessTypeLabel,
+    type AccessRequestDto,
+    type AccessType,
+} from "@/lib/api-result"
 
 // ==========================================
 // 1. GENERIC BASE FACTORY COMPONENT
 // ==========================================
 
 interface RequestsPageFactoryProps {
-    fetchApiFn: (id: string) => Promise<any>
+    fetchApiFn: (id?: string) => Promise<AccessRequestDto[]>
     actionButtonLabel?: string
     actionButtonRoutePrefix: string
     extraColumns?: (Omit<ColDef<any>, "field"> & { field?: string })[]
@@ -46,17 +50,11 @@ export const RequestsPageFactory = ({
                          currentUser?.cmplUser?.userId ?? 
                          currentUser?.departmentId
 
-        if (!targetId) return
-
         try {
-            const result = await withLoader(() => fetchApiFn(targetId))
-
-            if (!result?.isSuccess || !result.value) {
-                console.error(`Failed to load requests for route: ${location.pathname}`, result?.error)
-                return
-            }
-
-            setRequests(result.value.data ?? [])
+            const result = await withLoader(() =>
+                fetchApiFn(targetId ? String(targetId) : undefined)
+            )
+            setRequests(result)
         } catch (error) {
             console.error("Error fetching requests:", error)
         }
@@ -77,7 +75,7 @@ export const RequestsPageFactory = ({
                     accessReqId: req.accessReqId,
                     ticketNumber: "-",
                     folderPath: "-",
-                    accessType: "-" as unknown as AccessType,
+                    accessType: "NotApplicable" as AccessType,
                     status: req.currentStatus,
                     requestedAtUtc: req.requestedAtUtc
                 }]
@@ -85,6 +83,7 @@ export const RequestsPageFactory = ({
 
             return req.items.map((item) => ({
                 accessReqId: req.accessReqId,
+                itemId: item.itemId,
                 ticketNumber: item.ticketNumber,
                 folderPath: item.folderPath,
                 accessType: item.accessType, // This already matches AccessType
@@ -103,7 +102,7 @@ export const RequestsPageFactory = ({
                 headerName: "Access Type", 
                 field: "accessType", 
                 width: 120,
-                valueFormatter: (params) => params.value === 2 ? "Read/Write" : params.value
+                valueFormatter: (params) => accessTypeLabel(params.value)
             },
             {
                 headerName: "Status", 

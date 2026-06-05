@@ -1,11 +1,14 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import accessRequestApi from "@/api/accessRequestApi"
-import type { AccessRequestDto } from "@/api/types"
+import { hodCartApi } from "@/api"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
+import {
+  normalizeHodCartItem,
+  type AccessRequestDto,
+} from "@/lib/api-result"
 
 export const HodAllRequestsPage = () => {
   const location = useLocation()
@@ -19,12 +22,8 @@ export const HodAllRequestsPage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const result = await withLoader(() => accessRequestApi.getAll())
-      if (!result.isSuccess || !result.value) {
-        console.error("Failed to load all requests:", result.error?.message)
-        return
-      }
-      setRequests(result.value.data)
+      const result = await withLoader(() => hodCartApi.getCart())
+      setRequests(result.data.map(normalizeHodCartItem))
     } catch (error) {
       console.error("Failed to load all requests:", error)
     }

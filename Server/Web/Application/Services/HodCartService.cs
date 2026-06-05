@@ -18,16 +18,23 @@ public sealed class HodCartService(
         bool isTestEnv = db.Database.IsSqlite();
         var hodIdStr = hodUserId.ToString();
 
+        var fTotal = await db.Departments.Where(d => d.HodId == hodIdStr).CountAsync();
+
         // Items from users in HOD's department
         var deptIds = await db.Departments
-            .Where(d => d.HodId == hodIdStr && d.IsActive)
+            .Where(d => d.HodId == hodIdStr)
             .Select(d => d.Id)
             .ToListAsync();
 
-        var deptUserIds = await cmplDb.CmplUsers
-            .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
-            .Select(u => u.Id)
-            .ToListAsync();
+        var deptUserIds = isTestEnv
+            ? await db.CmplUsers
+                .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
+                .Select(u => u.Id)
+                .ToListAsync()
+            : await cmplDb.CmplUsers
+                .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
+                .Select(u => u.Id)
+                .ToListAsync();
 
         // Folder paths owned by this HOD
         var hodOwnedFolderPaths = await db.FolderMappings
@@ -134,38 +141,38 @@ public sealed class HodCartService(
             return Result.Failure(Error.NotFound("ITEM_005",
                 "Item not found or not in your cart."));
 
-        item.Status          = RequestStatus.HodRejected;
+        item.Status = RequestStatus.HodRejected;
         item.RejectionReason = rejectionReason;
-        item.HodApproverId   = hodUserId;
-        item.ModifiedOn      = DateTime.UtcNow;
-        item.ModifiedBy      = hodUserId;
+        item.HodApproverId = hodUserId;
+        item.ModifiedOn = DateTime.UtcNow;
+        item.ModifiedBy = hodUserId;
 
         db.AccessApprovals.Add(new AccessApprovalEntity
         {
-            AccessReqId    = item.AccessReqId,
-            AccessItemId   = item.AccessItemId,
-            ApproverId     = hodUserId,
+            AccessReqId = item.AccessReqId,
+            AccessItemId = item.AccessItemId,
+            ApproverId = hodUserId,
             ApprovalStatus = RequestStatus.HodRejected,
-            ApprovalLevel  = "HOD",
-            Comments       = rejectionReason,
-            IsActive       = true,
-            CreatedOn      = DateTime.UtcNow,
-            CreatedBy      = hodUserId
+            ApprovalLevel = "HOD",
+            Comments = rejectionReason,
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = hodUserId
         });
 
         db.AccessReqAudits.Add(new AccessReqAuditEntity
         {
-            AccessReqId     = item.AccessReqId,
-            AccessItemId    = item.AccessItemId,
-            EventType       = "HodRejected",
-            Message         = $"HOD rejected ticket {item.TicketNumber}: {rejectionReason}",
-            ActorUserId     = hodUserId,
+            AccessReqId = item.AccessReqId,
+            AccessItemId = item.AccessItemId,
+            EventType = "HodRejected",
+            Message = $"HOD rejected ticket {item.TicketNumber}: {rejectionReason}",
+            ActorUserId = hodUserId,
             RecipientUserId = item.AccessRequest.UserId,
-            RecipientName   = string.Empty,
-            RecipientRole   = "User",
-            IsActive        = true,
-            CreatedOn       = DateTime.UtcNow,
-            CreatedBy       = hodUserId
+            RecipientName = string.Empty,
+            RecipientRole = "User",
+            IsActive = true,
+            CreatedOn = DateTime.UtcNow,
+            CreatedBy = hodUserId
         });
 
         await db.SaveChangesAsync();
@@ -218,22 +225,22 @@ public sealed class HodCartService(
 
         foreach (var item in items)
         {
-            item.Status        = RequestStatus.PendingWithIt;
+            item.Status = RequestStatus.PendingWithIt;
             item.HodApproverId = hodUserId;
-            item.ModifiedOn    = DateTime.UtcNow;
-            item.ModifiedBy    = hodUserId;
+            item.ModifiedOn = DateTime.UtcNow;
+            item.ModifiedBy = hodUserId;
 
             db.AccessApprovals.Add(new AccessApprovalEntity
             {
-                AccessReqId    = item.AccessReqId,
-                AccessItemId   = item.AccessItemId,
-                ApproverId     = hodUserId,
+                AccessReqId = item.AccessReqId,
+                AccessItemId = item.AccessItemId,
+                ApproverId = hodUserId,
                 ApprovalStatus = RequestStatus.HodApproved,
-                ApprovalLevel  = "HOD",
-                Comments       = comments,
-                IsActive       = true,
-                CreatedOn      = DateTime.UtcNow,
-                CreatedBy      = hodUserId
+                ApprovalLevel = "HOD",
+                Comments = comments,
+                IsActive = true,
+                CreatedOn = DateTime.UtcNow,
+                CreatedBy = hodUserId
             });
         }
 
@@ -255,16 +262,20 @@ public sealed class HodCartService(
         int accessItemId, int hodUserId, RequestStatus requiredStatus)
     {
         var hodIdStr = hodUserId.ToString();
+        bool isTestEnv = db.Database.IsSqlite();
 
         var deptIds = await db.Departments
             .Where(d => d.HodId == hodIdStr && d.IsActive)
             .Select(d => d.Id)
             .ToListAsync();
 
-        var deptUserIds = await cmplDb.CmplUsers
+        var deptUserIds = isTestEnv ? await db.CmplUsers
             .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
             .Select(u => u.Id)
-            .ToListAsync();
+            .ToListAsync() : await cmplDb.CmplUsers
+            .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
+            .Select(u => u.Id)
+            .ToListAsync() ;
 
         var hodPaths = await db.FolderMappings
             .Where(f => f.PrimaryHodId == hodIdStr || f.SecondaryHodId == hodIdStr)

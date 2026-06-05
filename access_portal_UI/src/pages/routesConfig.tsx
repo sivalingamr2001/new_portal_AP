@@ -9,8 +9,8 @@ import { AuthLayout } from "@/layout/AuthLayout"
 import ErrorBountry from "@/pages/ErrorBountry"
 import { ProtectedRoute } from "@/pages/ProtectedRoute"
 
-import * as Pages from "./pages"
-import { withSuspense } from "./withSuspense"
+import * as Pages from "../router/pages"
+import { withSuspense } from "../router/withSuspense"
 
 const HomeRedirect = () => {
   const { currentUserRole, isAuthenticated } = useAuth()

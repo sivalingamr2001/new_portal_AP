@@ -51,6 +51,20 @@ public sealed class FolderMappingsController(IFolderMappingService service) : Co
         return result.IsSuccess ? NoContent() : HandleFailure(result);
     }
 
+    [HttpGet("parents")]
+    public async Task<IActionResult> GetParentFolders()
+    {
+        var folders = await service.GetParentFoldersAsync();
+        return Ok(folders);
+    }
+
+    [HttpGet("hierarchy")]
+    public async Task<IActionResult> GetFolderHierarchy()
+    {
+        var hierarchy = await service.GetFolderHierarchyAsync();
+        return Ok(hierarchy);
+    }
+
     private int GetCallerId()
         => int.Parse(User.FindFirst("sub")?.Value
             ?? HttpContext.Request.Headers["X-User-Id"].ToString());

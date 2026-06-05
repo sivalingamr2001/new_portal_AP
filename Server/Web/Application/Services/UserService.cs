@@ -336,6 +336,4 @@ public sealed class UserService(
         await db.SaveChangesAsync();
         return Result.Success();
     }
-
-    Task<PagedResult<PortalUserDetails>> IUserService.GetPortalUsersAsync(int page, int pageSize, string? search) => throw new NotImplementedException();
 }

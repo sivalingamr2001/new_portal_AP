@@ -4,7 +4,8 @@ import {
   useRef,
   useState,
 } from "react"
-import type { PagedResult, Result } from "@/api/types"
+import type { PagedResult } from "@/api"
+import type { Result } from "@/lib/api-result"
 
 export interface UsePaginatedDataGridOptions {
   pageSize?: number

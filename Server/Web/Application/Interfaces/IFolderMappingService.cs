@@ -1,3 +1,4 @@
+using Server.Shared.Helpers;
 using Web.Domain.Common;
 using Web.Domain.Dto;
 
@@ -9,5 +10,7 @@ public interface IFolderMappingService
     Task<Result<FolderMappingDto>> GetByIdAsync(int id);
     Task<Result<int>> CreateAsync(UpsertFolderMappingRequest dto, int createdBy);
     Task<Result> UpdateAsync(int id, UpsertFolderMappingRequest dto, int updatedBy);
-    Task<Result> DeleteAsync(int id, int deletedBy);
+    Task<Result> DeleteAsync(int id, int deletedBy);    
+    Task<List<FolderResponse>> GetParentFoldersAsync();
+    Task<List<FolderResponse>> GetFolderHierarchyAsync();
 }

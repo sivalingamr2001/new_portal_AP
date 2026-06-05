@@ -1,11 +1,14 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import accessRequestApi from "@/api/accessRequestApi"
-import type { AccessRequestDto } from "@/api/types"
+import { operatorCartApi } from "@/api"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
+import {
+  normalizeOperatorCartItem,
+  type AccessRequestDto,
+} from "@/lib/api-result"
 
 export const ApprovalQueuePage = () => {
   const location = useLocation()
@@ -19,12 +22,8 @@ export const ApprovalQueuePage = () => {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const result = await withLoader(() => accessRequestApi.getItCart())
-      if (!result.isSuccess || !result.value) {
-        console.error("Failed to load approval queue:", result.error?.message)
-        return
-      }
-      setRequests(result.value.data)
+      const result = await withLoader(() => operatorCartApi.getCart())
+      setRequests(result.data.map(normalizeOperatorCartItem))
     } catch (error) {
       console.error("Failed to load approval queue:", error)
     }

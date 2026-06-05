@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Server.Shared.Helpers;
 using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
@@ -8,7 +9,7 @@ namespace Web.Application.Services;
 
 public sealed class FolderMappingService(
     AppDbContext db,
-    HodDbContext hodDb) : IFolderMappingService
+    HodDbContext hodDb, FolderService folderService) : IFolderMappingService
 {
     public async Task<PagedResult<FolderMappingDto>> GetAllAsync(
         int page, int pageSize, string? search)
@@ -45,7 +46,6 @@ public sealed class FolderMappingService(
         UpsertFolderMappingRequest dto, int createdBy)
     {
         bool isTestEnv = db.Database.IsSqlite();
-        // Validate duplicate folder path
         var exists = await db.FolderMappings
             .AnyAsync(f => f.FolderName == dto.FolderPath && f.IsActive);
 
@@ -135,12 +135,9 @@ public sealed class FolderMappingService(
     {
         if (!string.IsNullOrWhiteSpace(primaryHodId))
         {
-            if (!int.TryParse(primaryHodId, out var pid))
-                return Error.Validation("FOLDER_003", "PrimaryHodId must be a valid integer.");
-
             var exists = isTestEnv
-                ? await db.HodMasters.AnyAsync(h => h.UserId == pid && h.Deleted == 0)
-                : await hodDb.HodMasters.AnyAsync(h => h.UserId == pid && h.Deleted == 0);
+                ? await db.HodMasters.AnyAsync(h => h.EmployeeId == primaryHodId && h.Deleted == 0)
+                : await hodDb.HodMasters.AnyAsync(h => h.EmployeeId == primaryHodId && h.Deleted == 0);
             if (!exists)
                 return Error.NotFound("FOLDER_004", "Primary HOD not found in HOD master.");
         }
@@ -151,13 +148,23 @@ public sealed class FolderMappingService(
                 return Error.Validation("FOLDER_005", "SecondaryHodId must be a valid integer.");
 
             var exists = isTestEnv
-                ? await db.HodMasters.AnyAsync(h => h.UserId == sid && h.Deleted == 0)
-                : await hodDb.HodMasters.AnyAsync(h => h.UserId == sid && h.Deleted == 0);
+                ? await db.HodMasters.AnyAsync(h => h.EmployeeId == secondaryHodId && h.Deleted == 0)
+                : await hodDb.HodMasters.AnyAsync(h => h.EmployeeId == secondaryHodId && h.Deleted == 0);
             if (!exists)
                 return Error.NotFound("FOLDER_006", "Secondary HOD not found in HOD master.");
         }
 
         return null;
+    }
+
+        public async Task<List<FolderResponse>> GetParentFoldersAsync()
+    {
+        return await folderService.GetParentFoldersAsync(CancellationToken.None);
+    }
+
+    public Task<List<FolderResponse>> GetFolderHierarchyAsync()
+    {
+        return Task.FromResult(folderService.GetStrictFolderHierarchy());
     }
 
     private static FolderMappingDto MapToDto(FolderMappingEntity f) => new(

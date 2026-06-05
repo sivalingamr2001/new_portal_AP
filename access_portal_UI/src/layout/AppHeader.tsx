@@ -26,7 +26,7 @@ export function AppHeader() {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isError, setIsError] = useState<boolean>(false)
 
-  const userId = currentUser?.cmplUser?.userId || 0 
+  const userId = currentUser?.user?.userId || currentUser?.cmplUser?.cmplUserId || 0
 
   // 2. Fetch notifications in the parent
   useEffect(() => {
@@ -67,14 +67,14 @@ export function AppHeader() {
 
     connection
       .start()
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Failed to connect to notifications hub:", error)
         setIsError(true)
       })
 
     return () => {
       connection.off("ReceiveNotification")
-      connection.stop().catch((error) => {
+      connection.stop().catch((error: unknown) => {
         console.error("Failed to stop notifications hub:", error)
       })
     }
@@ -166,9 +166,11 @@ export function AppHeader() {
           <DropdownMenuContent align="end" className="mt-1 w-56">
             <DropdownMenuLabel className="font-normal md:hidden">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm leading-none font-medium">{currentUser?.name || "User Name"}</p>
+                <p className="text-sm leading-none font-medium">
+                  {currentUser?.cmplUser?.cmplUserName || "User Name"}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.email || "user@example.com"}
+                  {currentUser?.cmplUser?.mailId || "user@example.com"}
                 </p>
               </div>
             </DropdownMenuLabel>
