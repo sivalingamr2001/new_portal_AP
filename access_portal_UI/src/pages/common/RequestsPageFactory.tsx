@@ -19,27 +19,27 @@ import { useLocation, useNavigate } from "react-router-dom"
 // 1. GENERIC BASE FACTORY COMPONENT
 // ==========================================
 
-interface RequestsPageFactoryProps {
+interface RequestsPageFactoryProps<TRequest = AccessRequestSummaryDto> {
   fetchApiFn: (
     id?: string
-  ) => Promise<PagedResult<AccessRequestSummaryDto> | AccessRequestSummaryDto[]>
+  ) => Promise<PagedResult<TRequest> | TRequest[]>
   actionButtonLabel?: string
   actionButtonRoutePrefix: string
   extraColumns?: (Omit<ColDef<any>, "field"> & { field?: string })[]
   showCreateButton?: boolean
 }
 
-export const RequestsPageFactory = ({
+export const RequestsPageFactory = <TRequest = AccessRequestSummaryDto,>({
   fetchApiFn,
   actionButtonLabel = "View",
   actionButtonRoutePrefix,
   extraColumns = [],
   showCreateButton = false,
-}: RequestsPageFactoryProps) => {
+}: RequestsPageFactoryProps<TRequest>) => {
   const location = useLocation()
   const { currentUser } = useAuth()
   const { loading, withLoader } = useLoader()
-  const [requests, setRequests] = useState<AccessRequestSummaryDto[]>([])
+  const [requests, setRequests] = useState<TRequest[]>([])
   const [createRequestModalOpen, setCreateRequestModalOpen] = useState(false)
 
   // New State: Cache for user names indexed by their user ID string or number
@@ -148,9 +148,8 @@ export const RequestsPageFactory = ({
           folderPath: item.folderPath,
           accessType: item.accessType ?? item.accessType,
           status: item.status ?? req.currentStatus,
-          // Map to cached API name if available; fall back to original property
           requestedBy: userNames[targetUserId] || req.requestedBy || `User #${targetUserId}`,
-          department: req.department,
+          departmentName: req.departmentName,
         }
       })
     })

@@ -1,5 +1,5 @@
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Enums;
 
 namespace Web.Application.Interfaces;

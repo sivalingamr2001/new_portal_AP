@@ -1,21 +1,22 @@
-import { apiService, ApiException } from "./axiosClient"
+import { ApiException, apiService } from "./axiosClient"
 import type {
-  PaginationParams,
-  PagedResult,
-  OperatorCartItemDto,
   ItemActionDto,
-  OverrideAccessTypeDto,
+  OverrideAccessTypeDto
 } from "./types"
 
 export const operatorCartApi = {
   getCart: async (
-    params?: PaginationParams
-  ): Promise<PagedResult<OperatorCartItemDto>> => {
+    params?: any // Changed to any to absorb arbitrary factory input parameters safely
+  ): Promise<any> => {
+    // Returns any to allow downstream casting inside components
     try {
-      const response = await apiService.get<PagedResult<OperatorCartItemDto>>(
-        "/operator-cart",
-        { params }
-      )
+      // If the factory passes separate primitives or an unexpected string ID instead of a clean object,
+      // normalize the structural layout before hitting the backend endpoint
+      const queryParams = typeof params === "object" ? params : {}
+
+      const response = await apiService.get<any>("/operator-cart", {
+        params: queryParams,
+      })
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error

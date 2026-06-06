@@ -1,13 +1,13 @@
-import type { Result } from "./types"
 
 // ─── Barrel Export ────────────────────────────────────────────────────────────
-export * from "./axiosClient"
-export * from "./authApi"
-export * from "./usersApi"
-export * from "./departmentsApi"
 export * from "./accessRequestsApi"
-export * from "./folderMappingsApi"
+export * from "./authApi"
+export * from "./axiosClient"
 export * from "./dashboardApi"
+export * from "./departmentsApi"
+export * from "./folderMappingsApi"
 export * from "./hodCartApi"
-export * from "./operatorCartApi"
 export * from "./notificationsApi"
+export * from "./operatorCartApi"
+export * from "./usersApi"
+

@@ -1,4 +1,4 @@
-import { notificationsApi, updateAxiosUserCache } from "@/api"
+import { notificationsApi } from "@/api"
 import type { NotificationDto } from "@/api/types"
 import { NotificationSheet } from "@/components/NotificationSheet"
 import { Button } from "@/components/ui/button"
@@ -189,7 +189,6 @@ export function AppHeader() {
 
   const handleLogout = () => {
     logout()
-    updateAxiosUserCache()
     navigate("/login")
   }
 

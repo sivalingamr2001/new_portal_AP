@@ -1,14 +1,14 @@
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import type { ColDef } from "ag-grid-community"
 import { useCallback, useMemo, useState, useEffect } from "react"
-import type { AccessNotificationDto } from "@/api/types"
 import { useLoader } from "@/hooks/useLoader"
 import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
 import { useLocation } from "react-router-dom"
+import type { NotificationDto } from "@/api/types"
 
 export const AuditLogsPage = () => {
   const location = useLocation()
-  const [auditLogs] = useState<AccessNotificationDto[]>([])
+  const [auditLogs] = useState<NotificationDto[]>([])
   const { loading, withLoader } = useLoader()
 
   const { title } = useMemo(

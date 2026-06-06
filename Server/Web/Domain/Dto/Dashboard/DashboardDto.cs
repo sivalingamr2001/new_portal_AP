@@ -1,4 +1,4 @@
-namespace Web.Domain.Dto;
+namespace Web.Domain.Dto.Dashboard;
 
 public sealed record DashboardDto(
     int TotalRequests,

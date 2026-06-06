@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Infrastructure.Data;

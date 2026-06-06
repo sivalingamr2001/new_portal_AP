@@ -1,4 +1,4 @@
-namespace Web.Domain.Entities;
+namespace Web.Domain.Dto.Login;
 
 public sealed class LoginRequestDto
 {

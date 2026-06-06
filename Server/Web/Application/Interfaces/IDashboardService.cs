@@ -1,4 +1,4 @@
-using Web.Domain.Dto;
+using Web.Domain.Dto.Dashboard;
 
 namespace Web.Application.Services;
 

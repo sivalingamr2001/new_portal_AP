@@ -1,34 +1,24 @@
-import {
-  Activity,
-  AlertTriangle,
-  ArrowUpRight,
-  CheckCircle2,
-  Clock,
-  FileText,
-  UserCheck,
-  XCircle,
-} from "lucide-react"
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { dashboardApi } from "@/api/dashboardApi"; // Ensure this path matches your project structure
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  FileText,
+  UserCheck,
+  XCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-// 1. Explicitly defining interface contracts to match your backend Records
+// Contract matching your backend Dto layout structures
 interface RecentRequestDto {
   requestId: number
   userId: number
@@ -37,43 +27,62 @@ interface RecentRequestDto {
   itemCount: number
 }
 
-interface DashboardProps {
-  data: {
-    totalRequests: number
-    pendingWithHod: number
-    pendingWithIt: number
-    approvedActive: number
-    hodRejected: number
-    itRejected: number
-    revoked: number
-    expired: number
-    expiringSoon: number
-    myPendingItems: number
-    myApprovedItems: number
-    myRejectedItems: number
-    recentRequests: RecentRequestDto[]
-  }
+interface DashboardDataDto {
+  totalRequests: number
+  pendingWithHod: number
+  pendingWithIt: number
+  approvedActive: number
+  hodRejected: number
+  itRejected: number
+  revoked: number
+  expired: number
+  expiringSoon: number
+  myPendingItems: number
+  myApprovedItems: number
+  myRejectedItems: number
+  recentRequests: RecentRequestDto[]
 }
 
-export const Dashboard = ({ data }: DashboardProps) => {
-  // Safe fallbacks to prevent errors if the API response is undefined
-  const stats = data || {
-    totalRequests: 0,
-    pendingWithHod: 0,
-    pendingWithIt: 0,
-    approvedActive: 0,
-    hodRejected: 0,
-    itRejected: 0,
-    revoked: 0,
-    expired: 0,
-    expiringSoon: 0,
-    myPendingItems: 0,
-    myApprovedItems: 0,
-    myRejectedItems: 0,
-    recentRequests: [],
+export const Dashboard = () => {
+  const [stats, setStats] = useState<DashboardDataDto | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadDashboardMetrics = async () => {
+      try {
+        setLoading(true)
+        const response = await dashboardApi.getDashboard()
+        setStats(response)
+        setError(null)
+      } catch (err: any) {
+        console.error(err)
+        setError(err?.message || "Failed to load system metrics.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadDashboardMetrics()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Activity className="h-4 w-4 animate-spin text-primary" />
+        Loading metrics data stream...
+      </div>
+    )
   }
 
-  // Formatting backend metrics dynamically for the bar chart visualization
+  if (error || !stats) {
+    return (
+      <div className="p-6 text-center text-sm text-destructive">
+        {error || "No response data available from the core server."}
+      </div>
+    )
+  }
+
   const chartData = [
     {
       name: "Pending",
@@ -95,25 +104,6 @@ export const Dashboard = ({ data }: DashboardProps) => {
       Expired: stats.expired,
     },
   ]
-
-  // Dynamic color configuration mapper for Request Badge UI components
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "approved":
-      case "approvedactive":
-        return "default"
-      case "pendingwithhod":
-      case "pendingwithit":
-      case "pending":
-        return "secondary"
-      case "hodrejected":
-      case "itrejected":
-      case "rejected":
-        return "destructive"
-      default:
-        return "outline"
-    }
-  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -177,6 +167,74 @@ export const Dashboard = ({ data }: DashboardProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* PERSONAL METRIC SUBSECTION BAR */}
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight mb-3">My Request Metrics</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="bg-muted/40">
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">My Pending Items</p>
+                <div className="text-xl font-bold">{stats.myPendingItems}</div>
+              </div>
+              <Clock className="h-5 w-5 text-amber-500" />
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/40">
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">My Approved Items</p>
+                <div className="text-xl font-bold text-emerald-600">{stats.myApprovedItems}</div>
+              </div>
+              <UserCheck className="h-5 w-5 text-emerald-500" />
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/40">
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">My Rejected Items</p>
+                <div className="text-xl font-bold text-destructive">{stats.myRejectedItems}</div>
+              </div>
+              <XCircle className="h-5 w-5 text-destructive" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* CHARTS & LIVE REQUESTS ROW */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* Global Breakdown Chart View */}
+        <Card className="lg:col-span-4">
+          <CardHeader>
+            <CardTitle>Global Workflow Breakdown</CardTitle>
+            <CardDescription>
+              Categorized lifecycle status distribution of system access requests.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-75 w-full pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ left: -10, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted))" />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ fill: "hsl(var(--muted)/0.2)" }}
+                    contentStyle={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--border))", borderRadius: "var(--radius)" }}
+                  />
+                  <Legend />
+                  <Bar dataKey="HOD" stackId="a" fill="#eab308" />
+                  <Bar dataKey="IT" stackId="a" fill="#2563eb" />
+                  <Bar dataKey="Active" fill="#10b981" />
+                  <Bar dataKey="Revoked" stackId="b" fill="#64748b" />
+                  <Bar dataKey="Expired" stackId="b" fill="#ef4444" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
-} 
+}

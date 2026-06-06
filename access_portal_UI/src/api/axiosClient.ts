@@ -23,37 +23,20 @@ export class ApiException extends Error {
   }
 }
 
-let cachedUserId: string | null = null
-
-export const updateAxiosUserCache = () => {
-  try {
-    const rawData = sessionStorage.getItem("jan_AP_user")
-    if (!rawData) {
-      cachedUserId = null
-      return
-    }
-    const session = JSON.parse(rawData)
-    const id = session?.user?.id ?? session?.id ?? session?.value?.user?.id
-    cachedUserId = id ? String(id) : null
-  } catch {
-    cachedUserId = null
-  }
-}
-
-updateAxiosUserCache()
+const rawData: any = sessionStorage.getItem("jan_AP_user")
+const session = JSON.parse(rawData)
+const userId = session?.user?.id ?? session?.id ?? session?.value?.user?.id
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: ENV_CONFIG?.BASE_API_URL ?? "/api",
   withCredentials: true,
-  headers: { "Content-Type": "application/json" }
+  headers: { "Content-Type": "application/json" },
 })
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    if (!cachedUserId) updateAxiosUserCache()
-
-    if (cachedUserId) {
-      config.headers["X-User-Id"] = cachedUserId
+    if (userId) {
+      config.headers["X-User-Id"] = userId
     }
     return config
   },

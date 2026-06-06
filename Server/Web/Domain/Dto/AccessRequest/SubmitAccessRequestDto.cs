@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using Web.Domain.Enums;
 
-namespace Web.Domain.Dto;
+namespace Web.Domain.Dto.AccessRequest;
 
 public sealed record SubmitAccessRequestDto(
     [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
@@ -69,11 +69,13 @@ public sealed record OperatorCartItemDto(
     int RequestId,
     string TicketNumber,
     string FolderPath,
-    AccessTypes RequestedAccessType,
+    AccessTypes AccessType,
     AccessTypes ConfirmedAccessType,
+    RequestStatus Status,
     string Reason,
     int? HodApproverId,
     int RequesterUserId,
+    string DepartmentName,
     DateTime SubmittedAt
 );
 

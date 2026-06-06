@@ -23,6 +23,7 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" />
     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="TypeGen" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Web.Application.Services;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.FolderMapping;
 
 namespace Web.API.Controllers;
 

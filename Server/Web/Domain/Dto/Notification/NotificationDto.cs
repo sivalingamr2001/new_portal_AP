@@ -1,4 +1,4 @@
-namespace Web.Domain.Dto;
+namespace Web.Domain.Dto.Notification;
 
 public sealed record NotificationDto(
     int AuditId,

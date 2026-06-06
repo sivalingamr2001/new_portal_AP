@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Enums;
 
 namespace Web.API.Controllers;
@@ -13,8 +13,14 @@ public sealed class OperatorCartController(IOperatorCartService service) : Contr
     // GET api/operator-cart?page=1&pageSize=20
     [HttpGet]
     public async Task<IActionResult> GetCart(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
-        => Ok(await service.GetCartAsync(page, pageSize));
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] RequestStatus? status = null)
+    {
+        var result = await service.GetCartAsync(page, pageSize, status);
+        return Ok(result);
+    }
+
 
     // POST api/operator-cart/items/{itemId}/approve
     [HttpPost("items/{itemId:int}/approve")]

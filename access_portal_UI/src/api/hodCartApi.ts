@@ -8,12 +8,18 @@ import type {
 
 export const hodCartApi = {
   getCart: async (
+    userId?: number,
     params?: PaginationParams
   ): Promise<PagedResult<HodCartItemDto>> => {
     try {
+      const queryParams = {
+        ...params,
+        hodDBUserId: userId,
+      }
+
       const response = await apiService.get<PagedResult<HodCartItemDto>>(
         "/hod-cart",
-        { params }
+        { params: queryParams }
       )
       return response.data
     } catch (error) {

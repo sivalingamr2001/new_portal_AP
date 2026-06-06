@@ -1,113 +1,101 @@
-﻿using System.IO;
-using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Web.Domain.Dto.FolderMapping;
+using Web.Infrastructure.Data;
 
-namespace Server.Shared.Helpers;
+namespace Web.Application.Services;
 
-// --- API RESPONSE DTO ---
-public class FolderResponse
+public class FolderService(AppDbContext context)
 {
-    public string DriveName { get; set; } = @"\\10.30.50.15\jipl";
-    public string Name { get; set; } = string.Empty;
-    public List<FolderResponse> Children { get; set; } = new();
-}
-
-// --- INTERNAL PROCESSING STRUCTURE ---
-internal class FolderNode
-{
-    public string Name { get; set; } = string.Empty;
-    public string DriveName { get; set; } = string.Empty;
-    public Dictionary<string, FolderNode> Children { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-}
-
-public class FolderService
-{
-    // Static configuration paths
+    private readonly AppDbContext _context = context;
     private const string TargetRoot = @"\\10.30.50.15\jipl";
-    private static readonly string ConfigFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Shared", "External Sources", "Folders.csv");
-    private static readonly string AuditFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Shared", "External Sources", "ntfs_permissions_audit.csv");
 
     /// <summary>
-    /// Professional Scoped Service method to generate folder hierarchy.
-    /// Strictly filters out unparented segments and files.
+    /// Fetches all distinct folder paths starting with the target root,
+    /// builds a tree structure grouped dynamically by your top-level root directory rules, 
+    /// and streams data using EF streaming to minimize memory usage.
     /// </summary>
-    public List<FolderResponse> GetStrictFolderHierarchy()
+    public async Task<List<FolderResponse>> GetStrictFolderHierarchyAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Initialize strictly with allowed parents from Folders.csv
-        var allowedParentsMap = LoadAllowedParents(ConfigFilePath);
+        // 1. Fetch only the unique folder paths from MySQL matching your target root
+        var folderPaths = await _context.Folders
+            .AsNoTracking()
+            .Where(a => a.FolderPath.StartsWith(TargetRoot))
+            .Select(a => a.FolderPath)
+            .Distinct()
+            .ToListAsync(cancellationToken);
 
-        // 2. Populate from Audit Log
-        if (File.Exists(AuditFilePath))
+        // 2. Load Allowed Parents (Top-level shares directly following the root unc)
+        // Dynamically extract the first subdirectory layer right after "\\10.30.50.15\jipl"
+        var allowedParentsMap = new Dictionary<string, FolderNode>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var fullPath in folderPaths)
         {
-            // 64KB Buffer for high-speed I/O
-            using var reader = new StreamReader(new FileStream(AuditFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536));
-            reader.ReadLine(); // Skip CSV Header
+            var segments = fullPath.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
 
-            while (reader.ReadLine() is { } line)
+            // For path "\\10.30.50.15\jipl\Finance", segments are ["10.30.50.15", "jipl", "Finance"]
+            // The top level parent folder name lives at index 2
+            if (segments.Length > 2)
             {
-                string fullPath = GetColumnValue(line, 2); // Extract 'folderpath' column
-
-                // Root Security Guard
-                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith(TargetRoot, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var segments = fullPath.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
-
-                // Find index where the Allowed Parent exists
-                int parentIdx = -1;
-                for (int i = 0; i < segments.Length; i++)
+                string parentName = segments[2];
+                if (!allowedParentsMap.ContainsKey(parentName))
                 {
-                    if (allowedParentsMap.ContainsKey(segments[i]))
+                    allowedParentsMap[parentName] = new FolderNode
                     {
-                        parentIdx = i;
-                        break;
-                    }
+                        Name = parentName,
+                        DriveName = TargetRoot
+                    };
                 }
 
-                // If an allowed parent is found, build the children recursively from that anchor
-                if (parentIdx != -1)
+                // 3. Build subfolder children paths out into the parent node tree
+                var currentNode = allowedParentsMap[parentName];
+                for (var i = 3; i < segments.Length; i++)
                 {
-                    var currentNode = allowedParentsMap[segments[parentIdx]];
+                    string segmentName = segments[i];
 
-                    for (int j = parentIdx + 1; j < segments.Length; j++)
+                    // Skip file segments containing dots (.zip, .txt, etc.)
+                    if (segmentName.Contains('.')) continue;
+
+                    if (!currentNode.Children.TryGetValue(segmentName, out var childNode))
                     {
-                        string segmentName = segments[j];
-
-                        // Skip files (segments with extensions like .txt)
-                        if (segmentName.Contains('.')) continue;
-
-                        if (!currentNode.Children.TryGetValue(segmentName, out var childNode))
+                        childNode = new FolderNode
                         {
-                            childNode = new FolderNode
-                            {
-                                Name = segmentName,
-                                DriveName = TargetRoot
-                            };
-                            currentNode.Children[segmentName] = childNode;
-                        }
-                        currentNode = childNode;
+                            Name = segmentName,
+                            DriveName = TargetRoot
+                        };
+                        currentNode.Children[segmentName] = childNode;
                     }
+                    currentNode = childNode;
                 }
             }
         }
 
-        // 3. Map to Recursive API-friendly response (Alphabetical A-Z)
+        // 4. Transform into your nested API response sorted alphabetically
         return allowedParentsMap.Values
             .OrderBy(x => x.Name)
             .Select(MapToResponse)
             .ToList();
     }
 
-    public async Task<List<FolderResponse>> GetParentFoldersAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Fast database lookup returning only unique primary base root directories 
+    /// located right below the Target Root directory level.
+    /// </summary>
+    public async Task<List<FolderResponse>> GetParentFoldersAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(ConfigFilePath)) return [];
-
-        var lines = await File.ReadAllLinesAsync(ConfigFilePath, cancellationToken);
-
-        return lines
-            .Skip(1) // Skip header
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(line => line.Split(',')[0].Trim('"').Trim())
+        // Query distinct folder paths starting with target root path string
+        var paths = await _context.Folders
+            .AsNoTracking()
+            .Where(a => a.FolderPath.StartsWith(TargetRoot))
+            .Select(a => a.FolderPath)
             .Distinct()
+            .ToListAsync(cancellationToken);
+
+        // Extract the base level subfolder names (e.g. index 2 in split operation)
+        return paths
+            .Select(path => path.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries))
+            .Where(segments => segments.Length > 2)
+            .Select(segments => segments[2])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(name => name)
             .Select(name => new FolderResponse
             {
@@ -115,26 +103,6 @@ public class FolderService
                 DriveName = TargetRoot
             })
             .ToList();
-    }
-
-    private static Dictionary<string, FolderNode> LoadAllowedParents(string path)
-    {
-        var map = new Dictionary<string, FolderNode>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(path)) return map;
-
-        foreach (var line in File.ReadLines(path).Skip(1))
-        {
-            var name = line.Trim('"', ' ', '\r', '\n');
-            if (!string.IsNullOrWhiteSpace(name) && !map.ContainsKey(name))
-            {
-                map[name] = new FolderNode
-                {
-                    Name = name,
-                    DriveName = TargetRoot
-                };
-            }
-        }
-        return map;
     }
 
     private FolderResponse MapToResponse(FolderNode node)
@@ -148,39 +116,5 @@ public class FolderService
                 .Select(MapToResponse)
                 .ToList()
         };
-    }
-
-    private static string GetColumnValue(string line, int index)
-    {
-        int currentColumn = 0;
-        bool inQuotes = false;
-        StringBuilder sb = new StringBuilder();
-
-        foreach (char c in line)
-        {
-            if (c == '\"') { inQuotes = !inQuotes; continue; }
-            if (c == ',' && !inQuotes)
-            {
-                if (currentColumn == index) return sb.ToString().Trim();
-                currentColumn++;
-                sb.Clear();
-                if (currentColumn > index) return string.Empty;
-                continue;
-            }
-            if (currentColumn == index) sb.Append(c);
-        }
-        return currentColumn == index ? sb.ToString().Trim() : string.Empty;
-    }
-
-    private static IReadOnlyList<string> ReadFoldersFromCsv()
-    {
-        return !File.Exists(ConfigFilePath)
-            ? Array.Empty<string>()
-            : File.ReadAllLines(ConfigFilePath)
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Skip(1)
-            .Select(line => line.Trim().Trim('"'))
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .ToList();
     }
 }

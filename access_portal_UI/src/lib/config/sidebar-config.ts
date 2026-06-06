@@ -1,13 +1,12 @@
 import type { UserRoleType } from "@/components/RoleGuard"
 import {
-  FileText,
+  Building2,
   CheckSquare,
+  FileText,
+  FolderTree,
   LayoutDashboard,
   ShieldCheck,
-  Clock,
-  Users,
-  Building2,
-  FolderTree,
+  Users
 } from "lucide-react"
 
 export interface SidebarGroupItem {

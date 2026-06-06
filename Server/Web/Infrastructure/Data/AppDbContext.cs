@@ -8,6 +8,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
     public DbSet<User> Users => Set<User>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<FolderMappingEntity> FolderMappings => Set<FolderMappingEntity>();
+    public DbSet<JanNtfsPermissionsAudit> Folders => Set<JanNtfsPermissionsAudit>();
     public DbSet<AccessRequestEntity> AccessRequests => Set<AccessRequestEntity>();
     public DbSet<AccessItemEntity> AccessItems => Set<AccessItemEntity>();
     public DbSet<AccessApprovalEntity> AccessApprovals => Set<AccessApprovalEntity>();
@@ -19,7 +20,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
     {
         base.OnModelCreating(modelBuilder);
 
-        // Primary Keys
         modelBuilder.Entity<User>().HasKey(u => u.Id);
         modelBuilder.Entity<Department>().HasKey(d => d.Id);
         modelBuilder.Entity<FolderMappingEntity>().HasKey(f => f.Id);
@@ -73,6 +73,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
         {
             modelBuilder.Ignore<CmplUser>();
             modelBuilder.Ignore<HodMaster>();
+            modelBuilder.Ignore<JanNtfsPermissionsAudit>();
         }
     }
 }

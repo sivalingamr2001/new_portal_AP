@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Web.Application.Interfaces;
 using Web.Application.Services;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Enums;
 
 namespace Web.API.Controllers;
@@ -13,10 +13,10 @@ public sealed class HodCartController(IHodCartService service) : ControllerBase
 {
     // GET api/hod-cart?page=1&pageSize=20
     [HttpGet]
-    public async Task<IActionResult> GetCart(
+    public async Task<IActionResult> GetCart(int hodDBUserId,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var result = await service.GetCartAsync(GetCallerUserId(), page, pageSize);
+        var result = await service.GetCartAsync(hodDBUserId, page, pageSize);
         return Ok(result);
     }
 

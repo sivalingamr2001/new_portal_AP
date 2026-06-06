@@ -1,6 +1,5 @@
 using Web.Domain.Common;
-using Web.Domain.Dto;
-using Web.Domain.Entities;
+using Web.Domain.Dto.Login;
 
 namespace Web.Application.Services;
 

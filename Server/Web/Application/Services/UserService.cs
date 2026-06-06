@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.Login;
 using Web.Domain.Dto.User;
 using Web.Infrastructure.Data;
 

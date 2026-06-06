@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Web.Domain.Dto;
+using Web.Domain.Dto.Dashboard;
 using Web.Domain.Enums;
 using Web.Infrastructure.Data;
 

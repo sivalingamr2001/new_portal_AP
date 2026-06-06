@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Server.Shared.Helpers;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.FolderMapping;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 
@@ -9,7 +8,7 @@ namespace Web.Application.Services;
 
 public sealed class FolderMappingService(
     AppDbContext db,
-    HodDbContext hodDb, FolderService folderService) : IFolderMappingService
+    HodDbContext hodDb, FolderService folderService, FolderServiceLocal serviceLocal) : IFolderMappingService
 {
     public async Task<PagedResult<FolderMappingDto>> GetAllAsync(
         int page, int pageSize, string? search)
@@ -174,12 +173,23 @@ public sealed class FolderMappingService(
 
     public async Task<List<FolderResponse>> GetParentFoldersAsync()
     {
-        return await folderService.GetParentFoldersAsync(CancellationToken.None);
+        bool isTestEnv = db.Database.IsSqlite();
+
+        var result = isTestEnv
+            ? await serviceLocal.GetParentFoldersAsync(CancellationToken.None)
+            : await folderService.GetParentFoldersAsync(CancellationToken.None);
+        return result;
     }
 
-    public Task<List<FolderResponse>> GetFolderHierarchyAsync()
+    public async Task<List<FolderResponse>> GetFolderHierarchyAsync()
     {
-        return Task.FromResult(folderService.GetStrictFolderHierarchy());
+        bool isTestEnv = db.Database.IsSqlite();
+
+        var result = isTestEnv
+            ? serviceLocal.GetStrictFolderHierarchy()
+            : await folderService.GetStrictFolderHierarchyAsync();
+
+        return result;
     }
 
     private static FolderMappingDto MapToDto(FolderMappingEntity f) => new(

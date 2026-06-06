@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Entities;
 using Web.Domain.Enums;
 using Web.Infrastructure.Data;
@@ -11,6 +11,7 @@ namespace Web.Application.Services;
 public sealed class HodCartService(
     AppDbContext db,
     CmplDbContext cmplDb,
+    IUserService userService,
     INotificationService notificationService) : IHodCartService
 {
     public async Task<PagedResult<HodCartItemDto>> GetCartAsync(int hodUserId, int page, int pageSize)
@@ -66,7 +67,12 @@ public sealed class HodCartService(
 
     public async Task<Result> ApproveItemAsync(int accessItemId, AccessTypes ConfirmAccessType, string comments, int hodUserId)
     {
-        var item = await GetOwnedItemAsync(accessItemId, hodUserId, RequestStatus.PendingWithHod);
+        bool isTestEnv = db.Database.IsSqlite();
+        //get portal user data by hodUserId
+        var user = await userService.GetPortalUserByIdAsync(hodUserId);
+        var hoduser = user.Value.HeadOfDepartment.Id;
+
+        var item = await GetOwnedItemAsync(accessItemId, hoduser, RequestStatus.PendingWithHod);
         if (item is null)
         {
             return Result.Failure(Error.NotFound("ITEM_005", "Item not found or not in your cart."));
@@ -75,9 +81,9 @@ public sealed class HodCartService(
         // 1. Update the entity properties in memory
         item.ConfirmAccessType = ConfirmAccessType;
         item.Status = RequestStatus.PendingWithIt;
-        item.HodApproverId = hodUserId;
+        item.HodApproverId = hoduser;
         item.ModifiedOn = DateTime.UtcNow;
-        item.ModifiedBy = hodUserId;
+        item.ModifiedBy = hoduser;
 
         // 2. Mark the entity as modified (Removed 'await' as Update is synchronous)
         db.AccessItems.Update(item);
@@ -87,13 +93,13 @@ public sealed class HodCartService(
         {
             AccessReqId = item.AccessReqId,
             AccessItemId = item.AccessItemId,
-            ApproverId = hodUserId,
+            ApproverId = hoduser,
             ApprovalStatus = RequestStatus.HodApproved,
             ApprovalLevel = "HOD",
             Comments = comments,
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = hodUserId
+            CreatedBy = hoduser
         });
 
         // 4. Stage the audit trail entry
@@ -103,13 +109,13 @@ public sealed class HodCartService(
             AccessItemId = item.AccessItemId,
             EventType = "HodApproved",
             Message = $"HOD approved ticket {item.TicketNumber}. Forwarded to IT.",
-            ActorUserId = hodUserId,
+            ActorUserId = hoduser,
             RecipientUserId = item.AccessRequest?.UserId ?? 0, // Fallback to 0 if AccessRequest isn't eager loaded
             RecipientName = string.Empty,
             RecipientRole = "It",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = hodUserId
+            CreatedBy = hoduser
         });
 
         // 5. Commit all pending database changes in a single transaction
@@ -130,28 +136,34 @@ public sealed class HodCartService(
 
     public async Task<Result> RejectItemAsync(int accessItemId, string rejectionReason, int hodUserId)
     {
-        var item = await GetOwnedItemAsync(accessItemId, hodUserId, RequestStatus.PendingWithHod);
+        bool isTestEnv = db.Database.IsSqlite();
+        //get portal user data by hodUserId
+        var user = await userService.GetPortalUserByIdAsync(hodUserId);
+        var hoduser = user.Value.HeadOfDepartment.Id;
+
+
+        var item = await GetOwnedItemAsync(accessItemId, hoduser, RequestStatus.PendingWithHod);
         if (item is null)
             return Result.Failure(Error.NotFound("ITEM_005",
                 "Item not found or not in your cart."));
 
         item.Status = RequestStatus.HodRejected;
         item.RejectionReason = rejectionReason;
-        item.HodApproverId = hodUserId;
+        item.HodApproverId = hoduser;
         item.ModifiedOn = DateTime.UtcNow;
-        item.ModifiedBy = hodUserId;
+        item.ModifiedBy = hoduser;
 
         db.AccessApprovals.Add(new AccessApprovalEntity
         {
             AccessReqId = item.AccessReqId,
             AccessItemId = item.AccessItemId,
-            ApproverId = hodUserId,
+            ApproverId = hoduser,
             ApprovalStatus = RequestStatus.HodRejected,
             ApprovalLevel = "HOD",
             Comments = rejectionReason,
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = hodUserId
+            CreatedBy = hoduser
         });
 
         db.AccessReqAudits.Add(new AccessReqAuditEntity
@@ -160,13 +172,13 @@ public sealed class HodCartService(
             AccessItemId = item.AccessItemId,
             EventType = "HodRejected",
             Message = $"HOD rejected ticket {item.TicketNumber}: {rejectionReason}",
-            ActorUserId = hodUserId,
+            ActorUserId = hoduser,
             RecipientUserId = item.AccessRequest.UserId,
             RecipientName = string.Empty,
             RecipientRole = "User",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
-            CreatedBy = hodUserId
+            CreatedBy = hoduser
         });
 
         await db.SaveChangesAsync();

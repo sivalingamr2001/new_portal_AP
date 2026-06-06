@@ -1,3 +1,5 @@
+using Web.Domain.Dto.Login;
+
 namespace Web.Domain.Dto.User;
 
 public sealed record CmplUserDto(

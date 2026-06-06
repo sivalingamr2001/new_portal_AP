@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Web.Application.Services;
 using Web.Domain.Common;
-using Web.Domain.Entities;
+using Web.Domain.Dto.Login;
 
 namespace Web.API.Controllers;
 

@@ -1,5 +1,5 @@
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Enums;
 
 namespace Web.Application.Interfaces;
@@ -7,7 +7,7 @@ namespace Web.Application.Interfaces;
 public interface IOperatorCartService
 {
     /// <summary>Returns all items pending IT/Operator approval.</summary>
-    Task<PagedResult<OperatorCartItemDto>> GetCartAsync(int page, int pageSize);
+    Task<PagedResult<OperatorCartItemDto>> GetCartAsync(int page, int pageSize, RequestStatus? status);
 
     /// <summary>Grant access — marks item ItApproved, sets expiry +90 days.</summary>
     Task<Result> ApproveItemAsync(int accessItemId, string comments, int operatorUserId);

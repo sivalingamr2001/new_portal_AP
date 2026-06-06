@@ -1,6 +1,6 @@
 using Web.Application.Services;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.Login;
 using Web.Domain.Dto.User;
 
 namespace Web.Application.Interfaces;

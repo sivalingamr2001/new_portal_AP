@@ -1,5 +1,5 @@
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.AccessRequest;
 
 namespace Web.Application.Services;
 

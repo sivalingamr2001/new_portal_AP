@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Domain.Common;
-using Web.Domain.Dto;
+using Web.Domain.Dto.Login;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 

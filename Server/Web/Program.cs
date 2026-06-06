@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
-using Server.Shared.Helpers;
 using Web.Application.Interfaces;
 using Web.Application.Services;
 using Web.Infrastructure.Data;
@@ -123,6 +122,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IFolderMappingService, FolderMappingService>();
 builder.Services.AddScoped<FolderService>();
+builder.Services.AddScoped<FolderServiceLocal>();
 
 // =========================================================================
 // 6. PIPELINE & MIDDLEWARE BUILD
