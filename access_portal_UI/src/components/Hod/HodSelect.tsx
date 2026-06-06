@@ -4,7 +4,7 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { useEffect, useState } from "react"
 
 export interface SelectedHod {
-    employeeId: string
+    userId: number
     hodName: string
     emailId?: string
 }
@@ -20,9 +20,8 @@ export const HodSelect = ({
     onChange,
     placeholder = "Search and select HOD...",
 }: HodSelectProps) => {
-    const [search, setSearch] = useState(
-        value?.hodName || value?.employeeId || ""
-    )
+    // 1. Initialize search text cleanly from incoming parent state values
+    const [search, setSearch] = useState(value?.hodName || "")
     const [openDropdown, setOpenDropdown] = useState(false)
 
     const {
@@ -45,10 +44,7 @@ export const HodSelect = ({
         },
     })
 
-    useEffect(() => {
-        loadData(1)
-    }, [])
-
+    // Debounced network search triggered when typing
     useEffect(() => {
         const timer = setTimeout(() => {
             loadData(1)
@@ -57,19 +53,23 @@ export const HodSelect = ({
         return () => clearTimeout(timer)
     }, [search])
 
+    // Global document click listener handles window close events
     useEffect(() => {
         const close = () => setOpenDropdown(false)
-
         document.addEventListener("click", close)
-
         return () => {
             document.removeEventListener("click", close)
         }
     }, [])
 
+    // 2. FIX: Synchronize the search box display text when the parent value changes or initializes
     useEffect(() => {
-        if (value) {
-            setSearch(value.hodName || value.employeeId || "")
+        if (value && value.hodName) {
+            setSearch(value.hodName)
+        } else if (value && value.userId > 0) {
+            setSearch(String(value.userId))
+        } else {
+            setSearch("")
         }
     }, [value])
 
@@ -77,7 +77,6 @@ export const HodSelect = ({
         e: React.UIEvent<HTMLDivElement>
     ) => {
         const target = e.currentTarget
-
         const reachedBottom =
             target.scrollTop + target.clientHeight >=
             target.scrollHeight - 50
@@ -88,16 +87,16 @@ export const HodSelect = ({
     }
 
     const handleSelect = (
-        employeeId: string,
+        userId: number,
         hodName: string,
         emailId?: string
     ) => {
+        // 3. FIX: Send structural integer objects back to parent hook validations
         onChange({
-            employeeId,
+            userId: Number(userId),
             hodName,
             emailId,
         })
-
         setSearch(hodName)
         setOpenDropdown(false)
     }
@@ -105,24 +104,21 @@ export const HodSelect = ({
     const normalizedSearch = search.trim().toLowerCase()
 
     const filteredHodList = hodList.filter((hod: any) => {
-        const employeeId = String(hod.employeeId ?? "")
-            .trim()
-            .toLowerCase()
-
-        const hodName = String(hod.hodName ?? hod.name ?? "")
-            .trim()
-            .toLowerCase()
-
-        const email = String(hod.emailId ?? hod.email ?? "")
-            .trim()
-            .toLowerCase()
+        const userIdStr = String(hod.userId || hod.id || "")
+        const hodName = String(hod.hodName || hod.name || "").trim().toLowerCase()
+        const email = String(hod.emailId || hod.email || "").trim().toLowerCase()
 
         if (!normalizedSearch) {
             return true
         }
 
-        return [employeeId, hodName, email].some(value =>
-            value.includes(normalizedSearch)
+        // Avoid filtering out items locally if the search text strictly matches the currently active selection
+        if (value && value.hodName?.toLowerCase() === normalizedSearch) {
+            return true
+        }
+
+        return [userIdStr, hodName, email].some(val =>
+            val.includes(normalizedSearch)
         )
     })
 
@@ -142,50 +138,45 @@ export const HodSelect = ({
             />
 
             {openDropdown && (
-                // Final client-side filter to prevent stale records from previous searches.
                 <div
                     className="absolute top-full z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-md border bg-popover shadow-md"
                     onClick={(e) => e.stopPropagation()}
                     onScroll={handleDropdownScroll}
                 >
+                    {filteredHodList.length === 0 && !loadingHods && (
+                        <div className="p-3 text-center text-sm text-muted-foreground">
+                            No matching HOD records found
+                        </div>
+                    )}
+
                     {filteredHodList.map((hod: any) => {
-                        const uniqueId =
-                            hod.employeeId || "N/A"
-
-                        const displayName =
-                            hod.hodName || hod.name || "N/A"
-
-                        const email =
-                            hod.emailId || hod.email || "No Email"
+                        const uniqueId = Number(hod.userId || hod.id || 0)
+                        const displayName = hod.hodName || hod.name || "N/A"
+                        const email = hod.emailId || hod.email || "No Email"
 
                         const isNoEmail =
                             !email ||
                             email.trim().toLowerCase() === "no email"
 
-                        const isSelected =
-                            value?.employeeId === String(uniqueId)
+                        // 4. FIX: Use matching numeric type checks to identify if active element is selected
+                        const isSelected = Number(value?.userId) === uniqueId
 
                         return (
                             <button
                                 type="button"
                                 key={uniqueId}
-                                className={`w-full px-3 py-2 text-left hover:bg-accent ${isSelected ? "bg-accent" : ""
-                                    }`}
-                                onClick={() =>
-                                    handleSelect(
-                                        String(uniqueId),
-                                        displayName,
-                                        email
-                                    )
-                                }
+                                className={`w-full px-3 py-2 text-left hover:bg-accent text-sm ${
+                                    isSelected ? "bg-accent font-medium text-accent-foreground" : ""
+                                }`}
+                                onClick={() => handleSelect(uniqueId, displayName, email)}
                             >
                                 <div>{displayName}</div>
-
                                 <div
-                                    className={`text-xs ${isNoEmail
-                                        ? "text-destructive"
-                                        : "text-muted-foreground"
-                                        }`}
+                                    className={`text-xs ${
+                                        isNoEmail
+                                            ? "text-destructive"
+                                            : "text-muted-foreground"
+                                    }`}
                                 >
                                     {email}
                                 </div>

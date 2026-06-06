@@ -16,18 +16,21 @@ import { AgreementCheckbox } from "./AgreementsSection"
 import AccessDetailsSection, { type RequestItem } from "./AccessDetailsSection"
 import { UserSection, type UserSectionValue } from "./UserSection"
 import { toast } from "sonner"
-import type { SubmitAccessRequestDto } from "@/api/types"
+import type { AccessTypes, SubmitAccessRequestDto } from "@/api/types"
 import { accessRequestsApi } from "@/api/accessRequestsApi"
+import { notificationsApi } from "@/api/notificationsApi"
 import { usersApi } from "@/api/usersApi"
 
 type CreateRequestModalProps = {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  onSuccess?: () => void
 }
 
 export const CreateRequestModal = ({
   isOpen,
   onOpenChange,
+  onSuccess,
 }: CreateRequestModalProps) => {
   const { currentUser } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
@@ -46,11 +49,12 @@ export const CreateRequestModal = ({
   ) => {
     updateValue(field, fieldValue)
 
-    if (!fieldValue) return
+    if (field !== "userId" || !fieldValue) return
 
-    const response = await usersApi.getPortalUser(
-      field === "userId" ? Number(fieldValue) : undefined
-    )
+    const userId = Number(fieldValue)
+    if (!userId) return
+
+    const response = await usersApi.getPortalUser(userId)
 
     if (!response?.user) return
 
@@ -74,7 +78,7 @@ export const CreateRequestModal = ({
     email: currentUser?.user?.email ?? "",
     itsrNumber: "",
     departmentName: currentUser?.department?.name ?? "",
-    hodId: currentUser?.headOfDepartment?.employeeId ?? 0,
+    hodId: Number(currentUser?.headOfDepartment?.id ?? 0),
     hodName: currentUser?.headOfDepartment?.name ?? "",
     location: currentUser?.user?.location ?? "",
     mobile: currentUser?.user?.mobileNumber ?? "",
@@ -91,14 +95,14 @@ export const CreateRequestModal = ({
     }))
   }
 
-  const normalizeAccessType = (value: string): 0 | 1 | 2 => {
+  const normalizeAccessType = (value: string): AccessTypes => {
     switch (value) {
       case "read-only":
-        return 1
+        return "ReadOnly"
       case "read-write":
-        return 2
+        return "ReadandWrite"
       default:
-        return 0
+        return "NotApplicable"
     }
   }
 
@@ -124,6 +128,10 @@ export const CreateRequestModal = ({
       const requestId = await accessRequestsApi.submitRequest(payload)
 
       if (requestId > 0) {
+        await notificationsApi.getNotifications().catch(() => undefined)
+        window.dispatchEvent(new CustomEvent("notifications:refresh"))
+        onSuccess?.()
+
         toast.success("Access request submitted successfully!")
         setRequestItems([
           {

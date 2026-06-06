@@ -102,33 +102,48 @@ export const EditDepartmentModal = ({
               <label className="text-sm font-medium text-foreground">
                 Assigned HOD
               </label>
-              <Controller
-                control={control}
-                name="hodId"
-                rules={{ required: "Please select an HOD" }}
-                render={({ field }) => (
-                  <HodSelect
-                    value={
-                      field.value
-                        ? {
-                            employeeId: String(field.value),
+
+              {/* FIX: Only mount the Controller once department data is available in state */}
+              {departmentData ? (
+                <Controller
+                  control={control}
+                  name="hodId"
+                  rules={{
+                    required: "Please select an HOD",
+                    validate: (val) => Number(val) > 0 || "Please select an HOD"
+                  }}
+                  render={({ field }) => (
+                    <HodSelect
+                      value={
+                        field.value && Number(field.value) > 0
+                          ? {
+                            userId: Number(field.value),
+                            // Double check all possible backend name locations
                             hodName:
-                              departmentData?.hodName ||
-                              departmentData?.assignedHodName ||
+                              departmentData.hodName ||
+                              departmentData.assignedHodName ||
+                              departmentData.name ||
                               "",
                             emailId:
-                              departmentData?.emailId ||
-                              departmentData?.hodEmail ||
+                              departmentData.emailId ||
+                              departmentData.hodEmail ||
                               "",
                           }
-                        : null
-                    }
-                    onChange={(hod) => {
-                      field.onChange(hod.employeeId)
-                    }}
-                  />
-                )}
-              />
+                          : null
+                      }
+                      onChange={(hod) => {
+                        field.onChange(hod.userId);
+
+                        // OPTIONAL: If your form needs to track the name dynamically to prevent reverting on re-renders
+                        // setValue("hodName", hod.hodName); 
+                      }}
+                    />
+                  )}
+                />
+              ) : (
+                <div className="h-10 w-full animate-pulse rounded-md bg-muted" /> // Standard loading skeleton placeholder
+              )}
+
               {errors.hodId && (
                 <p className="text-xs text-destructive">
                   {errors.hodId.message}

@@ -129,39 +129,39 @@ builder.Services.AddScoped<FolderService>();
 // =========================================================================
 var app = builder.Build();
 
-//using (var scope = app.Services.CreateScope())
-//{
-//    var services = scope.ServiceProvider;
-//    var env = services.GetRequiredService<IWebHostEnvironment>();
-//    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
-//    var db = services.GetRequiredService<AppDbContext>();
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var env = services.GetRequiredService<IWebHostEnvironment>();
+    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
+    var db = services.GetRequiredService<AppDbContext>();
 
-//    if (!isMySql || env.IsDevelopment())
-//    {
-//        try
-//        {
-//            var cmplDb = services.GetRequiredService<CmplDbContext>();
-//            var hodDb = services.GetRequiredService<HodDbContext>();
+    if (!isMySql || env.IsDevelopment())
+    {
+        try
+        {
+            var cmplDb = services.GetRequiredService<CmplDbContext>();
+            var hodDb = services.GetRequiredService<HodDbContext>();
 
-//            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
-//        }
-//        catch (Exception ex)
-//        {
-//            logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
-//        }
-//    }
-//    else
-//    {
-//        try
-//        {
-//            await db.Database.EnsureCreatedAsync();
-//        }
-//        catch (Exception ex)
-//        {
-//            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
-//        }
-//    }
-//}
+            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
+        }
+    }
+    else
+    {
+        try
+        {
+            await db.Database.EnsureCreatedAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
+        }
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {

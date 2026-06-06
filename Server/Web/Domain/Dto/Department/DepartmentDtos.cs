@@ -3,7 +3,7 @@ namespace Web.Domain.Dto.Department;
 public sealed record DepartmentDetailDto(
     int Id,
     string? Name,
-    string? HodId,
+    int? HodId,
     string? HodName,
     string? HodEmail,
     bool IsActive,
@@ -12,5 +12,5 @@ public sealed record DepartmentDetailDto(
 
 public sealed record UpsertDepartmentDto(
     string Name,
-    string? HodId
+    int? HodId
 );

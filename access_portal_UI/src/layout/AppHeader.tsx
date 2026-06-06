@@ -55,6 +55,31 @@ export function AppHeader() {
   useEffect(() => {
     if (!userId) return
 
+    const refreshNotifications = async () => {
+      try {
+        const data = await notificationsApi.getNotifications()
+        setNotifications(data || [])
+        setIsError(false)
+      } catch (error) {
+        console.error("Failed to refresh notifications:", error)
+        setIsError(true)
+      }
+    }
+
+    const handleNotificationsRefresh = () => {
+      void refreshNotifications()
+    }
+
+    window.addEventListener("notifications:refresh", handleNotificationsRefresh)
+
+    return () => {
+      window.removeEventListener("notifications:refresh", handleNotificationsRefresh)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+
     let isMounted = true
     let connection: HubConnection | null = null
 

@@ -17,7 +17,7 @@ public class AccessRequestEntity : BaseEntity
     public int UserId { get; set; }
 
     [Column("req_to")]
-    public int ReqTo { get; set; }
+    public int? ReqTo { get; set; }
 
     [Column("is_agreed")]
     public bool IsAgreed { get; set; }

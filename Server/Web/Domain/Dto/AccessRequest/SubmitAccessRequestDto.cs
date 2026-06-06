@@ -80,8 +80,8 @@ public sealed record OperatorCartItemDto(
 // Action DTOs
 public sealed record ItemActionDto(
     string Reason,
-    AccessTypes? ConfirmAccessType, // Moved up (Required or Nullable, but has no default value)
-    string? Comments = null         // Moved to the absolute end (Optional with default value)
+    AccessTypes? ConfirmAccessType,
+    string? Comments = null
 );
 
 public sealed record OverrideAccessTypeDto(AccessTypes AccessType);

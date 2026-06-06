@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Web.Domain.Common;
 using Web.Domain.Dto;
@@ -12,13 +13,13 @@ public sealed class DepartmentService(
     HodDbContext hodDb) : IDepartmentService
 {
     public async Task<PagedResult<DepartmentDetailDto>> GetAllAsync(
-    int page, int pageSize, string? search)
+        int page, int pageSize, string? search)
     {
         bool isTestEnv = db.Database.IsSqlite();
 
         var query = db.Departments.Where(d => d.IsActive);
 
-        // 1. Fixed Case-Insensitive Server Searching Matching
+        // 1. Case-Insensitive Server Searching
         if (!string.IsNullOrWhiteSpace(search))
         {
             var lowerTerm = search.Trim().ToLower();
@@ -27,41 +28,44 @@ public sealed class DepartmentService(
 
         var total = await query.CountAsync();
         var depts = await query
-            .OrderBy(d => d.Id) // ID 101 will always load first on Page 1
+            .OrderBy(d => d.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        // 2. FIX: Extract HodId values cleanly as STRINGS rather than parsing to integers
-        var hodEmployeeIds = depts
-            .Where(d => !string.IsNullOrWhiteSpace(d.HodId))
-            .Select(d => d.HodId!)
+        // 2. Extract valid HodId values (greater than 0)
+        var hodUserIds = depts
+            .Where(d => d.HodId > 0)
+            .Select(d => d.HodId)
             .Distinct()
             .ToList();
 
-        // 3. FIX: Query HodMasters using EmployeeId and index them into a string-keyed Dictionary
+        // 3. Query HodMasters using the integer UserId, not EmployeeId
         var hodsList = isTestEnv
-            ? await db.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId) && h.Deleted == 0).ToListAsync()
-            : await hodDb.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId) && h.Deleted == 0).ToListAsync();
+            ? await db.HodMasters.Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0).ToListAsync()
+            : await hodDb.HodMasters.Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0).ToListAsync();
 
-        // Materialize using local memory lookup routing safely
-        var hods = hodsList.ToDictionary(h => h.EmployeeId, StringComparer.OrdinalIgnoreCase);
+        // Map into an integer-keyed Dictionary
+        var hods = hodsList.ToDictionary(h => h.UserId);
 
-        // 4. Map the collection with clean, type-safe string-key lookups
+        // 4. Map the collections using integer lookups
         var data = depts.Select(d =>
         {
             HodMaster? hod = null;
-            if (!string.IsNullOrWhiteSpace(d.HodId))
+
+            // Check if HodId has a valid value greater than 0
+            if (d.HodId.HasValue && d.HodId.Value > 0)
             {
-                hods.TryGetValue(d.HodId, out hod);
+                // Use .Value to safely convert int? to int for the dictionary lookup
+                hods.TryGetValue(d.HodId.Value, out hod);
             }
 
             return new DepartmentDetailDto(
                 d.Id,
                 d.Name,
                 d.HodId,
-                hod?.Name,     // Will resolve to "SIVALINGAM R"
-                hod?.Email,    // Will resolve to "it-dev25.g@janatics.co.in"
+                hod?.Name,
+                hod?.Email,
                 d.IsActive,
                 d.CreatedOn);
         }).ToList();
@@ -82,16 +86,13 @@ public sealed class DepartmentService(
                 Error.NotFound("DEPT_001", "Department not found."));
         }
 
-        var hodContext = isTestEnv
-            ? db.HodMasters
-            : hodDb.HodMasters;
-
+        var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
         HodMaster? hod = null;
 
-        hod = await hodContext
-            .FirstOrDefaultAsync(h =>
-                h.EmployeeId == dept.HodId &&
-                h.Deleted == 0);
+        if (dept.HodId > 0)
+        {
+            hod = await hodContext.FirstOrDefaultAsync(h => h.UserId == dept.HodId && h.Deleted == 0);
+        }
 
         return Result.Success(
             new DepartmentDetailDto(
@@ -106,14 +107,17 @@ public sealed class DepartmentService(
 
     public async Task<Result<int>> CreateAsync(UpsertDepartmentDto dto, int createdBy)
     {
-        if (!string.IsNullOrWhiteSpace(dto.HodId))
+        // Assuming dto.HodId arrives as a string/int from request, convert cleanly to integer
+        int targetHodId = 0;
+        if (dto.HodId != null)
         {
-            if (!int.TryParse(dto.HodId, out var hodId))
-                return Result.Failure<int>(
-                    Error.Validation("DEPT_002", "HodId must be a valid integer."));
+            int.TryParse(dto.HodId.ToString(), out targetHodId);
+        }
 
+        if (targetHodId > 0)
+        {
             var hodExists = await hodDb.HodMasters
-                .AnyAsync(h => h.UserId == hodId && h.Deleted == 0);
+                .AnyAsync(h => h.UserId == targetHodId && h.Deleted == 0);
 
             if (!hodExists)
                 return Result.Failure<int>(
@@ -123,7 +127,7 @@ public sealed class DepartmentService(
         var dept = new Department
         {
             Name = dto.Name,
-            HodId = dto.HodId,
+            HodId = targetHodId, // Stores integer directly (0 if invalid/empty)
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = createdBy
@@ -146,33 +150,30 @@ public sealed class DepartmentService(
                 Error.NotFound("DEPT_001", "Department not found."));
         }
 
-        var hodContext = isTestEnv
-            ? db.HodMasters
-            : hodDb.HodMasters;
-
-        if (!string.IsNullOrWhiteSpace(dto.HodId))
+        int targetHodId = 0;
+        if (dto.HodId != null)
         {
-            var hodExists = await hodContext
-                .AnyAsync(h =>
-                    h.EmployeeId == dto.HodId &&
-                    h.Deleted == 0);
+            int.TryParse(dto.HodId.ToString(), out targetHodId);
+        }
+
+        if (targetHodId > 0)
+        {
+            var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
+            var hodExists = await hodContext.AnyAsync(h => h.UserId == targetHodId && h.Deleted == 0);
 
             if (!hodExists)
             {
                 return Result.Failure(
-                    Error.NotFound(
-                        "DEPT_003",
-                        "The specified HOD does not exist."));
+                    Error.NotFound("DEPT_003", "The specified HOD does not exist."));
             }
         }
 
         dept.Name = dto.Name;
-        dept.HodId = dto.HodId;
+        dept.HodId = targetHodId;
         dept.ModifiedOn = DateTime.UtcNow;
         dept.ModifiedBy = updatedBy;
 
         await db.SaveChangesAsync();
-
         return Result.Success();
     }
 

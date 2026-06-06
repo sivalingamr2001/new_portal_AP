@@ -27,12 +27,14 @@ interface FolderMappingModalProps {
   isOpen: boolean
   onClose: () => void
   initialData: FolderMappingDto | null
+  onSuccess?: () => void
 }
 
 export const FolderMappingModal = ({
   isOpen,
   onClose,
   initialData,
+  onSuccess,
 }: FolderMappingModalProps) => {
   const [loading, setLoading] = useState(false)
   const [folders, setFolders] = useState<FolderResponseDto[]>([])
@@ -116,7 +118,11 @@ export const FolderMappingModal = ({
     }
 
     try {
-      await folderMappingsApi.createFolderMapping(payload)
+      if (initialData?.id) {
+        await folderMappingsApi.updateFolderMapping(initialData.id, payload)
+      } else {
+        await folderMappingsApi.createFolderMapping(payload)
+      }
 
       toast.success(
         initialData
@@ -124,6 +130,7 @@ export const FolderMappingModal = ({
           : "Folder mapping created successfully"
       )
 
+      onSuccess?.()
       onClose()
     } catch (err) {
       console.error(
@@ -173,7 +180,7 @@ export const FolderMappingModal = ({
               value={
                 primaryHod
                   ? {
-                      employeeId: primaryHod.id,
+                      userId: Number(primaryHod.id || 0),
                       hodName: primaryHod.hodName || "",
                       emailId: primaryHod.emailId,
                     }
@@ -181,7 +188,7 @@ export const FolderMappingModal = ({
               }
               onChange={(hod) => {
                 setPrimaryHod({
-                  id: hod.employeeId,
+                  id: String(hod.userId),
                   hodName: hod.hodName,
                   emailId: hod.emailId,
                 })
@@ -196,7 +203,7 @@ export const FolderMappingModal = ({
               value={
                 secondaryHod
                   ? {
-                      employeeId: secondaryHod.id,
+                      userId: Number(secondaryHod.id || 0),
                       hodName: secondaryHod.hodName || "",
                       emailId: secondaryHod.emailId,
                     }
@@ -204,7 +211,7 @@ export const FolderMappingModal = ({
               }
               onChange={(hod) => {
                 setSecondaryHod({
-                  id: hod.employeeId,
+                  id: String(hod.userId),
                   hodName: hod.hodName,
                   emailId: hod.emailId,
                 })

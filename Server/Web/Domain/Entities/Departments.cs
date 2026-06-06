@@ -18,5 +18,5 @@ public sealed class Department : BaseEntity
 
     [Column("hod_id")]
     [MaxLength(255)]
-    public string? HodId { get; set; } = string.Empty;
+    public int? HodId { get; set; } = 0;
 }

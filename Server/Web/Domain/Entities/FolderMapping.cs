@@ -19,7 +19,7 @@ public sealed class FolderMappingEntity : BaseEntity
 
     [Column("primary_hod_id")]
     [MaxLength(255)]
-    public string? PrimaryHodId { get; set; }
+    public int? PrimaryHodId { get; set; }
 
     [Column("primary_hod_name")]
     [MaxLength(255)]
@@ -31,7 +31,7 @@ public sealed class FolderMappingEntity : BaseEntity
 
     [Column("secondary_hod_id")]
     [MaxLength(255)]
-    public string? SecondaryHodId { get; set; }
+    public int? SecondaryHodId { get; set; }
 
     [Column("secondary_hod_name")]
     [MaxLength(255)]

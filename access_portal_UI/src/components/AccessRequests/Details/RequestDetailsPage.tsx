@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useSearchParams } from "react-router-dom"
 import { accessRequestsApi, hodCartApi, operatorCartApi } from "@/api"
 import { useAuth } from "@/context/AuthContext"
-import type { AccessRequestDetailDto } from "@/api/types"
+import type { AccessRequestDetailDto, AccessTypes } from "@/api/types"
 import RequestDetails from "./RequestDetailSheet"
 import { toast } from "sonner"
 import { AccessRequestBpf } from "./AccessRequestBpf"
@@ -101,21 +101,35 @@ export const RequestDetailsPage = () => {
     }
   }
 
-  const handleApprove = (itemId: number) => {
+  const handleApprove = (
+    itemId: number,
+    confirmAccessType?: AccessTypes,
+    reason?: string
+  ) => {
     const item = visibleRequest.items.find(
       (candidate) => candidate.itemId === itemId
     )
+    const approvalReason = reason || (item?.status === "PendingWithHod" ? "Approved" : "Provisioned")
 
     if (item?.status === "PendingWithHod") {
       refreshAfterAction(
-        () => hodCartApi.approveItem(itemId, { reason: "Approved" }),
+        () =>
+          hodCartApi.approveItem(itemId, {
+            reason: approvalReason,
+            confirmAccessType,
+            comments: approvalReason,
+          }),
         "Item approved."
       )
       return
     }
 
     refreshAfterAction(
-      () => operatorCartApi.approveItem(itemId, { reason: "Provisioned" }),
+      () =>
+        operatorCartApi.approveItem(itemId, {
+          reason: approvalReason,
+          comments: approvalReason,
+        }),
       "Item provisioned."
     )
   }
@@ -139,9 +153,9 @@ export const RequestDetailsPage = () => {
     )
   }
 
-  const handleRevoke = (itemId: number) => {
+  const handleRevoke = (itemId: number, reason?: string) => {
     refreshAfterAction(
-      () => operatorCartApi.revokeItem(itemId, { reason: "Revoked" }),
+      () => operatorCartApi.revokeItem(itemId, { reason: reason || "Revoked" }),
       "Item revoked."
     )
   }

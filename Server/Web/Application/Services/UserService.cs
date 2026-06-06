@@ -153,21 +153,29 @@ public sealed class UserService(
         // Batch retrieve assigned Departments
         var departments = await db.Departments.Where(d => deptIds.Contains(d.Id)).ToListAsync();
 
-        // Extract unique string HOD Employee IDs linked to these departments
-        var hodEmployeeIds = departments.Where(d => !string.IsNullOrEmpty(d.HodId)).Select(d => d.HodId!).Distinct().ToList();
+        // Extract unique HOD user IDs linked to these departments
+        var hodUserIds = departments
+            .Where(d => d.HodId.HasValue && d.HodId.Value > 0)
+            .Select(d => d.HodId!.Value)
+            .Distinct()
+            .ToList();
 
-        // Batch retrieve assigned HOD profile records based on environment mapping
+        // Batch retrieve assigned HOD profile records based on integer user IDs
         List<HodDto> batchHods = new();
-        if (hodEmployeeIds.Any())
+        if (hodUserIds.Any())
         {
             if (isTestEnv)
             {
-                var masters = await db.HodMasters.Where(h => hodEmployeeIds.Contains(h.EmployeeId)).ToListAsync();
+                var masters = await db.HodMasters
+                    .Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0)
+                    .ToListAsync();
                 batchHods = masters.Select(h => new HodDto(h.UserId, h.Name, h.EmployeeId, h.Email, h.MobileNumber)).ToList();
             }
             else
             {
-                var cmplHods = await hodDb.HodMasters.Where(c => hodEmployeeIds.Contains(c.EmployeeId)).ToListAsync();
+                var cmplHods = await hodDb.HodMasters
+                    .Where(c => hodUserIds.Contains(c.UserId) && c.Deleted == 0)
+                    .ToListAsync();
                 batchHods = cmplHods.Select(c => new HodDto(c.UserId, c.Name, c.EmployeeId, c.Email, c.MobileNumber)).ToList();
             }
         }
@@ -199,9 +207,9 @@ public sealed class UserService(
                 {
                     departmentDto = new DepartmentDto(dept.Id, dept.Name, dept.HodId);
 
-                    if (!string.IsNullOrEmpty(dept.HodId))
+                    if (dept.HodId.HasValue && dept.HodId.Value > 0)
                     {
-                        hodDto = batchHods.FirstOrDefault(h => h.EmployeeId == dept.HodId);
+                        hodDto = batchHods.FirstOrDefault(h => h.Id == dept.HodId.Value);
                     }
                 }
             }
@@ -259,15 +267,14 @@ public sealed class UserService(
                 departmentDto = new DepartmentDto(dept.Id, dept.Name, dept.HodId);
 
                 // Handle HOD lookups by matching HodId string directly with EmployeeId fields
-                if (!string.IsNullOrEmpty(dept.HodId))
+                if (dept.HodId.HasValue && dept.HodId.Value > 0)
                 {
                     if (isTestEnv)
                     {
-                        // Test environment pulls from hodDb mapping directly to EmployeeId
-                        var hodMaster = await db.HodMasters.FirstOrDefaultAsync(c => c.EmployeeId == dept.HodId);
+                        var hodMaster = await db.HodMasters
+                            .FirstOrDefaultAsync(c => c.UserId == dept.HodId.Value && c.Deleted == 0);
                         if (hodMaster is not null)
                         {
-                            // Ensure your HodMasters schema property names match these or adjust accordingly
                             hodDto = new HodDto(
                                 hodMaster.UserId,
                                 hodMaster.Name,
@@ -279,7 +286,8 @@ public sealed class UserService(
                     }
                     else
                     {
-                        var hodCmpl = await hodDb.HodMasters.FirstOrDefaultAsync(c => c.EmployeeId == dept.HodId);
+                        var hodCmpl = await hodDb.HodMasters
+                            .FirstOrDefaultAsync(c => c.UserId == dept.HodId.Value && c.Deleted == 0);
                         if (hodCmpl is not null)
                         {
                             hodDto = new HodDto(
@@ -307,133 +315,19 @@ public sealed class UserService(
     }
 
     public async Task<Result> UpdatePortalUserAsync(
-        int id, UpsertPortalUserDto dto, int updatedBy)
+     int id, UpsertPortalUserDto dto, int updatedBy)
     {
-        // 1. Establish structural cross-table execution tracking strategy safeguards
-        var strategy = db.Database.CreateExecutionStrategy();
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        if (user is null)
+            return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
 
-        return await strategy.ExecuteAsync(async () =>
-        {
-            using var transaction = await db.Database.BeginTransactionAsync();
-            try
-            {
-                // 2. Fetch the target core Access Portal User record
-                var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
-                if (user is null)
-                    return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
+        user.Role = dto.Role;
+        user.Location = dto.Location;
+        user.ModifiedOn = DateTime.UtcNow;
+        user.ModifiedBy = updatedBy;
 
-                // 3. Extract matching profile columns from the underlying Compliance User entity
-                var cmplUser = await db.CmplUsers
-                    .FirstOrDefaultAsync(c => c.Id == dto.CmplUserId);
-
-                if (cmplUser is null)
-                    return Result.Failure(Error.NotFound("USR_003", "Associated compliance user metadata records not found."));
-
-                // Mirror driver detection patterns used in DepartmentService
-                bool isTestEnv = db.Database.IsSqlite();
-                string oldRole = user.Role;
-
-                // Commit basic property mapping modifications
-                user.Role = dto.Role;
-                user.Location = dto.Location;
-                user.ModifiedOn = DateTime.UtcNow;
-                user.ModifiedBy = updatedBy;
-
-                // 4. Case-Insensitive Check: If the target role is changed to "Hod"
-                if (!string.IsNullOrWhiteSpace(user.Role) &&
-                    user.Role.Trim().ToLowerInvariant() == "hod")
-                {
-                    if (!cmplUser.DepartmentId.HasValue || string.IsNullOrWhiteSpace(cmplUser.EmployeeId))
-                    {
-                        return Result.Failure(Error.Validation(
-                            "USR_004",
-                            "Cannot assign HOD role. User lacks an assigned DepartmentId or valid EmployeeId."));
-                    }
-
-                    // Locate the active department record
-                    var assignedDept = await db.Departments
-                        .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
-
-                    if (assignedDept is null)
-                        return Result.Failure(Error.NotFound("DEPT_001", "Associated active department not found."));
-
-                    // Secure Validation Guard: Confirm this user exists in the proper HodMasters context before assigning them
-                    var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
-
-                    var hodExists = await hodContext
-                        .AnyAsync(h =>
-                            h.EmployeeId != null &&
-                            h.EmployeeId.ToLower() == cmplUser.EmployeeId!.ToLower() &&
-                            h.Deleted == 0);
-
-                    if (!hodExists)
-                    {
-                        return Result.Failure(Error.NotFound(
-                            "DEPT_003",
-                            $"The specified HOD record (EmployeeId: {cmplUser.EmployeeId}) does not exist in HodMasters."));
-                    }
-
-                    // If a different user was previously managing this department slot, demote them to "User"
-                    if (!string.IsNullOrWhiteSpace(assignedDept.HodId) &&
-                        assignedDept.HodId.Trim().ToLowerInvariant() != cmplUser.EmployeeId!.Trim().ToLowerInvariant())
-                    {
-                        var oldHodCmpl = await db.CmplUsers
-                            .FirstOrDefaultAsync(c => c.EmployeeId == assignedDept.HodId);
-
-                        if (oldHodCmpl != null)
-                        {
-                            var oldHodPortalUser = await db.Users
-                                .FirstOrDefaultAsync(u => u.Id == oldHodCmpl.Id);
-
-                            if (oldHodPortalUser != null &&
-                                oldHodPortalUser.Role.Trim().ToLowerInvariant() == "hod")
-                            {
-                                oldHodPortalUser.Role = "User"; // Automatic structural demotion tracking
-                                oldHodPortalUser.ModifiedOn = DateTime.UtcNow;
-                                oldHodPortalUser.ModifiedBy = updatedBy;
-                                db.Users.Update(oldHodPortalUser);
-                            }
-                        }
-                    }
-
-                    // Sync the department's HodId with the new manager's EmployeeId
-                    assignedDept.HodId = cmplUser.EmployeeId;
-                    assignedDept.ModifiedOn = DateTime.UtcNow;
-                    assignedDept.ModifiedBy = updatedBy;
-                    db.Departments.Update(assignedDept);
-                }
-
-                // 5. Cleanup Demotion Path: If the user is being changed AWAY from HOD, clear the department slot
-                else if (!string.IsNullOrWhiteSpace(oldRole) &&
-                         oldRole.Trim().ToLowerInvariant() == "hod" &&
-                         cmplUser.DepartmentId.HasValue)
-                {
-                    var originalDept = await db.Departments
-                        .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value && d.IsActive);
-
-                    if (originalDept != null &&
-                        !string.IsNullOrWhiteSpace(originalDept.HodId) &&
-                        originalDept.HodId.Trim().ToLowerInvariant() == cmplUser.EmployeeId!.Trim().ToLowerInvariant())
-                    {
-                        originalDept.HodId = null; // Free up the HOD field
-                        originalDept.ModifiedOn = DateTime.UtcNow;
-                        originalDept.ModifiedBy = updatedBy;
-                        db.Departments.Update(originalDept);
-                    }
-                }
-
-                // Commit atomic updates across tables
-                await db.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return Result.Success();
-            }
-            catch (Exception)
-            {
-                await transaction.RollbackAsync();
-                throw;
-            }
-        });
+        await db.SaveChangesAsync();
+        return Result.Success();
     }
 
     public async Task<Result> DeletePortalUserAsync(int id, int deletedBy)

@@ -23,7 +23,7 @@ public sealed record UserProfile(
 public sealed record DepartmentDto(
     int Id,
     string? Name,
-    string? HodId
+    int? HodId
 );
 
 public sealed record HodDto(

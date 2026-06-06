@@ -45,7 +45,7 @@ public static class AppDataSeeder
             {
                 Id = id,
                 Name = null,
-                HodId = string.Empty
+                HodId = 0
             });
         }
 

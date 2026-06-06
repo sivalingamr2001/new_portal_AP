@@ -6,7 +6,7 @@ export interface AccessItemRequestDto {
 }
 
 export interface SubmitAccessRequestDto {
-  // reqTo?: string | null
+  reqTo?: number | null
   isAgreed: boolean
   itsrNo?: string | null
   items: AccessItemRequestDto[]

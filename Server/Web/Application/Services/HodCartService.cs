@@ -13,18 +13,12 @@ public sealed class HodCartService(
     CmplDbContext cmplDb,
     INotificationService notificationService) : IHodCartService
 {
-    public async Task<PagedResult<HodCartItemDto>> GetCartAsync(
-     string hodEmployeeId, int page, int pageSize)
+    public async Task<PagedResult<HodCartItemDto>> GetCartAsync(int hodUserId, int page, int pageSize)
     {
-        if (string.IsNullOrWhiteSpace(hodEmployeeId))
-        {
-            return new PagedResult<HodCartItemDto>(new List<HodCartItemDto>(), 0, page, pageSize);
-        }
-
         bool isTestEnv = db.Database.IsSqlite();
 
         var deptIds = await db.Departments
-            .Where(d => d.HodId == hodEmployeeId)
+            .Where(d => d.HodId == hodUserId)
             .Select(d => d.Id)
             .ToListAsync();
 
@@ -39,7 +33,7 @@ public sealed class HodCartService(
                 .ToListAsync();
 
         var hodOwnedFolderPaths = await db.FolderMappings
-            .Where(f => f.PrimaryHodId == hodEmployeeId || f.SecondaryHodId == hodEmployeeId)
+            .Where(f => f.PrimaryHodId == hodUserId || f.SecondaryHodId == hodUserId)
             .Select(f => f.FolderName)
             .ToListAsync();
 
@@ -72,7 +66,6 @@ public sealed class HodCartService(
 
     public async Task<Result> ApproveItemAsync(int accessItemId, AccessTypes ConfirmAccessType, string comments, int hodUserId)
     {
-        // Retrieve the item (ensure GetOwnedItemAsync includes/loads .AccessRequest to prevent null references)
         var item = await GetOwnedItemAsync(accessItemId, hodUserId, RequestStatus.PendingWithHod);
         if (item is null)
         {
@@ -195,10 +188,8 @@ public sealed class HodCartService(
     public async Task<Result> ApproveAllInRequestAsync(
         int accessRequestId, string comments, int hodUserId)
     {
-        var hodIdStr = hodUserId.ToString();
-
         var deptIds = await db.Departments
-            .Where(d => d.HodId == hodIdStr && d.IsActive)
+            .Where(d => d.HodId == hodUserId && d.IsActive)
             .Select(d => d.Id)
             .ToListAsync();
 
@@ -208,7 +199,7 @@ public sealed class HodCartService(
             .ToListAsync();
 
         var hodOwnedPaths = await db.FolderMappings
-            .Where(f => f.PrimaryHodId == hodIdStr || f.SecondaryHodId == hodIdStr)
+            .Where(f => f.PrimaryHodId == hodUserId || f.SecondaryHodId == hodUserId)
             .Select(f => f.FolderName)
             .ToListAsync();
 
@@ -262,11 +253,10 @@ public sealed class HodCartService(
     private async Task<AccessItemEntity?> GetOwnedItemAsync(
         int accessItemId, int hodUserId, RequestStatus requiredStatus)
     {
-        var hodIdStr = hodUserId.ToString();
         bool isTestEnv = db.Database.IsSqlite();
 
         var deptIds = await db.Departments
-            .Where(d => d.HodId == hodIdStr && d.IsActive)
+            .Where(d => d.HodId == hodUserId && d.IsActive)
             .Select(d => d.Id)
             .ToListAsync();
 
@@ -279,7 +269,7 @@ public sealed class HodCartService(
             .ToListAsync() ;
 
         var hodPaths = await db.FolderMappings
-            .Where(f => f.PrimaryHodId == hodIdStr || f.SecondaryHodId == hodIdStr)
+            .Where(f => f.PrimaryHodId == hodUserId || f.SecondaryHodId == hodUserId)
             .Select(f => f.FolderName)
             .ToListAsync();
 

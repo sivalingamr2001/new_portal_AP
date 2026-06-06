@@ -25,23 +25,14 @@ public sealed class AccessRequestService(
             ? await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId)
             : await cmplDb.CmplUsers.FirstOrDefaultAsync(u => u.Id == submittedByUserId);
 
-        if (user is null)
-            return Result.Failure<int>(Error.NotFound("REQ_004",
-                "Submitting user was not found."));
-
         if (!dto.IsAgreed)
             return Result.Failure<int>(Error.Validation("REQ_001",
                 "You must agree to the terms before submitting."));
 
-        var reqTo = await ResolveRequestHodUserIdAsync(dto.ReqTo, user, isTestEnv);
-        if (reqTo is null)
-            return Result.Failure<int>(Error.NotFound("REQ_005",
-                "HOD could not be resolved for the submitting user's department."));
-
         var request = new AccessRequestEntity
         {
             UserId = submittedByUserId,
-            ReqTo = reqTo.Value,
+            ReqTo = dto.ReqTo,
             IsAgreed = true,
             CurrentStatus = RequestStatus.PendingWithHod,
             IsActive = true,
@@ -81,7 +72,7 @@ public sealed class AccessRequestService(
         var request = new AccessRequestEntity
         {
             UserId = hodUserId,
-            ReqTo = dto.ReqTo ?? hodUserId,
+            ReqTo = dto.ReqTo,
             IsAgreed = true,
             CurrentStatus = RequestStatus.PendingWithIt,
             IsActive = true,
@@ -274,37 +265,6 @@ public sealed class AccessRequestService(
         return items;
     }
 
-    private async Task<int?> ResolveRequestHodUserIdAsync(
-        int? requestedHodUserId,
-        CmplUser user,
-        bool isTestEnv)
-    {
-        if (requestedHodUserId is > 0)
-            return requestedHodUserId.Value;
-
-        if (user.DepartmentId is null or <= 0)
-            return null;
-
-        var department = await db.Departments
-            .FirstOrDefaultAsync(d => d.Id == user.DepartmentId.Value && d.IsActive);
-
-        if (string.IsNullOrWhiteSpace(department?.HodId))
-            return null;
-
-        var departmentHodId = department.HodId.Trim();
-        var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
-        var departmentHodUserId = int.TryParse(departmentHodId, out var parsedHodUserId)
-            ? parsedHodUserId
-            : (int?)null;
-
-        var hod = await hodContext.FirstOrDefaultAsync(h =>
-            h.Deleted == 0 &&
-            (h.EmployeeId == departmentHodId ||
-             (departmentHodUserId.HasValue && h.UserId == departmentHodUserId.Value)));
-
-        return hod?.UserId;
-    }
-
     private async Task SendSubmissionNotificationsAsync(
         AccessRequestEntity request,
         List<AccessItemEntity> items,
@@ -352,25 +312,29 @@ public sealed class AccessRequestService(
         var hodUserIds = new HashSet<int>();
 
         // Folder's primary HOD
-        if (folderMapping?.PrimaryHodId is not null
-            && int.TryParse(folderMapping.PrimaryHodId, out var foldPrimaryHodId))
-            hodUserIds.Add(foldPrimaryHodId);
+        if (folderMapping?.PrimaryHodId is not null)
+        {
+            hodUserIds.Add(folderMapping.PrimaryHodId.Value);
+        }
 
         // Folder's secondary HOD (if exists)
-        if (folderMapping?.SecondaryHodId is not null
-            && int.TryParse(folderMapping.SecondaryHodId, out var foldSecondHodId))
-            hodUserIds.Add(foldSecondHodId);
+        if (folderMapping?.SecondaryHodId is not null)
+        {
+            hodUserIds.Add(folderMapping.SecondaryHodId.Value);
+        }
 
         // User's department HOD
         var user = await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == actorUserId);
         if (user?.DepartmentId is not null)
         {
             var dept = await db.Departments.FirstOrDefaultAsync(d => d.Id == user.DepartmentId);
-            if (dept?.HodId is not null && int.TryParse(dept.HodId, out var deptHodId))
-                hodUserIds.Add(deptHodId);
+            if (dept?.HodId is not null)
+            {
+                // Use .Value to safely convert the int? to int
+                hodUserIds.Add(dept.HodId.Value);
+            }
         }
 
-        // If folder HOD ≠ user dept HOD, both already added above
         // Notify all resolved HODs
         foreach (var hodId in hodUserIds)
         {

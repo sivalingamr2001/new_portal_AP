@@ -12,6 +12,13 @@ import {
   Trash2,
   X,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type {
   AccessItemDto,
   AccessRequestDetailDto,
@@ -22,9 +29,13 @@ import type {
 interface RequestDetailsProps {
   request: AccessRequestDetailDto
   currentUserRole: string | null
-  onApprove?: (itemId: number) => void
+  onApprove?: (
+    itemId: number,
+    confirmAccessType?: AccessTypes,
+    reason?: string
+  ) => void
   onReject?: (itemId: number, reason: string) => void
-  onRevoke?: (itemId: number) => void
+  onRevoke?: (itemId: number, reason: string) => void
   onResubmit?: (itemId: number, reason: string) => void
   onRenew?: (itemId: number, reason: string) => void
   onExport?: () => void
@@ -195,16 +206,23 @@ function AccessItemCard({
 }: {
   item: AccessItemDto
   currentUserRole: string | null
-  onApprove?: (itemId: number) => void
+  onApprove?: (
+    itemId: number,
+    confirmAccessType?: AccessTypes,
+    reason?: string
+  ) => void
   onReject?: (itemId: number, reason: string) => void
-  onRevoke?: (itemId: number) => void
+  onRevoke?: (itemId: number, reason: string) => void
   onResubmit?: (itemId: number, reason: string) => void
   onRenew?: (itemId: number, reason: string) => void
 }) {
-  const [modal, setModal] = useState<"reject" | "resubmit" | "renew" | null>(
-    null
-  )
+  const [modal, setModal] = useState<
+    "approve" | "reject" | "revoke" | "resubmit" | "renew" | null
+  >(null)
   const [reason, setReason] = useState("")
+  const [confirmAccessType, setConfirmAccessType] = useState<AccessTypes>(
+    item.confirmAccessType ?? item.accessType
+  )
   const isAdmin = currentUserRole === "Admin"
   const isHod = currentUserRole === "Hod" || isAdmin
   const isOperator = currentUserRole === "Operator" || isAdmin
@@ -221,8 +239,11 @@ function AccessItemCard({
   const showActions =
     canHodReview || canOperatorReview || canRevoke || canResubmit || canRenew
 
-  const openModal = (nextModal: "reject" | "resubmit" | "renew") => {
+  const openModal = (
+    nextModal: "approve" | "reject" | "revoke" | "resubmit" | "renew"
+  ) => {
     setReason("")
+    setConfirmAccessType(item.confirmAccessType ?? item.accessType)
     setModal(nextModal)
   }
 
@@ -233,11 +254,25 @@ function AccessItemCard({
 
   const submitModal = () => {
     const trimmedReason = reason.trim()
-    if (!trimmedReason) return
+    const actionReason =
+      trimmedReason ||
+      (modal === "approve"
+        ? canHodReview
+          ? "Approved"
+          : "Provisioned"
+        : modal === "revoke"
+          ? "Revoked"
+          : modal === "resubmit"
+            ? "Resubmitted"
+            : "Renewed")
 
-    if (modal === "reject") onReject?.(item.itemId, trimmedReason)
-    if (modal === "resubmit") onResubmit?.(item.itemId, trimmedReason)
-    if (modal === "renew") onRenew?.(item.itemId, trimmedReason)
+    if (modal === "approve") {
+      onApprove?.(item.itemId, confirmAccessType, actionReason)
+    }
+    if (modal === "reject") onReject?.(item.itemId, actionReason)
+    if (modal === "revoke") onRevoke?.(item.itemId, actionReason)
+    if (modal === "resubmit") onResubmit?.(item.itemId, actionReason)
+    if (modal === "renew") onRenew?.(item.itemId, actionReason)
 
     closeModal()
   }
@@ -312,7 +347,7 @@ function AccessItemCard({
                 label="Approve"
                 icon={Check}
                 variant="success"
-                onClick={() => onApprove?.(item.itemId)}
+                onClick={() => openModal("approve")}
               />
             </>
           )}
@@ -329,7 +364,7 @@ function AccessItemCard({
                 label="Provision"
                 icon={Check}
                 variant="success"
-                onClick={() => onApprove?.(item.itemId)}
+                onClick={() => openModal("approve")}
               />
             </>
           )}
@@ -339,7 +374,7 @@ function AccessItemCard({
               label="Revoke"
               icon={Trash2}
               variant="warning"
-              onClick={() => onRevoke?.(item.itemId)}
+              onClick={() => openModal("revoke")}
             />
           )}
 
@@ -361,19 +396,27 @@ function AccessItemCard({
         </div>
       )}
 
-      <ReasonModal
+      <ActionModal
         isOpen={modal !== null}
         title={
-          modal === "reject"
-            ? "Reject Access"
-            : modal === "renew"
-              ? "Renew Access"
-              : "Resubmit Access"
+          modal === "approve"
+            ? "Approve Access"
+            : modal === "reject"
+              ? "Reject Access"
+              : modal === "revoke"
+                ? "Revoke Access"
+                : modal === "renew"
+                  ? "Renew Access"
+                  : "Resubmit Access"
         }
         reason={reason}
         onReasonChange={setReason}
+        confirmAccessType={confirmAccessType}
+        showConfirmAccessType={modal === "approve" && canHodReview}
+        onConfirmAccessTypeChange={setConfirmAccessType}
         onCancel={closeModal}
         onSubmit={submitModal}
+        submitLabel={modal === "approve" ? "Approve" : modal === "revoke" ? "Revoke" : modal === "reject" ? "Reject" : modal === "renew" ? "Renew" : "Resubmit"}
       />
     </article>
   )
@@ -411,20 +454,28 @@ function ActionButton({
   )
 }
 
-function ReasonModal({
+function ActionModal({
   isOpen,
   title,
   reason,
+  confirmAccessType,
+  showConfirmAccessType,
   onReasonChange,
+  onConfirmAccessTypeChange,
   onCancel,
   onSubmit,
+  submitLabel,
 }: {
   isOpen: boolean
   title: string
   reason: string
+  confirmAccessType?: AccessTypes
+  showConfirmAccessType?: boolean
   onReasonChange: (reason: string) => void
+  onConfirmAccessTypeChange?: (value: AccessTypes) => void
   onCancel: () => void
   onSubmit: () => void
+  submitLabel: string
 }) {
   if (!isOpen) return null
 
@@ -432,11 +483,35 @@ function ReasonModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
         <h3 className="text-base font-semibold">{title}</h3>
+
+        {showConfirmAccessType && (
+          <div className="mt-4 space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Confirm Access Type
+            </label>
+            <Select
+              value={confirmAccessType}
+              onValueChange={(value) =>
+                onConfirmAccessTypeChange?.(value as AccessTypes)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select access type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NotApplicable">Not Applicable</SelectItem>
+                <SelectItem value="ReadOnly">Read Only</SelectItem>
+                <SelectItem value="ReadandWrite">Read & Write</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <textarea
           rows={4}
           value={reason}
           onChange={(event) => onReasonChange(event.target.value)}
-          placeholder="Enter reason"
+          placeholder="Enter reason or comments"
           className="mt-4 w-full rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
         />
         <div className="mt-4 flex justify-end gap-2">
@@ -449,11 +524,10 @@ function ReasonModal({
           </button>
           <button
             type="button"
-            disabled={!reason.trim()}
             onClick={onSubmit}
-            className="h-9 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            className="h-9 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground"
           >
-            Submit
+            {submitLabel}
           </button>
         </div>
       </div>
@@ -476,7 +550,7 @@ function DetailRow({
         <Icon className="h-3.5 w-3.5 shrink-0" />
         <span>{label}</span>
       </div>
-      <div className="text-sm font-medium break-words text-foreground">
+      <div className="text-sm font-medium break-all text-foreground">
         {value}
       </div>
     </div>
