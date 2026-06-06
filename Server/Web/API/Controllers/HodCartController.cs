@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Web.Application.Services;
+using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Enums;
@@ -13,11 +13,21 @@ public sealed class HodCartController(IHodCartService service) : ControllerBase
     // GET api/hod-cart?page=1&pageSize=20
     [HttpGet]
     public async Task<IActionResult> GetCart(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        [FromQuery] string employeeId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await service.GetCartAsync(GetCallerUserId(), page, pageSize);
+        // 2. Pass both IDs to the service layer to validate the relationship and fetch data
+        var result = await service.GetCartAsync(employeeId, page, pageSize);
+
+        if (result == null)
+        {
+            return NotFound($"Cart not found for employee ID: {employeeId}");
+        }
+
         return Ok(result);
     }
+
 
     [HttpPost("items/{itemId:int}/approve")]
     public async Task<IActionResult> Approve(int itemId, [FromBody] ItemActionDto dto)

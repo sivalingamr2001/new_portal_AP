@@ -10,6 +10,9 @@ public sealed class CmplUser
     [Column("CMPL_USER_NAME")]
     public string? Name { get; set; }
 
+    [Column("CMPL_USER_KEY")]
+    public string? Password { get; set; }
+
     [Column("emp_id")]
     public string? EmployeeId { get; set; }
 

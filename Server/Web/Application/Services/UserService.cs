@@ -264,7 +264,7 @@ public sealed class UserService(
                     if (isTestEnv)
                     {
                         // Test environment pulls from hodDb mapping directly to EmployeeId
-                        var hodMaster = await hodDb.HodMasters.FirstOrDefaultAsync(c => c.EmployeeId == dept.HodId);
+                        var hodMaster = await db.HodMasters.FirstOrDefaultAsync(c => c.EmployeeId == dept.HodId);
                         if (hodMaster is not null)
                         {
                             // Ensure your HodMasters schema property names match these or adjust accordingly

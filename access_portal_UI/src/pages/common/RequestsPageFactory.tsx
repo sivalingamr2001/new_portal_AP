@@ -3,6 +3,7 @@ import type {
   AccessRequestSummaryDto,
   PagedResult,
 } from "@/api/types"
+import { usersApi } from "@/api/usersApi"
 import { CreateRequestModal } from "@/components/AccessRequests/create-request-modal"
 import { DataGrid } from "@/components/DynamicGrid/Index"
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,9 @@ export const RequestsPageFactory = ({
   const { loading, withLoader } = useLoader()
   const [requests, setRequests] = useState<AccessRequestSummaryDto[]>([])
   const [createRequestModalOpen, setCreateRequestModalOpen] = useState(false)
+
+  // New State: Cache for user names indexed by their user ID string or number
+  const [userNames, setUserNames] = useState<Record<string | number, string>>({})
   const navigate = useNavigate()
 
   const { title } = useMemo(
@@ -48,9 +52,7 @@ export const RequestsPageFactory = ({
   )
 
   const fetchRequests = useCallback(async () => {
-    // Fallback checks for different user types
-    const targetId =
-      currentUser?.user?.id ?? ""
+    const targetId = currentUser?.user?.id ?? ""
 
     try {
       const result = await withLoader(() =>
@@ -60,16 +62,69 @@ export const RequestsPageFactory = ({
     } catch (error) {
       console.error("Error fetching requests:", error)
     }
-  }, [currentUser, fetchApiFn, withLoader, location.pathname])
+  }, [currentUser, fetchApiFn, withLoader])
 
   useEffect(() => {
     fetchRequests()
   }, [fetchRequests])
 
+  // New Effect: Detects new rows, extracts distinct IDs, and fetches user names concurrently
+  useEffect(() => {
+    const loadMissingNames = async () => {
+      if (!requests || requests.length === 0) return
+
+      // Find all unique user IDs across the flat request structures safely
+      const uniqueUserIds = new Set<string | number>()
+
+      requests.forEach((req: any) => {
+        if (req?.requesterUserId) uniqueUserIds.add(req.requesterUserId)
+        if (req?.requestedBy) uniqueUserIds.add(req.requestedBy)
+
+        // Also check nested structural arrays if present
+        const items = Array.isArray(req?.items) ? req.items : []
+        items.forEach((item: any) => {
+          if (item?.requesterUserId) uniqueUserIds.add(item.requesterUserId)
+        })
+      })
+
+      // Select only user IDs that haven't been fetched and stored in our state yet
+      const missingIds = Array.from(uniqueUserIds).filter(id => !userNames[id])
+      if (missingIds.length === 0) return
+
+      const updatedNamesMap = { ...userNames }
+
+      // Fetch names concurrently using Promise.all to maximize performance
+      await Promise.all(
+        missingIds.map(async (id) => {
+          try {
+            const numId = typeof id === "string" ? parseInt(id, 10) : id
+            if (isNaN(numId)) return
+
+            const profile = await usersApi.getPortalUser(numId)
+            updatedNamesMap[id] = profile?.user?.name || `User #${id}`
+          } catch (error) {
+            console.error(`Error resolving name for user ID ${id}:`, error)
+            updatedNamesMap[id] = `User #${id}` // Safe display fallback
+          }
+        })
+      )
+
+      setUserNames(updatedNamesMap)
+    }
+
+    loadMissingNames()
+  }, [requests, userNames])
+
   const handleActionClick = (data: any): void => {
-    const itemQuery = data.itemId ? `?itemId=${data.itemId}` : ""
-    navigate(`${actionButtonRoutePrefix}/${data.requestId}${itemQuery}`)
-  }
+    // 1. Ensure we fall back to item ID variations safely based on payload structure
+    const currentItemId = data.itemId;
+
+    // 2. Format query parameter string cleanly
+    const itemQuery = currentItemId ? `?itemId=${currentItemId}` : "";
+
+    // 3. Force routing strictly to your matching application path pattern
+    navigate(`/request/${data.requestId}${itemQuery}`);
+  };
 
   const flattenedRowData = useMemo(() => {
     return requests.flatMap((req: any) => {
@@ -82,18 +137,24 @@ export const RequestsPageFactory = ({
             ? [req]
             : []
 
-      return items.map((item) => ({
-        requestId: req.requestId,
-        itemId: item.itemId,
-        ticketNumber: item.ticketNumber,
-        folderPath: item.folderPath,
-        accessType: item.accessType ?? item.accessType,
-        status: item.status ?? req.currentStatus,
-        requestedBy: req.requestedBy,
-        department: req.department,
-      }))
+      return items.map((item: any) => {
+        // Retrieve the current entity's relevant user ID
+        const targetUserId = item?.requesterUserId || req?.requesterUserId || req?.requestedBy
+
+        return {
+          requestId: req.requestId ?? item.requestId,
+          itemId: item.itemId,
+          ticketNumber: item.ticketNumber,
+          folderPath: item.folderPath,
+          accessType: item.accessType ?? item.accessType,
+          status: item.status ?? req.currentStatus,
+          // Map to cached API name if available; fall back to original property
+          requestedBy: userNames[targetUserId] || req.requestedBy || `User #${targetUserId}`,
+          department: req.department,
+        }
+      })
     })
-  }, [requests])
+  }, [requests, userNames]) // Recalculates dynamically when userNames updates
 
   const coreColumns = useMemo<
     (Omit<ColDef<any>, "field"> & { field?: string })[]

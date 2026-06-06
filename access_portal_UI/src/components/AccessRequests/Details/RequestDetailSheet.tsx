@@ -205,10 +205,10 @@ function AccessItemCard({
     null
   )
   const [reason, setReason] = useState("")
-  const isAdmin = currentUserRole === "ADMIN"
-  const isHod = currentUserRole === "HOD" || isAdmin
-  const isOperator = currentUserRole === "OPERATOR" || isAdmin
-  const isUser = currentUserRole === "USER"
+  const isAdmin = currentUserRole === "Admin"
+  const isHod = currentUserRole === "Hod" || isAdmin
+  const isOperator = currentUserRole === "Operator" || isAdmin
+  const isUser = currentUserRole === "User"
   const canHodReview = isHod && item.status === "PendingWithHod"
   const canOperatorReview =
     isOperator &&

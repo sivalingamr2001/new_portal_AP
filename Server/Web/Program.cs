@@ -129,8 +129,8 @@ builder.Services.AddScoped<FolderService>();
 // =========================================================================
 var app = builder.Build();
 
-// using (var scope = app.Services.CreateScope())
-// {
+//using (var scope = app.Services.CreateScope())
+//{
 //    var services = scope.ServiceProvider;
 //    var env = services.GetRequiredService<IWebHostEnvironment>();
 //    var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
@@ -161,7 +161,7 @@ var app = builder.Build();
 //            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
 //        }
 //    }
-// }
+//}
 
 if (app.Environment.IsDevelopment())
 {

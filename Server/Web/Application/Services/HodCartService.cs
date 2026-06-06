@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Entities;
@@ -13,16 +14,17 @@ public sealed class HodCartService(
     INotificationService notificationService) : IHodCartService
 {
     public async Task<PagedResult<HodCartItemDto>> GetCartAsync(
-        int hodUserId, int page, int pageSize)
+     string hodEmployeeId, int page, int pageSize)
     {
+        if (string.IsNullOrWhiteSpace(hodEmployeeId))
+        {
+            return new PagedResult<HodCartItemDto>(new List<HodCartItemDto>(), 0, page, pageSize);
+        }
+
         bool isTestEnv = db.Database.IsSqlite();
-        var hodIdStr = hodUserId.ToString();
 
-        var fTotal = await db.Departments.Where(d => d.HodId == hodIdStr).CountAsync();
-
-        // Items from users in HOD's department
         var deptIds = await db.Departments
-            .Where(d => d.HodId == hodIdStr)
+            .Where(d => d.HodId == hodEmployeeId)
             .Select(d => d.Id)
             .ToListAsync();
 
@@ -36,13 +38,11 @@ public sealed class HodCartService(
                 .Select(u => u.Id)
                 .ToListAsync();
 
-        // Folder paths owned by this HOD
         var hodOwnedFolderPaths = await db.FolderMappings
-            .Where(f => f.PrimaryHodId == hodIdStr || f.SecondaryHodId == hodIdStr)
+            .Where(f => f.PrimaryHodId == hodEmployeeId || f.SecondaryHodId == hodEmployeeId)
             .Select(f => f.FolderName)
             .ToListAsync();
 
-        // Combine: items pending HOD approval for dept-users OR HOD-owned folders
         var query = db.AccessItems
             .Include(i => i.AccessRequest)
             .Where(i => i.Status == RequestStatus.PendingWithHod
@@ -59,6 +59,7 @@ public sealed class HodCartService(
                 i.AccessReqId,
                 i.TicketNumber,
                 i.FolderPath,
+                i.Status,
                 i.AccessType,
                 i.Reason,
                 i.AccessRequest.UserId,

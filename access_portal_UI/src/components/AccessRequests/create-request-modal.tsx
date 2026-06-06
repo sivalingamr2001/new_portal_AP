@@ -74,6 +74,7 @@ export const CreateRequestModal = ({
     email: currentUser?.user?.email ?? "",
     itsrNumber: "",
     departmentName: currentUser?.department?.name ?? "",
+    hodId: currentUser?.headOfDepartment?.employeeId ?? 0,
     hodName: currentUser?.headOfDepartment?.name ?? "",
     location: currentUser?.user?.location ?? "",
     mobile: currentUser?.user?.mobileNumber ?? "",
@@ -107,6 +108,7 @@ export const CreateRequestModal = ({
 
     try {
       const payload: SubmitAccessRequestDto = {
+        reqTo: value.hodId,
         isAgreed: value.agreementAccepted,
         itsrNo: value.itsrNumber || null,
         items: requestItems.map((item) => ({

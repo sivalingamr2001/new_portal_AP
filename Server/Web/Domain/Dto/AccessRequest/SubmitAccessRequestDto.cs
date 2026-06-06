@@ -57,6 +57,7 @@ public sealed record HodCartItemDto(
     int RequestId,
     string TicketNumber,
     string FolderPath,
+    RequestStatus Status,
     AccessTypes AccessType,
     string Reason,
     int RequesterUserId,

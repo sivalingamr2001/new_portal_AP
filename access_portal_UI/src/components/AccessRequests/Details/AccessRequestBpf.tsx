@@ -48,7 +48,7 @@ export function AccessRequestBpf({ status }: BpfProgressProps) {
 
   return (
     <div className="shrink-0 rounded-2xl">
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-2 flex items-center justify-between gap-4">
         <div>
           <p className="text-xs tracking-[0.25em] text-muted-foreground uppercase">
             Current Status
@@ -67,7 +67,7 @@ export function AccessRequestBpf({ status }: BpfProgressProps) {
         </span>
       </div>
 
-      <div className="relative mb-5">
+      <div className="relative">
         {/* Background Line */}
         <div className="absolute top-4 left-0 h-1 w-full rounded-full bg-slate-200" />
 

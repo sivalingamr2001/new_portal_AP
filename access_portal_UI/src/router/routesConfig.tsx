@@ -53,6 +53,10 @@ export const routesConfig: RouteObject[] = [
             path: "/profile",
             element: withSuspense(Pages.UserProfilePage),
           },
+          {
+            path: "/request/:requestId",
+            element: withSuspense(Pages.RequestDetailsPage),
+          },
 
           // --- USER PATHS ---
           {
@@ -61,10 +65,6 @@ export const routesConfig: RouteObject[] = [
               {
                 path: "/my-requests",
                 element: withSuspense(Pages.MyRequestsPage),
-              },
-              {
-                path: "/request/:requestId",
-                element: withSuspense(Pages.RequestDetailsPage),
               },
             ],
           },

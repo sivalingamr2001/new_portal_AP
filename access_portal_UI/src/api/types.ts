@@ -6,7 +6,7 @@ export interface AccessItemRequestDto {
 }
 
 export interface SubmitAccessRequestDto {
-  reqTo?: number | null
+  // reqTo?: string | null
   isAgreed: boolean
   itsrNo?: string | null
   items: AccessItemRequestDto[]
@@ -286,3 +286,4 @@ export interface Result<T> {
   error: { message: string } | null
   value: T | undefined
 }
+

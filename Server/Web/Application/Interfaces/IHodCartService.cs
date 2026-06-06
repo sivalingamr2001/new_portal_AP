@@ -2,7 +2,7 @@ using Web.Domain.Common;
 using Web.Domain.Dto;
 using Web.Domain.Enums;
 
-namespace Web.Application.Services;
+namespace Web.Application.Interfaces;
 
 public interface IHodCartService
 {
@@ -12,7 +12,7 @@ public interface IHodCartService
     ///   (a) users whose dept.hod_id == this HOD's userId
     ///   (b) folder mappings where primary_hod_id or secondary_hod_id == this HOD's userId
     /// </summary>
-    Task<PagedResult<HodCartItemDto>> GetCartAsync(int hodUserId, int page, int pageSize);
+    Task<PagedResult<HodCartItemDto>> GetCartAsync(string hodEmployeeId, int page, int pageSize);
 
     /// <summary>Approve a single access item — moves to PendingWithIt.</summary>
     Task<Result> ApproveItemAsync(int accessItemId, AccessTypes confirmAccessType, string comments, int hodUserId);
