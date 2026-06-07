@@ -11,10 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 // =========================================================================
 // 1. CONFIGURATION & VARIABLES
 // =========================================================================
+var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
+var providerName = dbProvider?.Trim();
+bool isMySql = !string.IsNullOrEmpty(providerName) && providerName.Equals("MySQL", StringComparison.OrdinalIgnoreCase);
+
+var defaultConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
 var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
-var serverVersion = ServerVersion.AutoDetect(connectionStringCmpl);
-var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
+var sqliteConnection = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
 
 // =========================================================================
 // 2. CORE SYSTEM SERVICES
@@ -74,30 +78,50 @@ builder.Services.AddCors(opts =>
 // =========================================================================
 // 4. DATABASE CONTEXTS
 // =========================================================================
-var providerName = dbProvider?.Trim();
-bool isMySql = !string.IsNullOrEmpty(providerName) && providerName.Equals("MySQL", StringComparison.OrdinalIgnoreCase);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (isMySql)
     {
-        var conn = builder.Configuration.GetConnectionString("DefaultConnection");
-        options.UseMySql(conn, ServerVersion.AutoDetect(conn));
+        var conn = defaultConnectionString ?? throw new InvalidOperationException("The DefaultConnection string is required when using MySQL provider.");
+        var serverVersion = ServerVersion.AutoDetect(conn);
+        options.UseMySql(conn, serverVersion);
     }
     else
     {
-        var conn = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
-        options.UseSqlite(conn);
+        options.UseSqlite(sqliteConnection);
     }
 });
 
 // Always register secondary contexts in the main container line
 // AppDbContext handles conditional masking internally via OnModelCreating
 builder.Services.AddDbContext<CmplDbContext>(options =>
-    options.UseMySql(connectionStringCmpl, serverVersion));
+{
+    if (isMySql)
+    {
+        var conn = connectionStringCmpl ?? throw new InvalidOperationException("The MySQLConnection_CMPL string is required when using MySQL provider.");
+        var serverVersion = ServerVersion.AutoDetect(conn);
+        options.UseMySql(conn, serverVersion);
+    }
+    else
+    {
+        options.UseSqlite(sqliteConnection);
+    }
+});
 
 builder.Services.AddDbContext<HodDbContext>(options =>
-    options.UseMySql(connectionStringHod, serverVersion));
+{
+    if (isMySql)
+    {
+        var conn = connectionStringHod ?? throw new InvalidOperationException("The MySQLConnection_HOD string is required when using MySQL provider.");
+        var serverVersion = ServerVersion.AutoDetect(conn);
+        options.UseMySql(conn, serverVersion);
+    }
+    else
+    {
+        options.UseSqlite(sqliteConnection);
+    }
+});
 
 // =========================================================================
 // 5. APPLICATION SERVICES (DI REGISTRATION)
