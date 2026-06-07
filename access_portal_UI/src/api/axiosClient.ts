@@ -17,15 +17,33 @@ export class ApiException extends Error {
   constructor(apiError: ApiError, httpStatus: number) {
     super(apiError.message)
     this.name = "ApiException"
-
     this.apiError = apiError
     this.httpStatus = httpStatus
   }
 }
 
-const rawData: any = sessionStorage.getItem("jan_AP_user")
-const session = JSON.parse(rawData)
-const userId = session?.user?.id ?? session?.id ?? session?.value?.user?.id
+/**
+ * Reads the stored session and extracts userId.
+ * Handles both the old shape ({ user: { id } }) and the new backend shape
+ * ({ userId }) so the transition doesn't break existing sessions.
+ */
+function getStoredUserId(): number | null {
+  try {
+    const raw = sessionStorage.getItem("jan_AP_user")
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    // New shape: AuthSessionResponseDto stored directly or under .value
+    const session = parsed?.value ?? parsed
+    return (
+      session?.userId ??        // new backend shape
+      session?.user?.id ??      // old shape (user.id)
+      session?.id ??            // fallback
+      null
+    )
+  } catch {
+    return null
+  }
+}
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: ENV_CONFIG?.BASE_API_URL ?? "/api",
@@ -35,6 +53,7 @@ const axiosInstance: AxiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const userId = getStoredUserId()
     if (userId) {
       config.headers["X-User-Id"] = userId
     }
@@ -50,9 +69,7 @@ axiosInstance.interceptors.response.use(
     if (response) {
       const data = response.data
       if (data && typeof data === "object" && "code" in data) {
-        return Promise.reject(
-          new ApiException(data as ApiError, response.status)
-        )
+        return Promise.reject(new ApiException(data as ApiError, response.status))
       }
       return Promise.reject(
         new ApiException(
@@ -79,29 +96,16 @@ axiosInstance.interceptors.response.use(
 )
 
 export const apiService = {
-  get: <T>(
-    url: string,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> => axiosInstance.get<T>(url, config),
-  post: <T>(
-    url: string,
-    data?: unknown,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> => axiosInstance.post<T>(url, data, config),
-  put: <T>(
-    url: string,
-    data?: unknown,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> => axiosInstance.put<T>(url, data, config),
-  patch: <T>(
-    url: string,
-    data?: unknown,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> => axiosInstance.patch<T>(url, data, config),
-  delete: <T>(
-    url: string,
-    config?: AxiosRequestConfig
-  ): Promise<AxiosResponse<T>> => axiosInstance.delete<T>(url, config),
+  get: <T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> =>
+    axiosInstance.get<T>(url, config),
+  post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> =>
+    axiosInstance.post<T>(url, data, config),
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> =>
+    axiosInstance.put<T>(url, data, config),
+  patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> =>
+    axiosInstance.patch<T>(url, data, config),
+  delete: <T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> =>
+    axiosInstance.delete<T>(url, config),
 }
 
 export default axiosInstance

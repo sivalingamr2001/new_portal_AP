@@ -1,146 +1,18 @@
-export interface AccessItemRequestDto {
-  folderPath: string
-  accessType: AccessTypes
-  confirmAccessType?: AccessTypes
-  reason: string
-}
+// ─── Enums ────────────────────────────────────────────────────────────────────
 
-export interface SubmitAccessRequestDto {
-  reqTo?: number | null
-  isAgreed: boolean
-  itsrNo?: string | null
-  items: AccessItemRequestDto[]
-}
+export type AccessTypes = "NotApplicable" | "ReadOnly" | "ReadAndWrite"
 
-export interface AccessItemDto {
-  itemId: number
-  ticketNumber: string
-  folderPath: string
-  accessType: AccessTypes
-  requestedAtUtc?: string
-  confirmAccessType: AccessTypes
-  status: RequestStatus
-  reason: string
-  rejectionReason: string | null
-  approvedAtUtc: string | null
-  expiresAtUtc: string | null
-}
+export type RequestStatus =
+  | "Pending"
+  | "Approved"
+  | "Rejected"
+  | "ApprovedByHod"
+  | "Completed"
+  | "Revoked"
+  | "Expired"
+  | "ItemRejectedByIt"
 
-export interface AccessRequestDetailDto {
-  requestId: number
-  userId: number
-  currentStatus: RequestStatus
-  itsrNo: string | null
-  createdOn: string
-  items: AccessItemDto[]
-}
-
-export interface AccessRequestSummaryDto {
-  requestId: number
-  currentStatus: RequestStatus
-  itsrNo: string | null
-  createdOn: string
-  items: AccessItemDto
-  totalItems?: number
-  approvedItems: number
-  rejectedItems: number
-}
-
-export interface ItemActionDto {
-  reason: string
-  confirmAccessType?: AccessTypes | null
-  comments?: string | null
-}
-
-// ─── Notification Types ────────────────────────────────────────────────────────────────────
-
-export interface NotificationDto {
-  auditId: number
-  eventType: string
-  message: string
-  ticketNumber: string | null
-  accessReqId: number
-  accessItemId: number | null
-  isRead: boolean
-  readAtUtc: string | null
-  createdOn: string
-}
-
-// ─── Users Types ────────────────────────────────────────────────────────────────────
-
-export interface CmplUserDto {
-  id: number
-  name: string | null
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-}
-
-export interface PortalUserDto {
-  id: number
-  name: string
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-  role: string
-  location: string
-  isActive: boolean
-  createdOn: string
-}
-
-export interface PortalUserDetails {
-  user: UserProfile | null
-  department: DepartmentDto | null
-  headOfDepartment: HodDto | null
-}
-
-export interface UpsertPortalUserDto {
-  cmplUserId: number
-  role: string
-  location: string
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface LoginValues {
-  identifier: string
-  password: string
-}
-
-export interface UserProfile {
-  id: number
-  name: string | null
-  role: string
-  location: string
-  employeeId: string | null
-  email: string | null
-  mobileNumber: number | null
-  departmentId: number | null
-}
-
-export interface DepartmentDto {
-  id: number
-  name: string | null
-  hodId: string | null
-}
-
-export interface HodDto {
-  id: number
-  name: string | null
-  employeeId: string | null
-  email: string | null
-  mobileNumber: string | null
-}
-
-export interface LoginResponse {
-  user: UserProfile | null
-  department: DepartmentDto | null
-  headOfDepartment: HodDto | null
-}
-
-// ─── Shared Types ────────────────────────────────────────────────────────────
+// ─── Shared ───────────────────────────────────────────────────────────────────
 
 export interface ApiError {
   code: string
@@ -148,88 +20,195 @@ export interface ApiError {
   type: "Failure" | "Validation" | "NotFound" | "Conflict"
 }
 
+export interface NotificationDto {
+  auditId: number
+  eventType?: string
+  message?: string
+  isRead: boolean
+  createdOn?: string
+  createdAtUtc?: string
+}
+
 export interface PaginationParams {
   page?: number
   pageSize?: number
 }
 
-export interface PagedResult<T> {
-  data: T[]
-  totalCount: number
-  page: number
+export interface PaginatedListDto<T> {
+  items: T[]
+  pageNumber: number
   pageSize: number
+  totalCount: number
   totalPages: number
-  hasNextPage: boolean
   hasPreviousPage: boolean
+  hasNextPage: boolean
 }
 
-export type AccessTypes = "NotApplicable" | "ReadOnly" | "ReadandWrite"
+// Keep PagedResult as alias so existing UI components that reference it still compile
+export type PagedResult<T> = PaginatedListDto<T>
 
-export type RequestStatus =
-  | "Submitted"
-  | "PendingWithHod"
-  | "PendingWithIt"
-  | "HodApproved"
-  | "ItApproved"
-  | "HodRejected"
-  | "ItRejected"
-  | "Revoked"
-  | "Expired"
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export interface LoginRequestDto {
+  userName: string
+  userKey: string
+}
 
-export interface RecentRequestDto {
-  requestId: number
+/** @deprecated Use LoginRequestDto – kept for backward-compat with existing login form */
+export interface LoginValues {
+  identifier: string
+  password: string
+}
+
+export interface AuthSessionResponseDto {
   userId: number
-  status: string
-  createdOn: string
-  itemCount: number
+  userName: string
+  userKey?: string
+  mobileNo?: number
+  mailId?: string
+  deptId?: number
+  empId?: string
+  userRole: string
+  location?: string
+  authenticatedAtUtc: string
 }
 
-export interface DashboardDto {
-  totalRequests: number
-  pendingWithHod: number
-  pendingWithIt: number
-  approvedActive: number
-  hodRejected: number
-  itRejected: number
-  revoked: number
-  expired: number
-  expiringSoon: number
-  myPendingItems: number
-  myApprovedItems: number
-  myRejectedItems: number
-  recentRequests: RecentRequestDto[]
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+export interface UserSearchParams extends PaginationParams {
+  searchTerm?: string
+  roleFilter?: string
+  locationFilter?: string
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export interface HodDetailResponse {
+  hodName?: string
+  hodEmployeeId?: string
+  hodEmail?: string
+  hodMobileNumber?: number
+}
 
-export interface DepartmentDetailDto {
-  id: number
-  name: string | null
-  hodId: string | null
-  hodName: string | null
-  hodEmail: string | null
+export interface DepartmentDetailResponse {
+  departmentId: number
+  departmentName: string
+  hodId?: number
+  hod?: HodDetailResponse
+}
+
+export interface UserProfileResponseDto {
+  userId: number
+  userName: string
+  userKey?: string
+  mobileNo?: number
+  mailId?: string
+  deptId?: number
+  empId?: string
+  userRole: string
+  location?: string
   isActive: boolean
+  department?: DepartmentDetailResponse
+}
+
+export interface HodUserDto {
+  userId: number
+  userName?: string
+  email?: string
+  departmentId?: number
+}
+
+// ─── Department ───────────────────────────────────────────────────────────────
+
+export interface DepartmentSearchParams extends PaginationParams {
+  searchTerm?: string
+  hodId?: number
+}
+
+export interface UpdateDepartmentRequest {
+  departmentId: number
+  departmentName: string
+  hodId?: number
+}
+
+// ─── Access Requests ──────────────────────────────────────────────────────────
+
+export interface AccessRequestSearchParams extends PaginationParams {
+  status?: RequestStatus
+  search?: string
+}
+
+export interface AccessRequestSummaryDto {
+  accessItemId: number
+  accessReqId: number
+  ticketNumber: string
+  requesterUserId: number
+  requesterName: string
+  folderPath: string
+  accessType: AccessTypes
+  confirmedAccessType: AccessTypes
+  reason: string
+  status: RequestStatus
+  accessFrom?: string
+  accessTo?: string
+  revokedOn?: string
   createdOn: string
 }
 
-export interface UpsertDepartmentDto {
-  name: string
-  hodId?: string | null
+export interface RequestedFolderItemDto {
+  folderPath: string
+  accessType: AccessTypes
+  reason: string
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export interface CreateRequestDto {
+  items: RequestedFolderItemDto[]
+  isAgreed: boolean
+  itsrNo: string
+}
+
+export interface CreateRequestResponseDto {
+  masterRequestId: number
+  message: string
+}
+
+export interface ProcessApprovalDto {
+  decision: RequestStatus
+  comments: string
+}
+
+export interface FinalizeProvisioningDto {
+  finalDecision: RequestStatus
+  confirmedAccessType: AccessTypes
+  operationalComments: string
+}
+
+export interface RevokeAccessDto {
+  revocationReason: string
+}
+
+export interface RenewAccessDto {
+  renewalNotes: string
+}
+
+export interface ResubmitRequestDto {
+  updatedReason?: string
+}
+
+export interface ResubmitResponseDto {
+  message: string
+  newMasterRequestId: number
+}
+
+// ─── Folder Mappings ─────────────────────────────────────────────────────────
 
 export interface FolderMappingDto {
   id: number
   folderPath: string
-  primaryHodId: string | null
-  primaryHodName: string | null
-  primaryHodEmail: string | null
-  secondaryHodId: string | null
-  secondaryHodName: string | null
-  secondaryHodEmail: string | null
+  primaryHodId?: string
+  primaryHodName?: string
+  primaryHodEmail?: string
+  secondaryHodId?: string
+  secondaryHodName?: string
+  secondaryHodEmail?: string
 }
 
 export interface UpsertFolderMappingRequest {
@@ -248,42 +227,6 @@ export interface FolderResponse {
   children: FolderResponse[]
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface HodCartItemDto {
-  itemId: number
-  requestId: number
-  ticketNumber: string
-  folderPath: string
-  accessType: AccessTypes
-  reason: string
-  requesterUserId: number
-  submittedAt: string
+export interface FolderMappingSearchParams extends PaginationParams {
+  search?: string
 }
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export interface OperatorCartItemDto {
-  itemId: number
-  requestId: number
-  ticketNumber: string
-  folderPath: string
-  requestedAccessType: AccessTypes
-  confirmedAccessType: AccessTypes
-  reason: string
-  hodApproverId: number | null
-  requesterUserId: number
-  submittedAt: string
-}
-
-export interface OverrideAccessTypeDto {
-  accessType: AccessTypes
-}
-
-export interface Result<T> {
-  isSuccess: boolean
-  isFailure: boolean
-  error: { message: string } | null
-  value: T | undefined
-}
-

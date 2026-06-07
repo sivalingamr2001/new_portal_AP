@@ -1,145 +1,68 @@
-import { apiService, ApiException } from "./axiosClient"
+import { apiService } from "./axiosClient"
 import type {
-  PaginationParams,
-  PagedResult,
   FolderMappingDto,
-  UpsertFolderMappingRequest,
+  FolderMappingSearchParams,
   FolderResponse,
+  PaginatedListDto,
+  UpsertFolderMappingRequest,
 } from "./types"
-
-// ─── Client ───────────────────────────────────────────────────────────────────
 
 export const folderMappingsApi = {
   getFolderMappings: async (
-    params?: PaginationParams & { search?: string }
-  ): Promise<PagedResult<FolderMappingDto>> => {
-    try {
-      const response = await apiService.get<PagedResult<FolderMappingDto>>(
-        "/folder-mappings",
-        { params }
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_FOLDER_MAPPINGS_FAILED",
-          message: "Failed to fetch folder mappings.",
-          type: "Failure",
+    params?: FolderMappingSearchParams
+  ): Promise<PaginatedListDto<FolderMappingDto>> => {
+    const response = await apiService.get<PaginatedListDto<FolderMappingDto>>(
+      "/folder-mappings",
+      {
+        params: {
+          pageNumber: params?.pageNumber,
+          pageSize: params?.pageSize,
+          search: params?.search,
         },
-        0
-      )
-    }
+      }
+    )
+    return response.data
   },
 
   getFolderMapping: async (id: number): Promise<FolderMappingDto> => {
-    try {
-      const response = await apiService.get<FolderMappingDto>(
-        `/folder-mappings/${id}`
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_FOLDER_MAPPING_FAILED",
-          message: `Failed to fetch folder mapping ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
-    }
+    const response = await apiService.get<FolderMappingDto>(
+      `/folder-mappings/${id}`
+    )
+    return response.data
   },
 
   createFolderMapping: async (
     dto: UpsertFolderMappingRequest
   ): Promise<number> => {
-    try {
-      const response = await apiService.post<number>("/folder-mappings", dto)
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "CREATE_FOLDER_MAPPING_FAILED",
-          message: "Failed to create folder mapping.",
-          type: "Failure",
-        },
-        0
-      )
-    }
+    const response = await apiService.post<number>(
+      "/folder-mappings",
+      dto
+    )
+    return response.data
   },
 
   updateFolderMapping: async (
     id: number,
     dto: UpsertFolderMappingRequest
   ): Promise<void> => {
-    try {
-      await apiService.put<void>(`/folder-mappings/${id}`, dto)
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "UPDATE_FOLDER_MAPPING_FAILED",
-          message: `Failed to update folder mapping ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
-    }
+    await apiService.put<void>(`/folder-mappings/${id}`, dto)
   },
 
   deleteFolderMapping: async (id: number): Promise<void> => {
-    try {
-      await apiService.delete<void>(`/folder-mappings/${id}`)
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "DELETE_FOLDER_MAPPING_FAILED",
-          message: `Failed to delete folder mapping ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
-    }
+    await apiService.delete<void>(`/folder-mappings/${id}`)
   },
 
   getParentFolders: async (): Promise<FolderResponse[]> => {
-    try {
-      const response = await apiService.get<FolderResponse[]>(
-        "/folder-mappings/parents"
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_PARENT_FOLDERS_FAILED",
-          message: "Failed to fetch parent folders.",
-          type: "Failure",
-        },
-        0
-      )
-    }
+    const response = await apiService.get<FolderResponse[]>(
+      "/folder-mappings/parents"
+    )
+    return response.data
   },
 
   getFolderHierarchy: async (): Promise<FolderResponse[]> => {
-    try {
-      const response = await apiService.get<FolderResponse[]>(
-        "/folder-mappings/hierarchy"
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_FOLDER_HIERARCHY_FAILED",
-          message: "Failed to fetch folder hierarchy.",
-          type: "Failure",
-        },
-        0
-      )
-    }
+    const response = await apiService.get<FolderResponse[]>(
+      "/folder-mappings/hierarchy"
+    )
+    return response.data
   },
 }

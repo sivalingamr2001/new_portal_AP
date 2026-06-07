@@ -1,126 +1,189 @@
-import {
-  ApiException,
-  apiService,
-  type PagedResult,
-  type PaginationParams,
-} from "./axiosClient"
 import type {
-  AccessRequestDetailDto,
+  PaginatedListDto,
+  PaginationParams,
   AccessRequestSummaryDto,
-  ItemActionDto,
-  SubmitAccessRequestDto,
+  AccessRequestSearchParams,
+  CreateRequestDto,
+  CreateRequestResponseDto,
+  ProcessApprovalDto,
+  FinalizeProvisioningDto,
+  RevokeAccessDto,
+  RenewAccessDto,
+  ResubmitRequestDto,
+  ResubmitResponseDto,
+  RequestStatus,
 } from "./types"
+import {
+  mockAccessRequests,
+  createPaginatedResponse,
+  filterBySearchTerm,
+} from "./mockData"
 
 export const accessRequestsApi = {
-  submitRequest: async (dto: SubmitAccessRequestDto): Promise<number> => {
-    try {
-      const response = await apiService.post<number>("/access-requests", dto)
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "SUBMIT_REQUEST_FAILED",
-          message: "Failed to submit access request.",
-          type: "Failure",
-        },
-        0
-      )
+  /**
+   * GET /api/access-requests (MOCK)
+   * Returns paginated list of mock access requests with optional filtering.
+   */
+  getAllRequests: async (
+    params?: AccessRequestSearchParams
+  ): Promise<PaginatedListDto<AccessRequestSummaryDto>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    
+    let filtered = mockAccessRequests
+    if (params?.search) {
+      filtered = filterBySearchTerm(filtered, params.search, [
+        "folderPath",
+        "reason",
+        "requesterName",
+      ])
     }
+    
+    if (params?.status) {
+      filtered = filtered.filter((r) => r.status === params.status)
+    }
+    
+    return createPaginatedResponse(
+      filtered,
+      params?.pageNumber || 1,
+      params?.pageSize || 20
+    )
   },
 
-  submitHodRequest: async (dto: SubmitAccessRequestDto): Promise<number> => {
-    try {
-      const response = await apiService.post<number>(
-        "/access-requests/hod",
-        dto
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "SUBMIT_HOD_REQUEST_FAILED",
-          message: "Failed to submit HOD access request.",
-          type: "Failure",
-        },
-        0
-      )
-    }
-  },
-
-  getRequestDetail: async (id: number): Promise<AccessRequestDetailDto> => {
-    try {
-      const response = await apiService.get<AccessRequestDetailDto>(
-        `/access-requests/${id}`
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_REQUEST_DETAIL_FAILED",
-          message: `Failed to fetch access request ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
-    }
-  },
-
+  /**
+   * GET /api/access-requests/my (MOCK)
+   * Returns current user's own requests.
+   */
   getMyRequests: async (
+    params?: { page?: number; pageSize?: number; status?: RequestStatus }
+  ): Promise<PaginatedListDto<AccessRequestSummaryDto>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    
+    let filtered = mockAccessRequests
+    if (params?.status) {
+      filtered = filtered.filter((r) => r.status === params.status)
+    }
+    
+    return createPaginatedResponse(
+      filtered,
+      params?.page || 1,
+      params?.pageSize || 10
+    )
+  },
+
+  /**
+   * GET /api/access-requests/by-user/{userId} (MOCK)
+   */
+  getRequestsByUser: async (
+    userId: number
+  ): Promise<PaginatedListDto<AccessRequestSummaryDto>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const filtered = mockAccessRequests.filter(
+      (r) => r.requesterUserId === userId
+    )
+    return createPaginatedResponse(filtered, 1, 10)
+  },
+
+  /**
+   * GET /api/access-requests/by-department/{deptId} (MOCK)
+   */
+  getRequestsByDepartment: async (
+    deptId: number
+  ): Promise<PaginatedListDto<AccessRequestSummaryDto>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    // Mock implementation - filter by department if applicable
+    return createPaginatedResponse(mockAccessRequests, 1, 10)
+  },
+
+  /**
+   * GET /api/access-requests/my-folder-queue (MOCK)
+   * Items queued for the current user's folders (HOD approval queue).
+   */
+  getMyFolderQueue: async (
     params?: PaginationParams
-  ): Promise<PagedResult<AccessRequestSummaryDto>> => {
-    try {
-      const response = await apiService.get<
-        PagedResult<AccessRequestSummaryDto>
-      >("/access-requests/my", { params })
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_MY_REQUESTS_FAILED",
-          message: "Failed to fetch your access requests.",
-          type: "Failure",
-        },
-        0
-      )
+  ): Promise<PaginatedListDto<AccessRequestSummaryDto>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const pending = mockAccessRequests.filter((r) => r.status === "Pending")
+    return createPaginatedResponse(
+      pending,
+      params?.pageNumber || 1,
+      params?.pageSize || 10
+    )
+  },
+
+  /**
+   * POST /api/access-requests (MOCK)
+   * Submit a new access request.
+   */
+  submitRequest: async (
+    dto: CreateRequestDto
+  ): Promise<CreateRequestResponseDto> => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return {
+      masterRequestId: Math.floor(Math.random() * 10000),
+      message: "Request batch submitted successfully.",
     }
   },
 
-  resubmitItem: async (itemId: number, dto: ItemActionDto): Promise<void> => {
-    try {
-      await apiService.post<void>(
-        `/access-requests/items/${itemId}/resubmit`,
-        dto
-      )
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "RESUBMIT_ITEM_FAILED",
-          message: `Failed to resubmit access item ${itemId}.`,
-          type: "Failure",
-        },
-        0
-      )
-    }
+  /**
+   * POST /api/access-requests/items/{itemId}/approve (MOCK)
+   * HOD approves or rejects a specific request item.
+   */
+  approveItem: async (
+    itemId: number,
+    dto: ProcessApprovalDto
+  ): Promise<string> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return `Ticket #${itemId} evaluation recorded.`
   },
 
-  renewItem: async (itemId: number, dto: ItemActionDto): Promise<void> => {
-    try {
-      await apiService.post<void>(`/access-requests/items/${itemId}/renew`, dto)
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "RENEW_ITEM_FAILED",
-          message: `Failed to renew access item ${itemId}.`,
-          type: "Failure",
-        },
-        0
-      )
+  /**
+   * POST /api/access-requests/items/{itemId}/provision (MOCK)
+   * IT operator finalizes provisioning.
+   */
+  provisionItem: async (
+    itemId: number,
+    dto: FinalizeProvisioningDto
+  ): Promise<string> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return `Provisioning for ticket #${itemId} completed.`
+  },
+
+  /**
+   * POST /api/access-requests/items/{itemId}/revoke (MOCK)
+   * Revokes an active access item.
+   */
+  revokeItem: async (
+    itemId: number,
+    dto: RevokeAccessDto
+  ): Promise<string> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return `Access for ticket #${itemId} has been revoked.`
+  },
+
+  /**
+   * POST /api/access-requests/items/{itemId}/renew (MOCK)
+   * Renews access for an item nearing expiry.
+   */
+  renewItem: async (
+    itemId: number,
+    dto: RenewAccessDto
+  ): Promise<string> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return `Access for ticket #${itemId} renewed by 90 days.`
+  },
+
+  /**
+   * POST /api/access-requests/items/{itemId}/resubmit (MOCK)
+   * Resubmits a previously rejected item.
+   */
+  resubmitItem: async (
+    itemId: number,
+    dto: ResubmitRequestDto
+  ): Promise<ResubmitResponseDto> => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    return {
+      message: "Resubmission successful.",
+      newMasterRequestId: Math.floor(Math.random() * 10000),
     }
   },
 }

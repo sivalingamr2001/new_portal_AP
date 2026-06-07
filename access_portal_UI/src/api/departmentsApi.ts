@@ -1,87 +1,69 @@
-import { apiService, ApiException } from "./axiosClient"
 import type {
-  DepartmentDetailDto,
-  PagedResult,
-  PaginationParams,
-  UpsertDepartmentDto,
+  DepartmentSearchParams,
+  DepartmentDetailResponse,
+  UpdateDepartmentRequest,
+  PaginatedListDto,
 } from "./types"
-
-// ─── Client ───────────────────────────────────────────────────────────────────
+import {
+  mockDepartments,
+  createPaginatedResponse,
+  filterBySearchTerm,
+} from "./mockData"
 
 export const departmentsApi = {
+  /**
+   * GET /api/departmentcontoller (MOCK)
+   * Returns paginated list of mock departments with optional search filtering.
+   */
   getDepartments: async (
-    params?: PaginationParams & { search?: string }
-  ): Promise<PagedResult<DepartmentDetailDto>> => {
-    try {
-      const response = await apiService.get<PagedResult<DepartmentDetailDto>>(
-        "/departments",
-        { params }
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_DEPARTMENTS_FAILED",
-          message: "Failed to fetch departments.",
-          type: "Failure",
-        },
-        0
-      )
+    params?: DepartmentSearchParams
+  ): Promise<PaginatedListDto<DepartmentDetailResponse>> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    
+    let filtered = mockDepartments
+    if (params?.searchTerm) {
+      filtered = filterBySearchTerm(filtered, params.searchTerm, [
+        "departmentName",
+      ])
     }
+    
+    return createPaginatedResponse(
+      filtered,
+      params?.pageNumber || 1,
+      params?.pageSize || 20
+    )
   },
 
-  getDepartment: async (id: number): Promise<DepartmentDetailDto> => {
-    try {
-      const response = await apiService.get<DepartmentDetailDto>(
-        `/departments/${id}`
-      )
-      return response.data
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "FETCH_DEPARTMENT_FAILED",
-          message: `Failed to fetch department with id ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
+  /**
+   * GET /api/departmentcontoller/{departmentId} (MOCK)
+   */
+  getDepartment: async (departmentId: number): Promise<DepartmentDetailResponse> => {
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    const dept = mockDepartments.find((d) => d.departmentId === departmentId)
+    if (!dept) {
+      throw new Error(`Department ${departmentId} not found`)
     }
+    return dept
   },
 
+  /**
+   * PUT /api/departmentcontoller (MOCK)
+   * Returns updated department with provided data merged.
+   */
   updateDepartment: async (
-    id: number,
-    dto: UpsertDepartmentDto
-  ): Promise<void> => {
-    try {
-      await apiService.put<void>(`/departments/${id}`, dto)
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "UPDATE_DEPARTMENT_FAILED",
-          message: `Failed to update department with id ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
+    dto: UpdateDepartmentRequest
+  ): Promise<DepartmentDetailResponse> => {
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const dept = mockDepartments.find((d) => d.departmentId === dto.departmentId)
+    if (!dept) {
+      throw new Error(`Department ${dto.departmentId} not found`)
     }
-  },
-
-  deleteDepartment: async (id: number): Promise<void> => {
-    try {
-      await apiService.delete<void>(`/departments/${id}`)
-    } catch (error) {
-      if (error instanceof ApiException) throw error
-      throw new ApiException(
-        {
-          code: "DELETE_DEPARTMENT_FAILED",
-          message: `Failed to delete department with id ${id}.`,
-          type: "Failure",
-        },
-        0
-      )
+    
+    // Return updated mock department
+    return {
+      ...dept,
+      departmentName: dto.departmentName || dept.departmentName,
+      hodId: dto.hodId || dept.hodId,
     }
   },
 }
