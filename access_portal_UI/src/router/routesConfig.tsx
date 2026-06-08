@@ -60,7 +60,7 @@ export const routesConfig: RouteObject[] = [
 
           // --- USER PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.User]} />,
+            element: <RoleGuard allowedRoles={[UserRole.User, UserRole.Hod]} />,
             children: [
               {
                 path: "/my-requests",

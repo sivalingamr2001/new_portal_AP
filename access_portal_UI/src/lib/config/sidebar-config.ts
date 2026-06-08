@@ -39,6 +39,13 @@ export const sidebarItems: SidebarGroup[] = [
     title: "HOD",
     items: [
       {
+        label: "My Requests",
+        desc: "View and manage your access requests",
+        to: "/my-requests",
+        icon: FileText,
+        roles: [3], // UserRole.User
+      },
+      {
         label: "Pending Approvals",
         desc: "Review and approve pending access requests",
         to: "/hod/pending-approvals",

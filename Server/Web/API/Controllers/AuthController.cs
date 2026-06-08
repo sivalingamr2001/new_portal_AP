@@ -19,14 +19,19 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         var result = await authService.LoginAsync(dto);
 
         if (result.IsFailure)
-            return result.Error!.Type == ErrorType.NotFound
-                ? Unauthorized(new { message = result.Error.Message })
-                : BadRequest(new { message = result.Error.Message });
+        {
+            // Use result.Error.Description to extract "Invalid password."
+            var userFriendlyMessage = result.Error;
+
+            return result.Error.Type == ErrorType.NotFound
+                ? Unauthorized(new { message = userFriendlyMessage })
+                : BadRequest(new { message = userFriendlyMessage });
+        }
 
         return Ok(result.Value);
     }
 
-    // POST api/auth/logout  (stateless JWT — client discards token)
+
     [HttpPost("logout")]
     public IActionResult Logout() => Ok(new { message = "Logged out." });
 }

@@ -25,13 +25,17 @@ public sealed class AuthService(
             return Result.Failure<LoginResponseDto>(
                 Error.NotFound("AUTH_001", "User not found."));
 
+        //validate the password from dto
+        if(cmplUser.Password != dto.Password)
+            return Result.Failure<LoginResponseDto>(
+                Error.Validation("AUTH_003", "Invalid password."));
+
         var portalUser = await db.Users.FirstOrDefaultAsync(u => u.Id == cmplUser.Id);
 
         if (portalUser is null || !portalUser.IsActive)
             return Result.Failure<LoginResponseDto>(
                 Error.Validation("AUTH_002", "Account is inactive or not registered in the portal."));
 
-        // Resolve department
         Department? department = null;
         HodMaster? hod = null;
 

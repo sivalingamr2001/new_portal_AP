@@ -14,7 +14,8 @@ import { useLoader } from "@/hooks/useLoader"
 import { useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
-import { authApi, getUserId } from "@/api"
+import { ApiException, authApi, getUserId } from "@/api"
+import { toast } from "sonner"
 
 export const LoginPage = () => {
   const { login } = useAuth()
@@ -28,24 +29,23 @@ export const LoginPage = () => {
     e.preventDefault()
 
     try {
-      const values = {
-        identifier,
-        password,
-      }
-
-      // TypeScript now infers 'data' as LoginResponse
+      const values = { identifier, password }
       const data = await withLoader(() => authApi.login(values))
       getUserId()
 
       if (data) {
         login(data, 30)
-
-        navigate("/", {
-          replace: true,
-        })
+        navigate("/", { replace: true })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error)
+
+      if (error instanceof ApiException) {
+        const toastText = error.message;
+        toast.error(toastText);
+      } else {
+        toast.error("A network error occurred. Please try again.");
+      }
     }
   }
 

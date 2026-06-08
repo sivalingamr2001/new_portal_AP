@@ -13,15 +13,23 @@ export const authApi = {
         values
       )
       return response.data
-    } catch (error) {
+    } catch (error: any) {
+      // Use 'any' or your HTTP library error type here
       if (error instanceof ApiException) throw error
+
+      // Extract the real backend message if it exists
+      const backendMessage =
+        error.response?.data?.message ||
+        error.data?.message ||
+        "Login request failed unexpectedly."
+
       throw new ApiException(
         {
           code: "LOGIN_FAILED",
-          message: "Login request failed unexpectedly.",
+          message: backendMessage, // Put the real message here
           type: "Failure",
         },
-        0
+        error.response?.status || 0
       )
     }
   },

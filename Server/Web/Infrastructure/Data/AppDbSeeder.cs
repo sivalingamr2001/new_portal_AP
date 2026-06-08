@@ -86,6 +86,7 @@ public static class AppDataSeeder
                 {
                     Id = id,
                     Name = parts.ElementAtOrDefault(1) ?? string.Empty,
+                    Password = parts.ElementAtOrDefault(2) ?? string.Empty,
                     EmployeeId = NormalizeValue(parts.ElementAtOrDefault(27)),
                     Email = NormalizeValue(parts.ElementAtOrDefault(9)),
                     MobileNumber = mobileNumber,
@@ -106,10 +107,10 @@ public static class AppDataSeeder
 
         var demoUsers = new[]
         {
-            new { Id = 1, EmpId = "E001", Name = "Demo Admin", Role = "Admin" },
-            new { Id = 2, EmpId = "E002", Name = "Demo Operator", Role = "Operator" },
-            new { Id = 5, EmpId = "E003", Name = "Demo HOD", Role = "Hod" },
-            new { Id = 6, EmpId = "E004", Name = "Demo User", Role = "User" }
+            new { Id = 1, EmpId = "E001", Name = "Demo Admin", Password = "jan@123", Role = "Admin" },
+            new { Id = 2, EmpId = "E002", Name = "Demo Operator",  Password = "jan@123", Role = "Operator" },
+            new { Id = 5, EmpId = "E003", Name = "Demo HOD",  Password = "jan@123", Role = "Hod" },
+            new { Id = 6, EmpId = "E004", Name = "Demo User",  Password = "jan@123", Role = "User" }
         };
 
         foreach (var demo in demoUsers)
@@ -120,6 +121,7 @@ public static class AppDataSeeder
                 {
                     Id = demo.Id,
                     Name = demo.Name,
+                    Password = demo.Password,
                     EmployeeId = demo.EmpId,
                     Email = $"{demo.EmpId.ToLower()}@demo.com",
                     MobileNumber = 0000000000,

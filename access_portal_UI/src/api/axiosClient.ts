@@ -27,7 +27,8 @@ export const getUserId = () => {
   try {
     const rawData: any = sessionStorage.getItem("jan_AP_user")
     const session = JSON.parse(rawData)
-    const userId: number | null = session?.user?.id ?? session?.id ?? session?.value?.user?.id
+    const userId: number | null =
+      session?.user?.id ?? session?.id ?? session?.value?.user?.id
     return userId ?? null
   } catch (error) {
     console.error("Error parsing user session data:", error)
@@ -57,7 +58,7 @@ axiosInstance.interceptors.response.use(
   (error: AxiosError<ApiError>) => {
     const response = error.response
     if (response) {
-      const data = response.data
+      const data: any = response.data
       if (data && typeof data === "object" && "code" in data) {
         return Promise.reject(
           new ApiException(data as ApiError, response.status)
@@ -66,8 +67,8 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(
         new ApiException(
           {
-            code: "UNKNOWN_ERROR",
-            message: `Error Status: ${response.status}`,
+            code: data.message.code,
+            message: data.message.message,
             type: "Failure",
           },
           response.status

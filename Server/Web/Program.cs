@@ -143,7 +143,7 @@ using (var scope = app.Services.CreateScope())
             var cmplDb = services.GetRequiredService<CmplDbContext>();
             var hodDb = services.GetRequiredService<HodDbContext>();
 
-            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+            //await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
         }
         catch (Exception ex)
         {
@@ -182,7 +182,19 @@ app.UseCors(CorsPolicyName);
 // =========================================================================
 // 7. ENDPOINT MAPPINGS
 // =========================================================================
+app.UseDefaultFiles();
+
+// 2. Enables serving files directly from the wwwroot directory (js, css, images, html)
+app.UseStaticFiles();
+
+app.UseRouting();
+
+// Add app.UseAuthentication() and app.UseAuthorization() here if you have them
+
 app.MapControllers();
+
+// 3. Fallback route: Maps all non-API routing requests straight to your client-side index file
+app.MapFallbackToFile("index.html");
 app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
