@@ -1,0 +1,202 @@
+ I'll analyze your code for sending stage-based emails. Let me review all three files to understand the complete flow and identify issues or improvements.
+
+## Architecture Overview
+
+Your email system has three layers:
+1. **AccessRequestService** (business logic) → calls `SendStageEmailAsync`
+2. **AccessRequestEmailNotificationService** (notification orchestrator) → builds email content
+3. **EmailService** (infrastructure) → persists to database queue (`jan_mail_system`)
+
+## Critical Issues Found
+
+### 1. **SendStageEmailAsync is Defined but Never Called**
+In your `AccessRequestService`, you defined `SendStageEmailAsync` and `BuildMailProgramSuffix`, but **they are never invoked anywhere** in the workflow methods (Submit, Resubmit, Renew, etc.). 
+
+**You need to call this helper at each stage transition**, for example:
+
+```csharp
+// After HOD approval
+public async Task<Result> ApproveByHodAsync(...) 
+{
+    // ... existing logic ...
+    
+    await SendStageEmailAsync(
+        eventType: "HOD.Approved",
+        subject: $"Access Request #{ticketNumber} - HOD Approved",
+        summary: $"Your access request has been approved by HOD.",
+        accessRequest: request,
+        requester: requester,
+        recipients: new[] { requester }, // + IT operators
+        item: item,
+        comments: approvalComments,
+        expirationDateUtc: null,
+        cancellationToken);
+}
+```
+
+### 2. **Recipient Logic is Inverted in AccessRequestEmailNotificationService**
+Look at this code:
+
+```csharp
+var requesterEmail = notification.Requester.Email?.Trim();
+var toRecipients = !string.IsNullOrWhiteSpace(requesterEmail)
+    ? new[] { requesterEmail }
+    : new[] { recipientEmails[0] };  // Falls back to first HOD/IT person!
+
+var ccRecipients = recipientEmails
+    .Except(toRecipients, StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+```
+
+**Problem**: `notification.Recipients` contains HODs/IT operators (approvers), but you're sending **TO the requester** and **CC-ing the actual recipients** (approvers). 
+
+For approval workflows, typically:
+- **TO**: The person who needs to act (HOD/IT approver)
+- **CC**: The requester (for visibility)
+
+**Fix based on stage type:**
+```csharp
+// For approval requests (HOD/IT needs to act)
+var toRecipients = recipientEmails; // HODs or IT operators
+var ccRecipients = !string.IsNullOrWhiteSpace(requesterEmail) 
+    ? new[] { requesterEmail } 
+    : Array.Empty<string>();
+
+// For status updates to requester (approved/rejected)
+var toRecipients = !string.IsNullOrWhiteSpace(requesterEmail)
+    ? new[] { requesterEmail }
+    : recipientEmails;
+var ccRecipients = Array.Empty<string>();
+```
+
+### 3. **Missing Stage-Specific Email Calls**
+You need to inject `SendStageEmailAsync` calls at these points:
+
+| Stage | Event Type | Recipients | When to Call |
+|-------|-----------|------------|--------------|
+| User Submitted | `User.Submitted` | Requester | After `SaveChangesAsync` in `SubmitRequestAsync` |
+| HOD Notified | `HOD.Pending` | HOD(s) | In `NotifyHodsForItemAsync` |
+| HOD Approved | `HOD.Approved` | IT Operators + Requester | After HOD approval |
+| HOD Rejected | `HOD.Rejected` | Requester | After HOD rejection |
+| IT Approved | `IT.Approved` | Requester | After IT approval |
+| IT Rejected | `IT.Rejected` | Requester | After IT rejection |
+| Resubmitted | `User.Resubmitted` | HOD(s) | In `ResubmitItemAsync` |
+| Renewed | `User.Renewal` | HOD(s) | In `RenewItemAsync` |
+
+### 4. **BuildRecipientLabel Has Hardcoded Role**
+```csharp
+private static string BuildRecipientLabel(CmplUser employee)
+{
+    var role = employee.Email is null ? "User" : "User"; // Always "User"!
+    return $"{BuildDisplayName(employee)} ({role})";
+}
+```
+**Fix**: Pass actual role or derive from context.
+
+## Recommended Refactoring
+
+### A. Add Email Calls to Existing Methods
+
+```csharp
+// In SubmitRequestAsync, after notifications:
+await SendStageEmailAsync(
+    eventType: "User.Submitted",
+    subject: "Access Request Submitted",
+    summary: $"Your access request with {items.Count} item(s) has been submitted.",
+    accessRequest: request,
+    requester: user!,
+    recipients: new[] { user! },
+    item: null, // Or first item if you want item-specific
+    comments: null,
+    expirationDateUtc: null,
+    cancellationToken: default);
+
+// In ResubmitItemAsync, after SaveChangesAsync:
+await SendStageEmailAsync(
+    eventType: "User.Resubmitted", 
+    subject: $"Ticket {item.TicketNumber} Resubmitted",
+    summary: $"Access item has been resubmitted for approval.",
+    accessRequest: item.AccessRequest,
+    requester: await GetRequesterAsync(item.AccessRequest.UserId),
+    recipients: await ResolveHodRecipientsAsync(item), // Need to fetch HODs
+    item: item,
+    comments: reason,
+    expirationDateUtc: null,
+    cancellationToken: default);
+```
+
+### B. Fix the Recipient/TO-CC Logic
+
+Add a `RecipientType` to your notification record:
+
+```csharp
+public sealed record AccessRequestEmailNotification(
+    string MailProgramSuffix,
+    string Subject,
+    string Heading,
+    string Summary,
+    AccessRequestEntity Request,
+    CmplUser Requester,
+    IReadOnlyCollection<CmplUser> Recipients,
+    RecipientRole PrimaryRecipient, // NEW
+    AccessItemEntity? Item = null,
+    string? Comments = null,
+    DateTime? ExpirationDateUtc = null);
+
+public enum RecipientRole { Requester, Approver, ItOperator }
+```
+
+Then in `SendStageNotificationAsync`:
+```csharp
+string[] toRecipients, ccRecipients;
+
+if (notification.PrimaryRecipient == RecipientRole.Requester)
+{
+    toRecipients = !string.IsNullOrWhiteSpace(requesterEmail) 
+        ? new[] { requesterEmail } 
+        : recipientEmails.Take(1).ToArray();
+    ccRecipients = recipientEmails.Except(toRecipients).ToArray();
+}
+else // Approver or IT
+{
+    toRecipients = recipientEmails; // HODs/IT operators
+    ccRecipients = !string.IsNullOrWhiteSpace(requesterEmail) 
+        ? new[] { requesterEmail } 
+        : Array.Empty<string>();
+}
+```
+
+### C. Add Missing Requester Resolution Helper
+
+```csharp
+private async Task<CmplUser> GetRequesterAsync(int userId)
+{
+    bool isTestEnv = db.Database.IsSqlite();
+    var context = isTestEnv ? db.CmplUsers : cmplDb.CmplUsers;
+    return await context.FirstOrDefaultAsync(u => u.Id == userId) 
+        ?? new CmplUser { Id = userId, Name = "Unknown" };
+}
+```
+
+## Minor Issues
+
+1. **Email body table has no item section styling** - The `itemSection` and `expirationSection` are injected directly after `</tr>` without proper row closure in some paths. Verify HTML structure.
+
+2. **Oracle sequence hardcoded**: `jan_test_seq.nextval` — should this be `jan_mail_system_seq` or configurable?
+
+3. **No email sent on HOD self-submit**: `SubmitHodRequestAsync` only sends `notificationService.NotifyRoleGroupAsync`, no email.
+
+4. **CancellationToken not passed**: Your service methods don't accept `CancellationToken` — add it to all async methods.
+
+## Quick Fix Checklist
+
+- [ ] Call `SendStageEmailAsync` in `SubmitRequestAsync` (to requester)
+- [ ] Call `SendStageEmailAsync` in `ResubmitItemAsync` (to HODs)
+- [ ] Call `SendStageEmailAsync` in `RenewItemAsync` (to HODs)
+- [ ] Add email calls to your HOD approval/rejection methods
+- [ ] Add email calls to your IT approval/rejection methods
+- [ ] Fix TO/CC logic based on who needs to act vs. who needs to know
+- [ ] Pass `CancellationToken` through all method signatures
+- [ ] Fix `BuildRecipientLabel` to show actual roles
+
+Would you like me to show the complete modified `AccessRequestService` with all email calls injected at the right stages?

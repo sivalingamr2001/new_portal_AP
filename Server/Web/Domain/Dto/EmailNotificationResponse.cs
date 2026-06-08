@@ -1,3 +1,5 @@
+using Web.Domain.Entities;
+
 namespace Web.Shared.Utilites.EmailService;
 
 public sealed class EmailNotificationRequest
@@ -24,3 +26,15 @@ public class EmailNotificationLog
     public string Status { get; set; } = string.Empty;
     public string? ErrorMessage { get; set; }
 }
+
+public sealed record AccessRequestEmailNotification(
+    string MailProgramSuffix,
+    string Subject,
+    string Heading,
+    string Summary,
+    AccessRequestEntity Request,
+    CmplUser Requester,
+    IReadOnlyCollection<CmplUser> Recipients,
+    AccessItemEntity? Item = null,
+    string? Comments = null,
+    DateTime? ExpirationDateUtc = null);
