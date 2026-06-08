@@ -23,9 +23,17 @@ export class ApiException extends Error {
   }
 }
 
-const rawData: any = sessionStorage.getItem("jan_AP_user")
-const session = JSON.parse(rawData)
-const userId = session?.user?.id ?? session?.id ?? session?.value?.user?.id
+export const getUserId = () => {
+  try {
+    const rawData: any = sessionStorage.getItem("jan_AP_user")
+    const session = JSON.parse(rawData)
+    const userId: number | null = session?.user?.id ?? session?.id ?? session?.value?.user?.id
+    return userId ?? null
+  } catch (error) {
+    console.error("Error parsing user session data:", error)
+    return null
+  }
+}
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: ENV_CONFIG?.BASE_API_URL ?? "/api",
@@ -35,6 +43,7 @@ const axiosInstance: AxiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const userId = getUserId()
     if (userId) {
       config.headers["X-User-Id"] = userId
     }

@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
@@ -211,6 +212,13 @@ public sealed class UserService(
                     {
                         hodDto = batchHods.FirstOrDefault(h => h.Id == dept.HodId.Value);
                     }
+
+                            // Fallback: if department HodId did not yield a HOD, try matching by CMPL EmployeeId
+                            if (hodDto is null && !string.IsNullOrWhiteSpace(cmpl?.EmployeeId))
+                            {
+                                hodDto = batchHods.FirstOrDefault(h => !string.IsNullOrWhiteSpace(h.EmployeeId) &&
+                                                                      string.Equals(h.EmployeeId, cmpl.EmployeeId, StringComparison.OrdinalIgnoreCase));
+                            }
                 }
             }
 
@@ -300,6 +308,33 @@ public sealed class UserService(
                         }
                     }
                 }
+
+                    // Fallback: if no HOD found by HodId, try matching by CMPL EmployeeId
+                    if (hodDto is null && !string.IsNullOrWhiteSpace(cmpl?.EmployeeId))
+                    {
+                        if (isTestEnv)
+                        {
+                            var fallback = await db.HodMasters
+                                .FirstOrDefaultAsync(h => h.EmployeeId != null &&
+                                                          h.EmployeeId.ToLower() == cmpl.EmployeeId.ToLower() &&
+                                                          h.Deleted == 0);
+                            if (fallback is not null)
+                            {
+                                hodDto = new HodDto(fallback.UserId, fallback.Name, fallback.EmployeeId, fallback.Email, fallback.MobileNumber);
+                            }
+                        }
+                        else
+                        {
+                            var fallback = await hodDb.HodMasters
+                                .FirstOrDefaultAsync(h => h.EmployeeId != null &&
+                                                          h.EmployeeId.ToLower() == cmpl.EmployeeId.ToLower() &&
+                                                          h.Deleted == 0);
+                            if (fallback is not null)
+                            {
+                                hodDto = new HodDto(fallback.UserId, fallback.Name, fallback.EmployeeId, fallback.Email, fallback.MobileNumber);
+                            }
+                        }
+                    }
             }
         }
 

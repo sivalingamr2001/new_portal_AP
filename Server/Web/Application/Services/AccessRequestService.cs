@@ -65,9 +65,16 @@ public sealed class AccessRequestService(
     public async Task<Result<int>> SubmitHodRequestAsync(
         SubmitAccessRequestDto dto, int hodUserId)
     {
-        var hod = await hodDb.HodMasters.FirstOrDefaultAsync(h => h.UserId == hodUserId);
-        if (hod is null)
-            return Result.Failure<int>(Error.NotFound("HOD_001", "HOD not found."));
+        // Validate that the submitter is a HOD via portal User role
+        var hodPortalUser = await db.Users.FirstOrDefaultAsync(u => u.Id == hodUserId && u.Role == "Hod");
+        if (hodPortalUser is null)
+            return Result.Failure<int>(Error.NotFound("HOD_001", "User is not authorized as an HOD."));
+
+        // Get HOD's CMPL user details for notification
+        bool isTestEnv = db.Database.IsSqlite();
+        var cmplHod = isTestEnv
+            ? await db.CmplUsers.FirstOrDefaultAsync(c => c.Id == hodUserId)
+            : await cmplDb.CmplUsers.FirstOrDefaultAsync(c => c.Id == hodUserId);
 
         var request = new AccessRequestEntity
         {
@@ -98,7 +105,7 @@ public sealed class AccessRequestService(
         await notificationService.NotifyRoleGroupAsync(
             role: "It",
             title: "New HOD Access Request",
-            message: $"HOD {hod.Name} submitted an access request with {items.Count} item(s).",
+            message: $"HOD {cmplHod?.Name ?? "(unknown)"} submitted an access request with {items.Count} item(s).",
             type: "HodRequest",
             requestId: request.AccessReqId);
 

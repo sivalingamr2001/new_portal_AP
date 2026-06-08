@@ -14,7 +14,7 @@ import { useLoader } from "@/hooks/useLoader"
 import { useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
-import { authApi } from "@/api"
+import { authApi, getUserId } from "@/api"
 
 export const LoginPage = () => {
   const { login } = useAuth()
@@ -35,6 +35,7 @@ export const LoginPage = () => {
 
       // TypeScript now infers 'data' as LoginResponse
       const data = await withLoader(() => authApi.login(values))
+      getUserId()
 
       if (data) {
         login(data, 30)

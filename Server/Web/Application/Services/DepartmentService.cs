@@ -116,12 +116,13 @@ public sealed class DepartmentService(
 
         if (targetHodId > 0)
         {
-            var hodExists = await hodDb.HodMasters
-                .AnyAsync(h => h.UserId == targetHodId && h.Deleted == 0);
+            // Validate that the target HOD is a portal user with Role = "Hod"
+            var hodPortalUser = await db.Users
+                .FirstOrDefaultAsync(u => u.Id == targetHodId && u.Role == "Hod");
 
-            if (!hodExists)
+            if (hodPortalUser is null)
                 return Result.Failure<int>(
-                    Error.NotFound("DEPT_003", "The specified HOD does not exist."));
+                    Error.NotFound("DEPT_003", "The specified user is not authorized as an HOD."));
         }
 
         var dept = new Department
@@ -158,13 +159,14 @@ public sealed class DepartmentService(
 
         if (targetHodId > 0)
         {
-            var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
-            var hodExists = await hodContext.AnyAsync(h => h.UserId == targetHodId && h.Deleted == 0);
+            // Validate that the target HOD is a portal user with Role = "Hod"
+            var hodPortalUser = await db.Users
+                .FirstOrDefaultAsync(u => u.Id == targetHodId && u.Role == "Hod");
 
-            if (!hodExists)
+            if (hodPortalUser is null)
             {
                 return Result.Failure(
-                    Error.NotFound("DEPT_003", "The specified HOD does not exist."));
+                    Error.NotFound("DEPT_003", "The specified user is not authorized as an HOD."));
             }
         }
 
