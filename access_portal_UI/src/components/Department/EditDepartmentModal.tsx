@@ -7,13 +7,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { HodSelect } from "../Hod/HodSelect"
 
 export interface UpdateDepartmentRequest {
   deptName?: string | null
-  hodId?: string | null
+  hodId?: string | null  
+  email?: string | null  
 }
 
 interface EditDepartmentModalProps {
@@ -29,34 +30,54 @@ export const EditDepartmentModal = ({
   departmentData,
   onSave,
 }: EditDepartmentModalProps) => {
+  // 1. Local state to store and display the HOD Name independently of the ID
+  const [selectedHodName, setSelectedHodName] = useState("")
+
   const {
     register,
     handleSubmit,
     control,
     reset,
+    setValue,
+    watch,
     formState: { isSubmitting, errors },
   } = useForm<UpdateDepartmentRequest>({
     defaultValues: {
       deptName: "",
       hodId: null,
+      email: null,
     },
   })
 
+  const currentEmail = watch("email")
+
+  // 2. Synchronize initial values cleanly when modal opens
   useEffect(() => {
     if (isOpen && departmentData) {
       reset({
         deptName: departmentData.name || "",
-        hodId: departmentData.hodId ? String(departmentData.hodId) : null,
+        hodId: departmentData.hodId ? String(departmentData.hodId).trim() : null,
+        email: departmentData.email ? String(departmentData.email).trim() : null,
       })
+      
+      // Look through all potential API naming schemas to extract the text name string
+      setSelectedHodName(
+        departmentData.hodName || 
+        departmentData.assignedHodName || 
+        departmentData.managerName || 
+        ""
+      )
     } else if (!isOpen) {
-      reset({ deptName: "", hodId: null })
+      reset({ deptName: "", hodId: null, email: null })
+      setSelectedHodName("")
     }
   }, [departmentData, isOpen, reset])
 
   const onSubmit = async (data: UpdateDepartmentRequest) => {
     const payload: UpdateDepartmentRequest = {
       deptName: data.deptName?.trim() || null,
-      hodId: data.hodId ? data.hodId.toString() : null,
+      hodId: data.hodId?.trim() || null,
+      email: data.email?.trim() || null,
     }
     await onSave(payload)
   }
@@ -97,51 +118,43 @@ export const EditDepartmentModal = ({
               )}
             </div>
 
-            {/* HOD Dropdown Selector */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Assigned HOD
               </label>
 
-              {/* FIX: Only mount the Controller once department data is available in state */}
               {departmentData ? (
                 <Controller
                   control={control}
                   name="hodId"
                   rules={{
                     required: "Please select an HOD",
-                    validate: (val) => Number(val) > 0 || "Please select an HOD"
+                    validate: (val) => (val && val.trim() !== "") || "Please select an HOD"
                   }}
                   render={({ field }) => (
                     <HodSelect
                       value={
-                        field.value && Number(field.value) > 0
+                        field.value 
                           ? {
-                            userId: Number(field.value),
-                            // Double check all possible backend name locations
-                            hodName:
-                              departmentData.hodName ||
-                              departmentData.assignedHodName ||
-                              departmentData.name ||
-                              "",
-                            emailId:
-                              departmentData.emailId ||
-                              departmentData.hodEmail ||
-                              "",
+                            employeeId: field.value, 
+                            email: currentEmail || departmentData.email || "",
+                            // 3. Feeds local state to display name directly instead of the raw ID string
+                            hodName: selectedHodName, 
                           }
                           : null
                       }
                       onChange={(hod) => {
-                        field.onChange(hod.userId);
-
-                        // OPTIONAL: If your form needs to track the name dynamically to prevent reverting on re-renders
-                        // setValue("hodName", hod.hodName); 
+                        field.onChange(hod.employeeId)
+                        setValue("email", hod.email) 
+                        
+                        // 4. Instantly catch and update text state when an item is chosen from the list
+                        setSelectedHodName(hod.hodName) 
                       }}
                     />
                   )}
                 />
               ) : (
-                <div className="h-10 w-full animate-pulse rounded-md bg-muted" /> // Standard loading skeleton placeholder
+                <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
               )}
 
               {errors.hodId && (
@@ -152,7 +165,6 @@ export const EditDepartmentModal = ({
             </div>
           </div>
 
-          {/* Form Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button
               type="button"

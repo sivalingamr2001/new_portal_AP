@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Domain.Entities;
+using Microsoft.Extensions.Configuration;
 
 namespace Web.Infrastructure.Data;
 
@@ -20,6 +21,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
     {
         base.OnModelCreating(modelBuilder);
 
+        // =========================================================================
+        // 1. PRIMARY KEY CONFIGURATIONS
+        // =========================================================================
         modelBuilder.Entity<User>().HasKey(u => u.Id);
         modelBuilder.Entity<Department>().HasKey(d => d.Id);
         modelBuilder.Entity<FolderMappingEntity>().HasKey(f => f.Id);
@@ -28,43 +32,61 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
         modelBuilder.Entity<AccessApprovalEntity>().HasKey(a => a.AccessApproveId);
         modelBuilder.Entity<AccessReqAuditEntity>().HasKey(a => a.AuditId);
 
+        // =========================================================================
+        // 2. RELATIONSHIP MAPPINGS (CASCADE DELETES)
+        // =========================================================================
         modelBuilder.Entity<AccessRequestEntity>()
             .HasMany(a => a.AccessItems)
             .WithOne(i => i.AccessRequest)
             .HasForeignKey(i => i.AccessReqId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 2. One-Way Mapping: Request -> Approvals
+        // Request -> Approvals
         modelBuilder.Entity<AccessRequestEntity>()
             .HasMany(a => a.AccessApprovals)
             .WithOne()
             .HasForeignKey(i => i.AccessReqId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 3. One-Way Mapping: Request -> Audits
+        // Request -> Audits
         modelBuilder.Entity<AccessRequestEntity>()
             .HasMany(a => a.AccessAudits)
             .WithOne()
             .HasForeignKey(i => i.AccessReqId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 4. One-Way Mapping: Item -> Approvals
+        // Item -> Approvals
         modelBuilder.Entity<AccessItemEntity>()
             .HasMany(a => a.AccessApprovals)
             .WithOne()
             .HasForeignKey(i => i.AccessItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 5. One-Way Mapping: Item -> Audits
+        // Item -> Audits
         modelBuilder.Entity<AccessItemEntity>()
             .HasMany(a => a.AccessAudits)
             .WithOne()
             .HasForeignKey(i => i.AccessItemId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Environment Provider Logic
+        // =========================================================================
+        // 3. MYSQL INDEX & LENGTH CRITICAL CONSTRAINT WORKAROUNDS
+        // =========================================================================
+        modelBuilder.Entity<JanNtfsPermissionsAudit>(entity =>
+        {
+            // Explicitly locks lengths inside Fluent API to avoid 3072 byte index overflows
+            entity.Property(e => e.AssignedIdentity).HasMaxLength(255);
+            entity.Property(e => e.IdentityType).HasMaxLength(100);
+            entity.Property(e => e.AccessControlType).HasMaxLength(100);
+            entity.Property(e => e.ResolvedUser).HasMaxLength(255);
+            entity.Property(e => e.GroupName).HasMaxLength(255);
+        });
+
+        // =========================================================================
+        // 4. ENVIRONMENT DB PROVIDER LOGIC
+        // =========================================================================
         var dbProvider = configuration.GetValue<string>("Database:Provider");
-        if (dbProvider != "MySQL")
+        if (!string.Equals(dbProvider, "MySQL", StringComparison.OrdinalIgnoreCase))
         {
             modelBuilder.Entity<CmplUser>().HasKey(c => c.Id);
             modelBuilder.Entity<HodMaster>().HasKey(h => h.UserId);
@@ -73,7 +95,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, IConfig
         {
             modelBuilder.Ignore<CmplUser>();
             modelBuilder.Ignore<HodMaster>();
-            modelBuilder.Ignore<JanNtfsPermissionsAudit>();
         }
     }
 }

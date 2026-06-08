@@ -56,8 +56,8 @@ public sealed class FolderMappingService(
                 Error.Conflict("FOLDER_002", "A mapping for this folder path already exists."));
 
         // Convert the incoming string IDs cleanly to nullable integers
-        int? primaryId = ParseHodId(dto.PrimaryHodId);
-        int? secondaryId = ParseHodId(dto.SecondaryHodId);
+        string? primaryId = dto.PrimaryHodId;
+        string? secondaryId = dto.SecondaryHodId;
 
         var validationError = await ValidateHodIdsAsync(primaryId, secondaryId, isTestEnv);
         if (validationError is not null)
@@ -82,8 +82,46 @@ public sealed class FolderMappingService(
         return Result.Success(entity.Id);
     }
 
-    public async Task<Result> UpdateAsync(
-        int id, UpsertFolderMappingRequest dto, int updatedBy)
+    private async Task<Error?> ValidateHodIdsAsync(string? primaryHodId, string? secondaryHodId, bool isTestEnv)
+    {
+        var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
+
+        // 1. Validate the Primary HOD using explicit string matching pipelines
+        if (!string.IsNullOrWhiteSpace(primaryHodId))
+        {
+            var cleanPrimaryId = primaryHodId.Trim().ToLower();
+
+            // Cross-checks the value against EITHER EmployeeId OR Email strings in HodMaster
+            var primaryExists = await hodContext.AnyAsync(h =>
+                h.Deleted == 0 &&
+                ((h.EmployeeId != null && h.EmployeeId.ToLower() == cleanPrimaryId) ||
+                 (h.Email != null && h.Email.ToLower() == cleanPrimaryId))
+            );
+
+            if (!primaryExists)
+                return Error.NotFound("FOLDER_004", "Primary HOD not found in HOD master list.");
+        }
+
+        // 2. Validate the Secondary HOD using explicit string matching pipelines
+        if (!string.IsNullOrWhiteSpace(secondaryHodId))
+        {
+            var cleanSecondaryId = secondaryHodId.Trim().ToLower();
+
+            // Cross-checks the value against EITHER EmployeeId OR Email strings in HodMaster
+            var secondaryExists = await hodContext.AnyAsync(h =>
+                h.Deleted == 0 &&
+                ((h.EmployeeId != null && h.EmployeeId.ToLower() == cleanSecondaryId) ||
+                 (h.Email != null && h.Email.ToLower() == cleanSecondaryId))
+            );
+
+            if (!secondaryExists)
+                return Error.NotFound("FOLDER_006", "Secondary HOD not found in HOD master list.");
+        }
+
+        return null;
+    }
+
+    public async Task<Result> UpdateAsync(int id, UpsertFolderMappingRequest dto, int updatedBy)
     {
         var entity = await db.FolderMappings
             .FirstOrDefaultAsync(f => f.Id == id && f.IsActive);
@@ -100,27 +138,30 @@ public sealed class FolderMappingService(
 
         bool isTestEnv = db.Database.IsSqlite();
 
-        // Convert the incoming string IDs cleanly to nullable integers
-        int? primaryId = ParseHodId(dto.PrimaryHodId);
-        int? secondaryId = ParseHodId(dto.SecondaryHodId);
-
-        var validationError = await ValidateHodIdsAsync(primaryId, secondaryId, isTestEnv);
+        // 3. Removed ParseHodId() entirely. Validate incoming DTO parameters straight as string values
+        var validationError = await ValidateHodIdsAsync(dto.PrimaryHodId, dto.SecondaryHodId, isTestEnv);
         if (validationError is not null)
             return Result.Failure(validationError);
 
+        // 4. Update the structural fields using your matching string attributes
         entity.FolderName = dto.FolderPath;
-        entity.PrimaryHodId = primaryId;
-        entity.PrimaryHodName = dto.PrimaryHodName;
-        entity.PrimaryHodEmail = dto.PrimaryHodEmail;
-        entity.SecondaryHodId = secondaryId;
-        entity.SecondaryHodName = dto.SecondaryHodName;
-        entity.SecondaryHodEmail = dto.SecondaryHodEmail;
+
+        // Ensure data values are trimmed for storage standardization
+        entity.PrimaryHodId = dto.PrimaryHodId?.Trim();     // Assuming target tracking property column is string
+        entity.PrimaryHodName = dto.PrimaryHodName?.Trim();
+        entity.PrimaryHodEmail = dto.PrimaryHodEmail?.Trim();
+
+        entity.SecondaryHodId = dto.SecondaryHodId?.Trim(); // Assuming target tracking property column is string
+        entity.SecondaryHodName = dto.SecondaryHodName?.Trim();
+        entity.SecondaryHodEmail = dto.SecondaryHodEmail?.Trim();
+
         entity.ModifiedOn = DateTime.UtcNow;
         entity.ModifiedBy = updatedBy;
 
         await db.SaveChangesAsync();
         return Result.Success();
     }
+
 
     public async Task<Result> DeleteAsync(int id, int deletedBy)
     {
@@ -136,39 +177,6 @@ public sealed class FolderMappingService(
 
         await db.SaveChangesAsync();
         return Result.Success();
-    }
-
-    // ─── Private ─────────────────────────────────────────────────────────────────
-
-    private async Task<Error?> ValidateHodIdsAsync(int? primaryHodId, int? secondaryHodId, bool isTestEnv)
-    {
-        var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
-
-        // Check if primary HOD exists using integer UserId
-        if (primaryHodId.HasValue && primaryHodId > 0)
-        {
-            var exists = await hodContext.AnyAsync(h => h.UserId == primaryHodId.Value && h.Deleted == 0);
-            if (!exists)
-                return Error.NotFound("FOLDER_004", "Primary HOD not found in HOD master.");
-        }
-
-        // Check if secondary HOD exists using integer UserId
-        if (secondaryHodId.HasValue && secondaryHodId > 0)
-        {
-            var exists = await hodContext.AnyAsync(h => h.UserId == secondaryHodId.Value && h.Deleted == 0);
-            if (!exists)
-                return Error.NotFound("FOLDER_006", "Secondary HOD not found in HOD master.");
-        }
-
-        return null;
-    }
-
-    // Converts string input safely to int?, treating empty, non-numeric, or "0" as null
-    private static int? ParseHodId(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input)) return null;
-        if (int.TryParse(input, out var id) && id > 0) return id;
-        return null;
     }
 
     public async Task<List<FolderResponse>> GetParentFoldersAsync()
@@ -191,14 +199,13 @@ public sealed class FolderMappingService(
 
         return result;
     }
-
     private static FolderMappingDto MapToDto(FolderMappingEntity f) => new(
         f.Id,
         f.FolderName,
-        f.PrimaryHodId > 0 ? f.PrimaryHodId.ToString() : null,
+        !string.IsNullOrWhiteSpace(f.PrimaryHodId) ? f.PrimaryHodId.Trim() : null,
         f.PrimaryHodName,
         f.PrimaryHodEmail,
-        f.SecondaryHodId > 0 ? f.SecondaryHodId.ToString() : null,
+        !string.IsNullOrWhiteSpace(f.SecondaryHodId) ? f.SecondaryHodId.Trim() : null,
         f.SecondaryHodName,
         f.SecondaryHodEmail
     );

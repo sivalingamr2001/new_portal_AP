@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Web.Domain.Common;
 using Web.Domain.Dto.AccessRequest;
 
@@ -12,10 +13,18 @@ public interface IAccessRequestService
     Task<Result<int>> SubmitHodRequestAsync(SubmitAccessRequestDto dto, int hodUserId);
 
     /// <summary>Get full request detail with all items.</summary>
-    Task<Result<AccessRequestDetailDto>> GetRequestDetailAsync(int requestId, int callerUserId);
+    Task<Result<AccessRequestDetailDto>> GetRequestDetailAsync(int requestId, int callerUserId, int? itemId = null);
 
-    /// <summary>Get all requests submitted by a user.</summary>
-    Task<PagedResult<AccessRequestSummaryDto>> GetMyRequestsAsync(int userId, int page, int pageSize);
+    /// <summary>
+    /// Get all requests matching role permissions. 
+    /// Restricts regular Users/Operators to their own submissions, 
+    /// while opening global visibility for HODs across their departments and folder scopes.
+    /// </summary>
+    /// <param name="userId">The system database user primary key integer.</param>
+    /// <param name="identifier">Optional HOD Employee ID or Email string filter.</param>
+    /// <param name="page">The requested target list page integer index.</param>
+    /// <param name="pageSize">The maximum count limit parameter for the list rows.</param>
+    Task<PagedResult<AccessRequestSummaryDto>> GetMyRequestsAsync(int userId, string? identifier, int page, int pageSize);
 
     /// <summary>User resubmits a rejected item (moves back to PendingWithHod).</summary>
     Task<Result> ResubmitItemAsync(int accessItemId, string reason, int userId);

@@ -10,6 +10,7 @@ import {
   Shield,
   Ticket,
   Trash2,
+  User,
   X,
 } from "lucide-react"
 import {
@@ -37,6 +38,7 @@ interface RequestDetailsProps {
   onReject?: (itemId: number, reason: string) => void
   onRevoke?: (itemId: number, reason: string) => void
   onResubmit?: (itemId: number, reason: string) => void
+  onOpenResubmit?: (itemId: number) => void
   onRenew?: (itemId: number, reason: string) => void
   onExport?: () => void
 }
@@ -99,6 +101,7 @@ export default function RequestDetails({
   onReject,
   onRevoke,
   onResubmit,
+  onOpenResubmit,
   onRenew,
   onExport,
 }: RequestDetailsProps) {
@@ -154,9 +157,9 @@ export default function RequestDetails({
             icon={Shield}
           />
           <DetailRow
-            label="User ID"
-            value={String(request.userId)}
-            icon={Mail}
+            label="Requester Name"
+            value={request.requesterName || "N/A"}
+            icon={User}
           />
           <DetailRow
             label="Created On"
@@ -186,6 +189,7 @@ export default function RequestDetails({
               onReject={onReject}
               onRevoke={onRevoke}
               onResubmit={onResubmit}
+              onOpenResubmit={onOpenResubmit}
               onRenew={onRenew}
             />
           ))}
@@ -202,6 +206,7 @@ function AccessItemCard({
   onReject,
   onRevoke,
   onResubmit,
+  onOpenResubmit,
   onRenew,
 }: {
   item: AccessItemDto
@@ -214,6 +219,7 @@ function AccessItemCard({
   onReject?: (itemId: number, reason: string) => void
   onRevoke?: (itemId: number, reason: string) => void
   onResubmit?: (itemId: number, reason: string) => void
+  onOpenResubmit?: (itemId: number) => void
   onRenew?: (itemId: number, reason: string) => void
 }) {
   const [modal, setModal] = useState<
@@ -320,17 +326,27 @@ function AccessItemCard({
         />
       </div>
 
-      <div className="mt-3 grid gap-3">
+      <div className="mt-3 grid md:grid-cols-2 xl:grid-cols-4 gap-3">
         <DetailRow
           label="Reason"
           value={item.reason || "No reason provided"}
           icon={Mail}
         />
-        {item.rejectionReason && (
-          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
-            {item.rejectionReason}
-          </div>
-        )}
+        <DetailRow
+          label="Approved By (HOD)"
+          value={item.approvedByHodName || "Not approved yet"}
+          icon={Mail}
+        />
+        <DetailRow
+          label="Approved By (IT)"
+          value={item.approvedByITName || "Not approved yet"}
+          icon={Mail}
+        />
+        <DetailRow
+          label="Rejected By (HOD/IT)"
+          value={item.rejectedByHodName || item.rejectedByITName || "Not rejected yet"}
+          icon={Mail}
+        />
       </div>
 
       {showActions && (
@@ -382,7 +398,7 @@ function AccessItemCard({
             <ActionButton
               label="Resubmit"
               icon={RefreshCw}
-              onClick={() => openModal("resubmit")}
+              onClick={() => onOpenResubmit?.(item.itemId)}
             />
           )}
 
@@ -506,6 +522,8 @@ function ActionModal({
             </Select>
           </div>
         )}
+
+        
 
         <textarea
           rows={4}

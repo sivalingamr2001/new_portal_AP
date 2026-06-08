@@ -6,7 +6,7 @@ export interface AccessItemRequestDto {
 }
 
 export interface SubmitAccessRequestDto {
-  reqTo?: number | null
+  reqTo?: string | null
   isAgreed: boolean
   itsrNo?: string | null
   items: AccessItemRequestDto[]
@@ -22,6 +22,10 @@ export interface AccessItemDto {
   status: RequestStatus
   reason: string
   rejectionReason: string | null
+  approvedByHodName: string | null
+  rejectedByHodName: string | null
+  approvedByITName: string | null
+  rejectedByITName: string | null
   approvedAtUtc: string | null
   expiresAtUtc: string | null
 }
@@ -29,6 +33,7 @@ export interface AccessItemDto {
 export interface AccessRequestDetailDto {
   requestId: number
   userId: number
+  requesterName: string | null
   currentStatus: RequestStatus
   itsrNo: string | null
   createdOn: string
@@ -217,6 +222,7 @@ export interface DepartmentDetailDto {
 export interface UpsertDepartmentDto {
   name: string
   hodId?: string | null
+  email?: string | null
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

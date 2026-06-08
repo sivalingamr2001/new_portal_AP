@@ -14,6 +14,8 @@ export type RequestStatus =
 
 interface BpfProgressProps {
   status: RequestStatus
+  rejectedBy?: string | null
+  rejectionReason?: string | null
 }
 
 const steps = [
@@ -23,7 +25,11 @@ const steps = [
   { key: "Granted", label: "Access Granted" },
 ]
 
-export function AccessRequestBpf({ status }: BpfProgressProps) {
+export function AccessRequestBpf({
+  status,
+  rejectedBy,
+  rejectionReason,
+}: BpfProgressProps) {
   const currentStep = (() => {
     switch (status) {
       case "Submitted":
@@ -122,14 +128,19 @@ export function AccessRequestBpf({ status }: BpfProgressProps) {
       </div>
 
       {(status === "HodRejected" || status === "ItRejected") && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-          Request has been rejected.
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          <div className="font-semibold">Rejected by {rejectedBy || "the approver"}</div>
+          {rejectionReason ? (
+            <div className="mt-1 text-red-700/90">Reason: {rejectionReason}</div>
+          ) : (
+            <div className="mt-1 text-red-700/90">No rejection reason was provided.</div>
+          )}
         </div>
       )}
 
       {status === "Revoked" && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-xs">
-          Access has been revoked.
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 m-2 text-xs">
+          Access has been revoked. {/* Need to add revoke reason here when API supports it */}
         </div>
       )}
 

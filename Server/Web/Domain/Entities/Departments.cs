@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Web.Domain.Common;
 
 namespace Web.Domain.Entities;
@@ -18,5 +19,9 @@ public sealed class Department : BaseEntity
 
     [Column("hod_id")]
     [MaxLength(255)]
-    public int? HodId { get; set; } = 0;
+    public string? HodId { get; set; } = string.Empty;
+
+    [Column("email_id")]
+    [MaxLength(255)]
+    public string? Email { get; set; } = string.Empty;
 }

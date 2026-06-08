@@ -31,20 +31,23 @@ public sealed class AccessRequestController(IAccessRequestService service) : Con
             : HandleFailure(result);
     }
 
-    // GET api/access-requests/{id}
+    // GET api/access-requests/{id}?itemId=3
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetDetail(int id)
+    public async Task<IActionResult> GetDetail(int id, [FromQuery] int? itemId = null)
     {
-        var result = await service.GetRequestDetailAsync(id, GetCallerUserId());
+        var result = await service.GetRequestDetailAsync(id, GetCallerUserId(), itemId);
         return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
     }
+
 
     // GET api/access-requests/my?page=1&pageSize=20
     [HttpGet("my")]
     public async Task<IActionResult> GetMyRequests(
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        [FromQuery] string? identifier, // 1. Captured optionally from query strings (?identifier=1409)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await service.GetMyRequestsAsync(GetCallerUserId(), page, pageSize);
+        var result = await service.GetMyRequestsAsync(GetCallerUserId(), identifier, page, pageSize);
         return Ok(result);
     }
 

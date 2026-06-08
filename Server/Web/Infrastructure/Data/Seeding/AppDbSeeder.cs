@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Web.Domain.Entities;
 
-namespace Web.Infrastructure.Data;
+namespace Web.Infrastructure.Data.Seeding;
 
 public static class AppDataSeeder
 {
@@ -45,7 +45,7 @@ public static class AppDataSeeder
             {
                 Id = id,
                 Name = null,
-                HodId = 0
+                HodId = null
             });
         }
 

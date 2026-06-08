@@ -1,5 +1,6 @@
 using Web.Domain.Common;
 using Web.Domain.Dto.AccessRequest;
+using Web.Domain.Dto.User;
 using Web.Domain.Enums;
 
 namespace Web.Application.Interfaces;
@@ -22,4 +23,5 @@ public interface IHodCartService
 
     /// <summary>Bulk approve all items in a request visible to this HOD.</summary>
     Task<Result> ApproveAllInRequestAsync(int accessRequestId, string comments, int hodUserId);
+    Task<Result<List<HodUserListDto>>> GetCmplUserByIdentifiersAsync(string? employeeId, string? email);
 }

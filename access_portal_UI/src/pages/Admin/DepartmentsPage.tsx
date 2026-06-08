@@ -18,6 +18,7 @@ const departmentConfig: DynamicPageConfig<DepartmentDetailDto> = {
     await departmentsApi.updateDepartment(id as number, {
       name: payload.deptName ?? "",
       hodId: payload.hodId,
+      email: payload.email,
     })
   },
   columns: ({ openEditModal }) => [

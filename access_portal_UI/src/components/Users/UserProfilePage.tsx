@@ -55,10 +55,6 @@ export const UserProfilePage = () => {
                 <p className="text-[22px] font-normal text-primary">{userProfile?.employeeId || '-'}</p>
                 <p className="text-[11px] text-muted-foreground font-medium mt-1">Employee ID</p>
               </div>
-              <div>
-                <p className="text-[22px] font-normal text-primary">&nbsp;</p>
-                <p className="text-[11px] text-slate-400 font-medium mt-1">Team Size</p>
-              </div>
             </div>
 
             {/* Contact Details */}

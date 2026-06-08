@@ -40,18 +40,21 @@ export const FolderMappingModal = ({
   const [folders, setFolders] = useState<FolderResponseDto[]>([])
 
   const [folderPath, setFolderPath] = useState<string>("")
+  
+  // 1. Updated State contracts to hold string values: id (EmployeeID) and email
   const [primaryHod, setPrimaryHod] = useState<{
     id: string
     hodName?: string
-    emailId?: string
+    email?: string
   } | null>(null)
+  
   const [secondaryHod, setSecondaryHod] = useState<{
     id: string
     hodName?: string
-    emailId?: string
+    email?: string
   } | null>(null)
 
-  // 1. Data Lookups aligned with non-wrapped raw endpoints context
+  // Data Lookups for Parent Folders remain unchanged
   useEffect(() => {
     if (!isOpen) return
 
@@ -60,7 +63,6 @@ export const FolderMappingModal = ({
         const foldersRes = await folderMappingsApi.getParentFolders()
 
         if (foldersRes) {
-          // Normalize Drive/Path structure if needed from FolderResponse
           const transformedFolders = (foldersRes as any[]).map((f, idx) => ({
             id: String(idx),
             name: f.name || "",
@@ -76,7 +78,7 @@ export const FolderMappingModal = ({
     loadDropdownData()
   }, [isOpen])
 
-  // 2. Clear or set form parameters on lifecycle visibility change mutations
+  // 2. Synchronize lifecycle visibility changes using string parameters from initialData
   useEffect(() => {
     if (isOpen && initialData) {
       setFolderPath(initialData.folderPath || "")
@@ -84,14 +86,15 @@ export const FolderMappingModal = ({
       setPrimaryHod({
         id: initialData.primaryHodId || "",
         hodName: initialData.primaryHodName || "",
-        emailId: initialData.primaryHodEmail || "",
+        email: initialData.primaryHodEmail || "", // maps to email string
       })
+      
       setSecondaryHod(
         initialData.secondaryHodId
           ? {
               id: initialData.secondaryHodId || "",
               hodName: initialData.secondaryHodName || "",
-              emailId: initialData.secondaryHodEmail || "",
+              email: initialData.secondaryHodEmail || "", // maps to email string
             }
           : null
       )
@@ -102,7 +105,7 @@ export const FolderMappingModal = ({
     }
   }, [isOpen, initialData])
 
-  // 3. Delegation pipeline hand-off execution routing
+  // 3. Execution payload submission block
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -111,10 +114,10 @@ export const FolderMappingModal = ({
       folderPath,
       primaryHodId: primaryHod?.id || null,
       primaryHodName: primaryHod?.hodName || null,
-      primaryHodEmail: primaryHod?.emailId || null,
+      primaryHodEmail: primaryHod?.email || null, // Maps string property directly to parameter
       secondaryHodId: secondaryHod?.id || null,
       secondaryHodName: secondaryHod?.hodName || null,
-      secondaryHodEmail: secondaryHod?.emailId || null,
+      secondaryHodEmail: secondaryHod?.email || null, // Maps string property directly to parameter
     }
 
     try {
@@ -175,22 +178,22 @@ export const FolderMappingModal = ({
 
           <div className="space-y-2">
             <Label htmlFor="primaryHod">Primary HOD</Label>
-            {/* HodSelect returns EmployeeId */}
             <HodSelect
               value={
-                primaryHod
+                primaryHod && primaryHod.id
                   ? {
-                      userId: Number(primaryHod.id || 0),
+                      employeeId: primaryHod.id, // Fixed parameter mapping assignment
                       hodName: primaryHod.hodName || "",
-                      emailId: primaryHod.emailId,
+                      email: primaryHod.email || "", // Fixed parameter mapping assignment
                     }
                   : null
               }
               onChange={(hod) => {
+                // 4. Fixed: Access properties using the updated HodSelect return payload fields
                 setPrimaryHod({
-                  id: String(hod.userId),
+                  id: hod.employeeId, 
                   hodName: hod.hodName,
-                  emailId: hod.emailId,
+                  email: hod.email, 
                 })
               }}
             />
@@ -198,22 +201,22 @@ export const FolderMappingModal = ({
 
           <div className="space-y-2">
             <Label htmlFor="secondaryHod">Secondary HOD</Label>
-            {/* HodSelect returns EmployeeId */}
             <HodSelect
               value={
-                secondaryHod
+                secondaryHod && secondaryHod.id
                   ? {
-                      userId: Number(secondaryHod.id || 0),
+                      employeeId: secondaryHod.id, // Fixed parameter mapping assignment
                       hodName: secondaryHod.hodName || "",
-                      emailId: secondaryHod.emailId,
+                      email: secondaryHod.email || "", // Fixed parameter mapping assignment
                     }
                   : null
               }
               onChange={(hod) => {
+                // 5. Fixed: Access properties using the updated HodSelect return payload fields
                 setSecondaryHod({
-                  id: String(hod.userId),
+                  id: hod.employeeId, 
                   hodName: hod.hodName,
-                  emailId: hod.emailId,
+                  email: hod.email, 
                 })
               }}
             />

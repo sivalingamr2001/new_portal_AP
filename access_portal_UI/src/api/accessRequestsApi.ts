@@ -49,10 +49,17 @@ export const accessRequestsApi = {
     }
   },
 
-  getRequestDetail: async (id: number): Promise<AccessRequestDetailDto> => {
+  getRequestDetail: async (
+    id: number,
+    itemId?: number
+  ): Promise<AccessRequestDetailDto> => {
     try {
       const response = await apiService.get<AccessRequestDetailDto>(
-        `/access-requests/${id}`
+        `/access-requests/${id}`,
+        {
+          // Axios automatically converts this to ?itemId=value and handles undefined
+          params: { itemId },
+        }
       )
       return response.data
     } catch (error) {

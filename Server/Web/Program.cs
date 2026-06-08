@@ -1,10 +1,14 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Server.Infrastructure.Oracle;
 using Web.Application.Interfaces;
 using Web.Application.Services;
+using Web.Infrastructure.BackgroundServices;
 using Web.Infrastructure.Data;
+using Web.Infrastructure.Data.Seeding;
 using Web.Infrastructure.Hubs;
+using Web.Shared.Utilites.EmailService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -111,6 +115,11 @@ else
 // =========================================================================
 // 5. APPLICATION SERVICES (DI REGISTRATION)
 // =========================================================================
+// Register as both a manual utility service and a background engine task
+builder.Services.AddSingleton<DailyUserDeptSyncService>();
+builder.Services.AddSingleton<IDailyUserDeptSyncService>(sp => sp.GetRequiredService<DailyUserDeptSyncService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DailyUserDeptSyncService>());
+
 // ✅ These services can now cleanly resolve IHubContext<NotificationHub> because AddSignalR() has executed above!
 builder.Services.AddScoped<IAccessRequestService, AccessRequestService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -123,6 +132,8 @@ builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IFolderMappingService, FolderMappingService>();
 builder.Services.AddScoped<FolderService>();
 builder.Services.AddScoped<FolderServiceLocal>();
+builder.Services.AddScoped<IOracleService, OracleService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // =========================================================================
 // 6. PIPELINE & MIDDLEWARE BUILD
@@ -136,7 +147,7 @@ using (var scope = app.Services.CreateScope())
     var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
     var db = services.GetRequiredService<AppDbContext>();
 
-    if (!isMySql || env.IsDevelopment())
+    if (!isMySql)
     {
         try
         {
@@ -154,13 +165,44 @@ using (var scope = app.Services.CreateScope())
     {
         try
         {
+            var databaseName = db.Database.GetDbConnection().Database;
+            logger.LogInformation("Ensuring AppDbContext tables exist in MySQL database '{DatabaseName}'.", databaseName);
+
+            // 1. Creates all tables safely
             await db.Database.EnsureCreatedAsync();
+            logger.LogInformation("AppDbContext schema ensured for MySQL database '{DatabaseName}'.", databaseName);
+
+            var configuration = services.GetRequiredService<IConfiguration>();
+
+            // 2. High-speed CSV Folder Data Seeding Intercept
+            logger.LogInformation("Checking if 'Folders' table requires initial high-speed data import...");
+            if (!await db.Folders.AnyAsync())
+            {
+                logger.LogWarning("'Folders' table is empty. Initiating data importer routine...");
+                await FolderDataSeeding.ExecuteImportAsync();
+            }
+            else
+            {
+                logger.LogInformation("'Folders' table already contains data records. Seeding skipped.");
+            }
+
+            // 🎯 NEW INTERCEPTION: Trigger Initial User & Department Sync
+            logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
+
+            // Resolve our manual interface directly from startup service provider
+            var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
+
+            // Fire the sync method explicitly 
+            await syncService.TriggerSyncAsync(CancellationToken.None);
+
+            logger.LogInformation("Initial baseline synchronization finished successfully.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while initializing the primary database tables.");
+            logger.LogError(ex, "An error occurred while initializing AppDbContext tables, bulk seeding, or running baseline sync tasks.");
         }
     }
+
 }
 
 if (app.Environment.IsDevelopment())

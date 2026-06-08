@@ -114,7 +114,7 @@ export const sidebarItems: SidebarGroup[] = [
         label: "Audit Logs",
         to: "/admin/audit-logs",
         icon: FileText,
-        roles: [1], // UserRole.Admin
+        roles: [], // UserRole.Admin
       },
     ],
   },

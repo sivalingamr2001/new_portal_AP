@@ -50,10 +50,9 @@ public sealed class AuthService(
             {
                 hod = isTestEnv
                     ? await db.HodMasters.FirstOrDefaultAsync(h =>
-                        h.UserId == department.HodId &&
-                        h.Deleted == 0)
+                        h.EmployeeId == department.HodId && h.Deleted == 0)
                     : await hodDb.HodMasters.FirstOrDefaultAsync(h =>
-                        h.UserId == department.HodId &&
+                        h.EmployeeId == department.HodId &&
                         h.Deleted == 0);
             }
         }

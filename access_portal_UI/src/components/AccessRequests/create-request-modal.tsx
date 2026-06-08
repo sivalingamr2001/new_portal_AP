@@ -78,7 +78,7 @@ export const CreateRequestModal = ({
     email: currentUser?.user?.email ?? "",
     itsrNumber: "",
     departmentName: currentUser?.department?.name ?? "",
-    hodId: Number(currentUser?.headOfDepartment?.id ?? 0),
+    hodId: currentUser?.headOfDepartment?.employeeId ?? currentUser?.headOfDepartment?.email ?? "",
     hodName: currentUser?.headOfDepartment?.name ?? "",
     location: currentUser?.user?.location ?? "",
     mobile: currentUser?.user?.mobileNumber ?? "",

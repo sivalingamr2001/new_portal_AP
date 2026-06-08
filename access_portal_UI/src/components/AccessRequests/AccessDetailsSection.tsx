@@ -66,15 +66,17 @@ function AccessDetailsSection({
   items: controlledItems,
   onItemsChange,
 }: AccessDetailsSectionProps) {
-  const [items, setItems] = useState<RequestItem[]>(
-    controlledItems ?? [
-      {
-        id: 1,
-        accessType: "not-applicable",
-        folderPath: "",
-        reason: "",
-      },
-    ]
+  const [items, setItems] = useState<RequestItem[]>(() =>
+    controlledItems && controlledItems.length > 0
+      ? controlledItems
+      : [
+          {
+            id: 1,
+            accessType: "not-applicable",
+            folderPath: "",
+            reason: "",
+          },
+        ]
   )
 
   const { currentUserRole } = useAuth()
@@ -87,6 +89,23 @@ function AccessDetailsSection({
   const [activeItemId, setActiveItemId] = useState<number | null>(null)
 
 const { loading, withLoader } = useLoader();
+
+useEffect(() => {
+  if (controlledItems && controlledItems.length > 0) {
+    setItems(controlledItems)
+    if (controlledItems[0]?.id) setExpandedId(controlledItems[0].id)
+    return
+  }
+
+  setItems([
+    {
+      id: 1,
+      accessType: "not-applicable",
+      folderPath: "",
+      reason: "",
+    },
+  ])
+}, [controlledItems])
 
 useEffect(() => {
   let cancelled = false;

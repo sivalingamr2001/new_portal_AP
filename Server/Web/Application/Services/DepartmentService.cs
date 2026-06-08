@@ -33,31 +33,34 @@ public sealed class DepartmentService(
             .Take(pageSize)
             .ToListAsync();
 
-        // 2. Extract valid HodId values (greater than 0)
-        var hodUserIds = depts
-            .Where(d => d.HodId > 0)
-            .Select(d => d.HodId)
-            .Distinct()
+        // 2. Extract valid HOD employee IDs from department records.
+        var hodEmployeeIds = depts
+            .Where(d => !string.IsNullOrWhiteSpace(d.HodId))
+            .Select(d => d.HodId!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // 3. Query HodMasters using the integer UserId, not EmployeeId
+        // 3. Query HodMasters by employee ID (the department HOD field is stored as CMPL employee ID).
         var hodsList = isTestEnv
-            ? await db.HodMasters.Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0).ToListAsync()
-            : await hodDb.HodMasters.Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0).ToListAsync();
+            ? await db.HodMasters
+                .Where(h => hodEmployeeIds.Contains(h.EmployeeId ?? string.Empty) && h.Deleted == 0)
+                .ToListAsync()
+            : await hodDb.HodMasters
+                .Where(h => hodEmployeeIds.Contains(h.EmployeeId ?? string.Empty) && h.Deleted == 0)
+                .ToListAsync();
 
-        // Map into an integer-keyed Dictionary
-        var hods = hodsList.ToDictionary(h => h.UserId);
+        // Map into a string-keyed dictionary for employee-ID lookups.
+        var hods = hodsList.ToDictionary(h => (h.EmployeeId ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase);
 
         // 4. Map the collections using integer lookups
         var data = depts.Select(d =>
         {
             HodMaster? hod = null;
 
-            // Check if HodId has a valid value greater than 0
-            if (d.HodId.HasValue && d.HodId.Value > 0)
+            // Check if HodId contains a valid CMPL employee ID.
+            if (!string.IsNullOrWhiteSpace(d.HodId))
             {
-                // Use .Value to safely convert int? to int for the dictionary lookup
-                hods.TryGetValue(d.HodId.Value, out hod);
+                hods.TryGetValue(d.HodId.Trim(), out hod);
             }
 
             return new DepartmentDetailDto(
@@ -89,9 +92,12 @@ public sealed class DepartmentService(
         var hodContext = isTestEnv ? db.HodMasters : hodDb.HodMasters;
         HodMaster? hod = null;
 
-        if (dept.HodId > 0)
+        if (!string.IsNullOrWhiteSpace(dept.HodId))
         {
-            hod = await hodContext.FirstOrDefaultAsync(h => h.UserId == dept.HodId && h.Deleted == 0);
+            hod = await hodContext.FirstOrDefaultAsync(h =>
+                h.EmployeeId != null &&
+                h.EmployeeId.ToLower() == dept.HodId.Trim().ToLower() &&
+                h.Deleted == 0);
         }
 
         return Result.Success(
@@ -107,28 +113,24 @@ public sealed class DepartmentService(
 
     public async Task<Result<int>> CreateAsync(UpsertDepartmentDto dto, int createdBy)
     {
-        // Assuming dto.HodId arrives as a string/int from request, convert cleanly to integer
-        int targetHodId = 0;
-        if (dto.HodId != null)
-        {
-            int.TryParse(dto.HodId.ToString(), out targetHodId);
-        }
+        var targetHodId = dto.HodId?.Trim();
 
-        if (targetHodId > 0)
+        if (!string.IsNullOrWhiteSpace(targetHodId))
         {
-            // Validate that the target HOD is a portal user with Role = "Hod"
-            var hodPortalUser = await db.Users
-                .FirstOrDefaultAsync(u => u.Id == targetHodId && u.Role == "Hod");
+            var hodRecord = await hodDb.HodMasters
+                .FirstOrDefaultAsync(h => h.EmployeeId != null
+                    && h.EmployeeId.ToLower() == targetHodId.ToLower()
+                    && h.Deleted == 0);
 
-            if (hodPortalUser is null)
+            if (hodRecord is null)
                 return Result.Failure<int>(
-                    Error.NotFound("DEPT_003", "The specified user is not authorized as an HOD."));
+                    Error.NotFound("DEPT_003", "The specified HOD employee ID is not authorized."));
         }
 
         var dept = new Department
         {
             Name = dto.Name,
-            HodId = targetHodId, // Stores integer directly (0 if invalid/empty)
+            HodId = targetHodId,
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = createdBy
@@ -151,22 +153,22 @@ public sealed class DepartmentService(
                 Error.NotFound("DEPT_001", "Department not found."));
         }
 
-        int targetHodId = 0;
-        if (dto.HodId != null)
-        {
-            int.TryParse(dto.HodId.ToString(), out targetHodId);
-        }
+        var targetHodId = dto.HodId?.Trim();
 
-        if (targetHodId > 0)
+        if (!string.IsNullOrWhiteSpace(targetHodId))
         {
-            // Validate that the target HOD is a portal user with Role = "Hod"
-            var hodPortalUser = await db.Users
-                .FirstOrDefaultAsync(u => u.Id == targetHodId && u.Role == "Hod");
+            var hodRecord = isTestEnv ?  await db.HodMasters
+                .FirstOrDefaultAsync(h => h.EmployeeId != null
+                    && h.EmployeeId.ToLower() == targetHodId.ToLower()
+                    && h.Deleted == 0) : await hodDb.HodMasters
+                .FirstOrDefaultAsync(h => h.EmployeeId != null
+                    && h.EmployeeId.ToLower() == targetHodId.ToLower()
+                    && h.Deleted == 0);
 
-            if (hodPortalUser is null)
+            if (hodRecord is null)
             {
                 return Result.Failure(
-                    Error.NotFound("DEPT_003", "The specified user is not authorized as an HOD."));
+                    Error.NotFound("DEPT_003", "The specified HOD employee ID is not authorized."));
             }
         }
 

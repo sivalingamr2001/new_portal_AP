@@ -20,6 +20,20 @@ public sealed class HodCartController(IHodCartService service) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("cmpl-lookup")]
+    public async Task<IActionResult> LookupCmplUser([FromQuery] string? employeeId, [FromQuery] string? email)
+    {
+        var result = await service.GetCmplUserByIdentifiersAsync(employeeId, email);
+
+        if (result.IsFailure)
+        {
+            // Reuses your clean client-side message parsing format handled earlier
+            return BadRequest(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
+
     [HttpPost("items/{itemId:int}/approve")]
     public async Task<IActionResult> Approve(int itemId, [FromBody] ItemActionDto dto)
     {

@@ -3,10 +3,11 @@ import { Input } from "@/components/ui/input"
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { useEffect, useState } from "react"
 
+// 1. Updated interface contract to strictly pass string keys to parent
 export interface SelectedHod {
-    userId: number
-    hodName: string
-    emailId?: string
+    employeeId: string // Unique identifier used by Department entity (hod_id)
+    email: string      // Assigned email identifier (email_id)
+    hodName: string    // Clean display name
 }
 
 interface HodSelectProps {
@@ -20,10 +21,11 @@ export const HodSelect = ({
     onChange,
     placeholder = "Search and select HOD...",
 }: HodSelectProps) => {
-    // 1. Initialize search text cleanly from incoming parent state values
+    // Initialize search text using the incoming structural HOD display name
     const [search, setSearch] = useState(value?.hodName || "")
     const [openDropdown, setOpenDropdown] = useState(false)
 
+    // Using your existing infinite scroll hook, feeding search params to your API
     const {
         rowData: hodList,
         page,
@@ -44,7 +46,7 @@ export const HodSelect = ({
         },
     })
 
-    // Debounced network search triggered when typing
+    // Debounced layout search logic
     useEffect(() => {
         const timer = setTimeout(() => {
             loadData(1)
@@ -53,7 +55,7 @@ export const HodSelect = ({
         return () => clearTimeout(timer)
     }, [search])
 
-    // Global document click listener handles window close events
+    // Global document click event handling to automatically clear dropdown overlay focus
     useEffect(() => {
         const close = () => setOpenDropdown(false)
         document.addEventListener("click", close)
@@ -62,12 +64,12 @@ export const HodSelect = ({
         }
     }, [])
 
-    // 2. FIX: Synchronize the search box display text when the parent value changes or initializes
+    // 2. Synchronize search text input overlay when parent values update dynamically
     useEffect(() => {
         if (value && value.hodName) {
             setSearch(value.hodName)
-        } else if (value && value.userId > 0) {
-            setSearch(String(value.userId))
+        } else if (value && value.employeeId) {
+            setSearch(value.employeeId)
         } else {
             setSearch("")
         }
@@ -86,16 +88,16 @@ export const HodSelect = ({
         }
     }
 
+    // 3. Selection handler returning string objects matching backend entities
     const handleSelect = (
-        userId: number,
-        hodName: string,
-        emailId?: string
+        employeeId: string,
+        email: string,
+        hodName: string
     ) => {
-        // 3. FIX: Send structural integer objects back to parent hook validations
         onChange({
-            userId: Number(userId),
-            hodName,
-            emailId,
+            employeeId: String(employeeId).trim(),
+            email: String(email).trim(),
+            hodName: hodName.trim(),
         })
         setSearch(hodName)
         setOpenDropdown(false)
@@ -103,10 +105,11 @@ export const HodSelect = ({
 
     const normalizedSearch = search.trim().toLowerCase()
 
+    // Evaluates records locally to maximize UX responsivity
     const filteredHodList = hodList.filter((hod: any) => {
-        const userIdStr = String(hod.userId || hod.id || "")
-        const hodName = String(hod.hodName || hod.name || "").trim().toLowerCase()
-        const email = String(hod.emailId || hod.email || "").trim().toLowerCase()
+        const empIdStr = String(hod.employeeId || hod.id || "").trim().toLowerCase()
+        const nameStr = String(hod.hodName || hod.name || "").trim().toLowerCase()
+        const emailStr = String(hod.emailId || hod.email || "").trim().toLowerCase()
 
         if (!normalizedSearch) {
             return true
@@ -117,7 +120,7 @@ export const HodSelect = ({
             return true
         }
 
-        return [userIdStr, hodName, email].some(val =>
+        return [empIdStr, nameStr, emailStr].some(val =>
             val.includes(normalizedSearch)
         )
     })
@@ -150,35 +153,36 @@ export const HodSelect = ({
                     )}
 
                     {filteredHodList.map((hod: any) => {
-                        const uniqueId = Number(hod.userId || hod.id || 0)
-                        const displayName = hod.hodName || hod.name || "N/A"
-                        const email = hod.emailId || hod.email || "No Email"
+                        // Extracting parameters dynamically according to varying backend property casing
+                        const currentEmpId = String(hod.employeeId || hod.id || "")
+                        const currentEmail = String(hod.emailId || hod.email || "")
+                        const displayName = String(hod.hodName || hod.name || "N/A")
 
                         const isNoEmail =
-                            !email ||
-                            email.trim().toLowerCase() === "no email"
+                            !currentEmail ||
+                            currentEmail.trim().toLowerCase() === "no email"
 
-                        // 4. FIX: Use matching numeric type checks to identify if active element is selected
-                        const isSelected = Number(value?.userId) === uniqueId
+                        // 4. Match values via string tracking expressions instead of integers
+                        const isSelected =
+                            value?.employeeId?.toLowerCase() === currentEmpId.toLowerCase() ||
+                            (!!value?.email && value.email.toLowerCase() === currentEmail.toLowerCase())
 
                         return (
                             <button
                                 type="button"
-                                key={uniqueId}
-                                className={`w-full px-3 py-2 text-left hover:bg-accent text-sm ${
-                                    isSelected ? "bg-accent font-medium text-accent-foreground" : ""
-                                }`}
-                                onClick={() => handleSelect(uniqueId, displayName, email)}
-                            >
-                                <div>{displayName}</div>
-                                <div
-                                    className={`text-xs ${
-                                        isNoEmail
-                                            ? "text-destructive"
-                                            : "text-muted-foreground"
+                                key={`${currentEmpId}-${currentEmail}`}
+                                className={`w-full px-3 py-2 text-left hover:bg-accent text-sm ${isSelected ? "bg-accent font-medium text-accent-foreground" : ""
                                     }`}
-                                >
-                                    {email}
+                                onClick={() => handleSelect(currentEmpId, currentEmail, displayName)}
+                            >
+                                <div className="font-medium">{displayName}</div>
+                                <div className="flex justify-between text-xs mt-0.5">
+                                    <span>Code: {currentEmpId || "N/A"}</span>
+                                </div>
+                                <div className="flex justify-between text-xs mt-0.5">
+                                    <span className={isNoEmail ? "text-destructive" : ""}>
+                                        Email: {currentEmail ? currentEmail : "No Email"}
+                                    </span>
                                 </div>
                             </button>
                         )

@@ -4,6 +4,7 @@ using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto.Login;
 using Web.Domain.Dto.User;
+using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 
 namespace Web.Application.Services;
@@ -155,27 +156,27 @@ public sealed class UserService(
         var departments = await db.Departments.Where(d => deptIds.Contains(d.Id)).ToListAsync();
 
         // Extract unique HOD user IDs linked to these departments
-        var hodUserIds = departments
-            .Where(d => d.HodId.HasValue && d.HodId.Value > 0)
-            .Select(d => d.HodId!.Value)
-            .Distinct()
+        var hodEmployeeIds = departments
+            .Where(d => !string.IsNullOrWhiteSpace(d.HodId))
+            .Select(d => d.HodId!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Batch retrieve assigned HOD profile records based on integer user IDs
+        // Batch retrieve assigned HOD profile records by CMPL employee ID.
         List<HodDto> batchHods = new();
-        if (hodUserIds.Any())
+        if (hodEmployeeIds.Any())
         {
             if (isTestEnv)
             {
                 var masters = await db.HodMasters
-                    .Where(h => hodUserIds.Contains(h.UserId) && h.Deleted == 0)
+                    .Where(h => hodEmployeeIds.Contains(h.EmployeeId ?? string.Empty) && h.Deleted == 0)
                     .ToListAsync();
                 batchHods = masters.Select(h => new HodDto(h.UserId, h.Name, h.EmployeeId, h.Email, h.MobileNumber)).ToList();
             }
             else
             {
                 var cmplHods = await hodDb.HodMasters
-                    .Where(c => hodUserIds.Contains(c.UserId) && c.Deleted == 0)
+                    .Where(c => hodEmployeeIds.Contains(c.EmployeeId ?? string.Empty) && c.Deleted == 0)
                     .ToListAsync();
                 batchHods = cmplHods.Select(c => new HodDto(c.UserId, c.Name, c.EmployeeId, c.Email, c.MobileNumber)).ToList();
             }
@@ -208,9 +209,11 @@ public sealed class UserService(
                 {
                     departmentDto = new DepartmentDto(dept.Id, dept.Name, dept.HodId);
 
-                    if (dept.HodId.HasValue && dept.HodId.Value > 0)
+                    if (!string.IsNullOrWhiteSpace(dept.HodId))
                     {
-                        hodDto = batchHods.FirstOrDefault(h => h.Id == dept.HodId.Value);
+                        hodDto = batchHods.FirstOrDefault(h =>
+                            !string.IsNullOrWhiteSpace(h.EmployeeId) &&
+                            string.Equals(h.EmployeeId, dept.HodId, StringComparison.OrdinalIgnoreCase));
                     }
 
                             // Fallback: if department HodId did not yield a HOD, try matching by CMPL EmployeeId
@@ -275,12 +278,14 @@ public sealed class UserService(
                 departmentDto = new DepartmentDto(dept.Id, dept.Name, dept.HodId);
 
                 // Handle HOD lookups by matching HodId string directly with EmployeeId fields
-                if (dept.HodId.HasValue && dept.HodId.Value > 0)
+                if (!string.IsNullOrWhiteSpace(dept.HodId))
                 {
                     if (isTestEnv)
                     {
                         var hodMaster = await db.HodMasters
-                            .FirstOrDefaultAsync(c => c.UserId == dept.HodId.Value && c.Deleted == 0);
+                            .FirstOrDefaultAsync(c => c.EmployeeId != null &&
+                                                      c.EmployeeId.ToLower() == dept.HodId.Trim().ToLower() &&
+                                                      c.Deleted == 0);
                         if (hodMaster is not null)
                         {
                             hodDto = new HodDto(
@@ -295,7 +300,9 @@ public sealed class UserService(
                     else
                     {
                         var hodCmpl = await hodDb.HodMasters
-                            .FirstOrDefaultAsync(c => c.UserId == dept.HodId.Value && c.Deleted == 0);
+                            .FirstOrDefaultAsync(c => c.EmployeeId != null &&
+                                                      c.EmployeeId.ToLower() == dept.HodId.Trim().ToLower() &&
+                                                      c.Deleted == 0);
                         if (hodCmpl is not null)
                         {
                             hodDto = new HodDto(

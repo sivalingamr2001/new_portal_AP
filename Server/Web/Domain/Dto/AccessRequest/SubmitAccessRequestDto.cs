@@ -5,8 +5,7 @@ using Web.Domain.Enums;
 namespace Web.Domain.Dto.AccessRequest;
 
 public sealed record SubmitAccessRequestDto(
-    [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
-    int? ReqTo,
+    string? ReqTo,
     bool IsAgreed,
     IEnumerable<AccessItemRequestDto> Items
 );
@@ -21,6 +20,7 @@ public sealed record AccessItemRequestDto(
 public sealed record AccessRequestDetailDto(
     int RequestId,
     int UserId,
+    string RequesterName,
     RequestStatus CurrentStatus,
     string? ItsrNo,
     DateTime CreatedOn,
@@ -36,6 +36,10 @@ public sealed record AccessItemDto(
     RequestStatus Status,
     string Reason,
     string? RejectionReason,
+    string? ApprovedByHodName,
+    string? RejectedByHodName,
+    string? ApprovedByITName,
+    string? RejectedByITName,
     DateTime? ApprovedAtUtc,
     DateTime? ExpiresAtUtc
 );

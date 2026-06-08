@@ -5,12 +5,14 @@ using Web.Domain.Dto.Notification;
 using Web.Domain.Entities;
 using Web.Infrastructure.Data;
 using Web.Infrastructure.Hubs;
+using Web.Shared.Utilites.EmailService;
 
 namespace Web.Application.Services;
 
 public sealed class NotificationService(
     AppDbContext db,
-    IHubContext<NotificationHub> hubContext) : INotificationService
+    IHubContext<NotificationHub> hubContext,
+    IEmailService emailService) : INotificationService
 {
     public async Task NotifyUserAsync(int userId, string role, string title, string message,
         string type, int? requestId = null, int? itemId = null, string? ticketNumber = null)
@@ -19,6 +21,8 @@ public sealed class NotificationService(
             requestId, itemId, ticketNumber);
 
         var dto = MapToDto(notification);
+
+        await QueueEmailNotificationAsync(userId, title, message, type);
 
         // Push to the user's personal SignalR group
         await hubContext.Clients
@@ -38,6 +42,7 @@ public sealed class NotificationService(
         foreach (var uid in usersInRole)
         {
             await PersistAsync(uid, role, title, message, type, requestId, itemId, ticketNumber);
+            await QueueEmailNotificationAsync(uid, title, message, type);
         }
 
         // Broadcast to role group
@@ -135,6 +140,25 @@ public sealed class NotificationService(
         db.AccessReqAudits.Add(entity);
         await db.SaveChangesAsync();
         return entity;
+    }
+
+    private async Task QueueEmailNotificationAsync(int userId, string title, string message, string type)
+    {
+        var user = await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == userId);
+        if (string.IsNullOrWhiteSpace(user?.Email))
+            return;
+
+        var request = new EmailNotificationRequest
+        {
+            MailFrom = "feedback@janatics.co.in",
+            MailTo = user.Email.Trim(),
+            MailCc = string.Empty,
+            MailSubject = title,
+            MailBody = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p><p>Type: {System.Net.WebUtility.HtmlEncode(type)}</p>",
+            MailProgram = $"PortalNotification_{type}"
+        };
+
+        await emailService.SendEmailAsync(request, CancellationToken.None);
     }
 
     private static NotificationDto MapToDto(AccessReqAuditEntity n) => new(

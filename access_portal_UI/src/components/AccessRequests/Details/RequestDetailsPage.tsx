@@ -6,6 +6,7 @@ import type { AccessRequestDetailDto, AccessTypes } from "@/api/types"
 import RequestDetails from "./RequestDetailSheet"
 import { toast } from "sonner"
 import { AccessRequestBpf } from "./AccessRequestBpf"
+import { ResubmitRequestModal } from "../ResubmitRequestModal"
 
 export const RequestDetailsPage = () => {
   const { requestId } = useParams<{ requestId: string }>()
@@ -16,6 +17,7 @@ export const RequestDetailsPage = () => {
   const [request, setRequest] = useState<AccessRequestDetailDto | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [resubmitTarget, setResubmitTarget] = useState<{ requestId: number; itemId: number } | null>(null)
 
   const fetchRequest = useCallback(() => {
     const accessReqId = Number(requestId)
@@ -167,6 +169,12 @@ export const RequestDetailsPage = () => {
     )
   }
 
+  const openResubmitModal = (itemId: number) => {
+    if (!request) return
+
+    setResubmitTarget({ requestId: request.requestId, itemId })
+  }
+
   const handleRenew = (itemId: number, reason: string) => {
     refreshAfterAction(
       () => accessRequestsApi.renewItem(itemId, { reason }),
@@ -191,9 +199,18 @@ export const RequestDetailsPage = () => {
     URL.revokeObjectURL(url)
   }
 
+  const selectedItem = visibleRequest.items[0]
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
-      <AccessRequestBpf status={visibleRequest.currentStatus} />
+      <AccessRequestBpf
+        status={visibleRequest.currentStatus}
+        rejectedBy={
+          selectedItem?.rejectedByHodName ||
+          selectedItem?.rejectedByITName || null
+        }
+        rejectionReason={selectedItem?.rejectionReason || null}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <RequestDetails
           request={visibleRequest}
@@ -202,10 +219,24 @@ export const RequestDetailsPage = () => {
           onReject={handleReject}
           onRevoke={handleRevoke}
           onResubmit={handleResubmit}
+          onOpenResubmit={openResubmitModal}
           onRenew={handleRenew}
           onExport={handleExport}
         />
       </div>
+
+      <ResubmitRequestModal
+        isOpen={Boolean(resubmitTarget)}
+        onOpenChange={(open) => {
+          if (!open) setResubmitTarget(null)
+        }}
+        requestId={resubmitTarget?.requestId ?? null}
+        itemId={resubmitTarget?.itemId ?? null}
+        onSuccess={() => {
+          setResubmitTarget(null)
+          fetchRequest()
+        }}
+      />
     </div>
   )
 }
