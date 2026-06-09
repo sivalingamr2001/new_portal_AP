@@ -137,6 +137,18 @@ export function AppHeader() {
         if (connection.state === HubConnectionState.Disconnected) {
           await connection.start()
         }
+
+        if (connection.state === HubConnectionState.Connected) {
+          try {
+            await connection.invoke("JoinUserGroup", String(userId))
+            const roleGroup = currentUser?.user?.role
+            if (roleGroup) {
+              await connection.invoke("JoinRoleGroup", roleGroup)
+            }
+          } catch (invokeError) {
+            console.warn("Failed to join notification groups:", invokeError)
+          }
+        }
       } catch (error: unknown) {
         // Catch and completely ignore expected abort handshakes
         if (!isMounted) return

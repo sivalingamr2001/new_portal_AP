@@ -125,7 +125,10 @@ export const CreateRequestModal = ({
         })),
       }
 
-      const requestId = await accessRequestsApi.submitRequest(payload)
+      const isCreatedByHod = currentUser?.user?.role?.includes("Hod") ?? false
+      const requestId = isCreatedByHod 
+        ? await accessRequestsApi.submitHodRequest(payload)
+        : await accessRequestsApi.submitRequest(payload)
 
       if (requestId > 0) {
         await notificationsApi.getNotifications().catch(() => undefined)

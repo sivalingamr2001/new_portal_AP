@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Web.Application.Services;
+using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto.AccessRequest;
 

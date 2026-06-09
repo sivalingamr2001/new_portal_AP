@@ -196,7 +196,7 @@ public sealed class HodCartService(
             ActorUserId = hodUserId,
             RecipientUserId = item.AccessRequest?.UserId ?? 0,
             RecipientName = string.Empty,
-            RecipientRole = "It",
+            RecipientRole = "Operator",
             IsActive = true,
             CreatedOn = DateTime.UtcNow,
             CreatedBy = hodUserId
@@ -207,7 +207,7 @@ public sealed class HodCartService(
 
         // 8. Trigger external notification service
         await notificationService.NotifyRoleGroupAsync(
-            role: "It",
+            role: "Operator",
             title: "HOD Approved — Action Required",
             message: $"Ticket {item.TicketNumber} has been approved by HOD and is pending IT review.",
             type: "HodApproved",
@@ -410,7 +410,7 @@ public sealed class HodCartService(
                 ActorUserId = hodUserId,
                 RecipientUserId = item.AccessRequest?.UserId ?? 0,
                 RecipientName = string.Empty,
-                RecipientRole = "It",
+                RecipientRole = "Operator",
                 IsActive = true,
                 CreatedOn = DateTime.UtcNow,
                 CreatedBy = hodUserId
@@ -422,7 +422,7 @@ public sealed class HodCartService(
 
         // 9. Trigger external notification group alerts
         await notificationService.NotifyRoleGroupAsync(
-            role: "It",
+            role: "Operator",
             title: "Bulk HOD Approval",
             message: $"{items.Count} items in Request #{accessRequestId} approved by HOD.",
             type: "BulkHodApproved",

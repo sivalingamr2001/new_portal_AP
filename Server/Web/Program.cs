@@ -134,6 +134,7 @@ builder.Services.AddScoped<FolderService>();
 builder.Services.AddScoped<FolderServiceLocal>();
 builder.Services.AddScoped<IOracleService, OracleService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IAccessRequestEmailNotificationService, AccessRequestEmailNotificationService>();
 
 // =========================================================================
 // 6. PIPELINE & MIDDLEWARE BUILD
@@ -154,7 +155,7 @@ using (var scope = app.Services.CreateScope())
             var cmplDb = services.GetRequiredService<CmplDbContext>();
             var hodDb = services.GetRequiredService<HodDbContext>();
 
-            //await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
         }
         catch (Exception ex)
         {

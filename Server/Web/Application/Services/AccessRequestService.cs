@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto.AccessRequest;
 using Web.Domain.Entities;
@@ -105,7 +106,7 @@ public sealed class AccessRequestService(
 
         // Notify IT operators
         await notificationService.NotifyRoleGroupAsync(
-            role: "It",
+            role: "Operator",
             title: "New HOD Access Request",
             message: $"HOD {cmplHod?.Name ?? "(unknown)"} submitted an access request with {items.Count} item(s).",
             type: "HodRequest",
@@ -372,7 +373,7 @@ public sealed class AccessRequestService(
             userId: actorUserId,
             role: "User",
             title: "Access Request Submitted",
-            message: $"Your request has been submitted. Tickets: {ticketList}",
+            message: $"Your request has been submitted. Ticket: {ticketList}",
             type: "RequestSubmitted",
             requestId: request.AccessReqId);
 
@@ -389,7 +390,7 @@ public sealed class AccessRequestService(
 
         // 3. Notify all IT Operators about new request
         await notificationService.NotifyRoleGroupAsync(
-            role: "It",
+            role: "Operator",
             title: "New Access Request",
             message: $"{items.Count} new item(s) submitted by {actorName} await HOD approval.",
             type: "NewRequest",

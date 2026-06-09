@@ -7,7 +7,12 @@ namespace Web.Application.Services;
 public class FolderService(AppDbContext context)
 {
     private readonly AppDbContext _context = context;
-    private const string TargetRoot = @"\\10.30.50.15\jipl";
+
+    // The actual path stored in your database
+    private const string DbTargetRoot = @"\\10.30.50.15\jipl";
+
+    // The masked path format shown to your API consumers
+    private const string DisplayTargetRoot = @"L:\Drive";
 
     /// <summary>
     /// Fetches all distinct folder paths starting with the target root,
@@ -19,21 +24,20 @@ public class FolderService(AppDbContext context)
         // 1. Fetch only the unique folder paths from MySQL matching your target root
         var folderPaths = await _context.Folders
             .AsNoTracking()
-            .Where(a => a.FolderPath.StartsWith(TargetRoot))
+            .Where(a => a.FolderPath.StartsWith(DbTargetRoot))
             .Select(a => a.FolderPath)
             .Distinct()
             .ToListAsync(cancellationToken);
 
         // 2. Load Allowed Parents (Top-level shares directly following the root unc)
-        // Dynamically extract the first subdirectory layer right after "\\10.30.50.15\jipl"
         var allowedParentsMap = new Dictionary<string, FolderNode>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var fullPath in folderPaths)
         {
             var segments = fullPath.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
 
-            // For path "\\10.30.50.15\jipl\Finance", segments are ["10.30.50.15", "jipl", "Finance"]
-            // The top level parent folder name lives at index 2
+            // For path "\\10.30.50.15\jipl\EDP\New", segments are ["10.30.50.15", "jipl", "EDP", "New"]
+            // The top level parent folder name lives at index 2 ("EDP")
             if (segments.Length > 2)
             {
                 string parentName = segments[2];
@@ -42,7 +46,7 @@ public class FolderService(AppDbContext context)
                     allowedParentsMap[parentName] = new FolderNode
                     {
                         Name = parentName,
-                        DriveName = TargetRoot
+                        DriveName = DisplayTargetRoot
                     };
                 }
 
@@ -60,7 +64,7 @@ public class FolderService(AppDbContext context)
                         childNode = new FolderNode
                         {
                             Name = segmentName,
-                            DriveName = TargetRoot
+                            DriveName = DisplayTargetRoot
                         };
                         currentNode.Children[segmentName] = childNode;
                     }
@@ -85,7 +89,7 @@ public class FolderService(AppDbContext context)
         // Query distinct folder paths starting with target root path string
         var paths = await _context.Folders
             .AsNoTracking()
-            .Where(a => a.FolderPath.StartsWith(TargetRoot))
+            .Where(a => a.FolderPath.StartsWith(DbTargetRoot))
             .Select(a => a.FolderPath)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -100,7 +104,7 @@ public class FolderService(AppDbContext context)
             .Select(name => new FolderResponse
             {
                 Name = name,
-                DriveName = TargetRoot
+                DriveName = DisplayTargetRoot
             })
             .ToList();
     }

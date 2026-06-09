@@ -61,7 +61,7 @@ public class AccessRequestEmailNotificationService : IAccessRequestEmailNotifica
                 MailTo = string.Join(",", toRecipients),
                 MailCc = ccRecipients.Length == 0 ? string.Empty : string.Join(",", ccRecipients),
                 MailSubject = notification.Subject,
-                MailBody = BuildEmailBody(notification),
+                MailBody = EmailTemplateUtility.BuildAccessRequestEmailBody(notification),
                 MailProgram = $"{ProgramName}_{notification.MailProgramSuffix}"
             };
 
@@ -96,82 +96,7 @@ public class AccessRequestEmailNotificationService : IAccessRequestEmailNotifica
         }
     }
 
-    private static string BuildEmailBody(AccessRequestEmailNotification notification)
-    {
-        var requesterName = BuildDisplayName(notification.Requester);
-        var recipients = notification.Recipients
-            .DistinctBy(employee => employee.Id)
-            .Select(BuildRecipientLabel)
-            .ToArray();
-
-        var itemSection = notification.Item is null
-            ? string.Empty
-            : $@"
-                                            <tr>
-                                                <td><strong>Access Item ID</strong></td>
-                                                <td>{notification.Item.AccessItemId}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Folder Path</strong></td>
-                                                <td>{Html(notification.Item.FolderPath)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Access Type</strong></td>
-                                                <td>{notification.Item.AccessType}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Status</strong></td>
-                                                <td>{notification.Item.Status}</td>
-                                            </tr>";
-
-        var commentsSection = string.IsNullOrWhiteSpace(notification.Comments)
-            ? string.Empty
-            : $@"
-                                        <p><strong>Comments:</strong> {Html(notification.Comments)}</p>";
-
-        var expirationSection = notification.ExpirationDateUtc is null
-            ? string.Empty
-            : $@"
-                                            <tr>
-                                                <td><strong>Expiration Date</strong></td>
-                                                <td>{notification.ExpirationDateUtc.Value:dd-MMM-yyyy HH:mm:ss} UTC</td>
-                                            </tr>";
-
-        return $@"
-                                    <!DOCTYPE html>
-                                    <html>
-                                    <body style='font-family: Arial, sans-serif; color: #222;'>
-                                        <h3>{Html(notification.Heading)}</h3>
-                                        <p>{Html(notification.Summary)}</p>
-
-                                        <table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse;'>
-                                            <tr>
-                                                <td><strong>Request ID</strong></td>
-                                                <td>#{notification.Request.AccessReqId}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Requester</strong></td>
-                                                <td>{Html(requesterName)} ({Html(notification.Requester.Email ?? string.Empty)})</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>User ID</strong></td>
-                                                <td>{notification.Requester.Id}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>ITSR Number</strong></td>
-                                                <td>{Html(notification.Request.ItsrNo ?? string.Empty)}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong>Recipients</strong></td>
-                                                <td>{Html(string.Join(", ", recipients))}</td>
-                                            </tr>{itemSection}{expirationSection}
-                                        </table>{commentsSection}
-
-                                        <p>Regards,<br>Access Management System</p>
-                                    </body>
-                                    </html>";
-    }
-
+    
     private static string BuildDisplayName(CmplUser employee)
     {
         return string.IsNullOrWhiteSpace(employee.Name) ? $"User {employee.Id}" : employee.Name.Trim();

@@ -6,8 +6,12 @@ namespace Web.Application.Services;
 
 public class FolderServiceLocal
 {
-    // Static configuration paths
-    private const string TargetRoot = @"\\10.30.50.15\jipl";
+    // The actual path stored in your audit records
+    private const string DbTargetRoot = @"\\10.30.50.15\jipl";
+
+    // The masked path format shown to your API consumers
+    private const string DisplayTargetRoot = @"L:\Drive";
+
     private static readonly string ConfigFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Shared", "External Sources", "Folders.csv");
     private static readonly string AuditFilePath = Path.Combine(Directory.GetCurrentDirectory(), "Shared", "External Sources", "ntfs_permissions_audit.csv");
 
@@ -31,8 +35,8 @@ public class FolderServiceLocal
             {
                 var fullPath = GetColumnValue(line, 2); // Extract 'folderpath' column
 
-                // Root Security Guard
-                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith(TargetRoot, StringComparison.OrdinalIgnoreCase))
+                // Root Security Guard using the true DB/UNC target root
+                if (string.IsNullOrEmpty(fullPath) || !fullPath.StartsWith(DbTargetRoot, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 var segments = fullPath.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
@@ -65,7 +69,7 @@ public class FolderServiceLocal
                             childNode = new FolderNode
                             {
                                 Name = segmentName,
-                                DriveName = TargetRoot
+                                DriveName = DisplayTargetRoot
                             };
                             currentNode.Children[segmentName] = childNode;
                         }
@@ -97,7 +101,7 @@ public class FolderServiceLocal
             .Select(name => new FolderResponse
             {
                 Name = name,
-                DriveName = TargetRoot
+                DriveName = DisplayTargetRoot
             })
             .ToList();
     }
@@ -115,7 +119,7 @@ public class FolderServiceLocal
                 map[name] = new FolderNode
                 {
                     Name = name,
-                    DriveName = TargetRoot
+                    DriveName = DisplayTargetRoot
                 };
             }
         }

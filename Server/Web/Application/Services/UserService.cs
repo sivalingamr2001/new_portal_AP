@@ -2,6 +2,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
+using Web.Domain.Dto.Department;
 using Web.Domain.Dto.Login;
 using Web.Domain.Dto.User;
 using Web.Domain.Entities;
@@ -12,6 +13,7 @@ namespace Web.Application.Services;
 public sealed class UserService(
     AppDbContext db,
     CmplDbContext cmplDb,
+    IDepartmentService departmentService,
     HodDbContext hodDb) : IUserService
 {
     // ─── CmplUsers (read-only) ───────────────────────────────────────────────────
@@ -357,18 +359,67 @@ public sealed class UserService(
     }
 
     public async Task<Result> UpdatePortalUserAsync(
-     int id, UpsertPortalUserDto dto, int updatedBy)
+        int id, UpsertPortalUserDto dto, int updatedBy)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
         if (user is null)
             return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
 
+        // Update user properties
         user.Role = dto.Role;
         user.Location = dto.Location;
         user.ModifiedOn = DateTime.UtcNow;
         user.ModifiedBy = updatedBy;
 
+        // Persist user changes first so department service gets fresh data
         await db.SaveChangesAsync();
+
+        // Check role safely using string comparison
+        if (dto.Role == "Hod")
+        {
+            // Find compliance user to get their department details
+            var cmplUser = await db.CmplUsers.FindAsync(dto.CmplUserId);
+            if (cmplUser is null)
+            {
+                return Result.Failure(Error.NotFound("USR_003", "Compliance user details not found."));
+            }
+
+            // Validate that the compliance user is assigned to a department
+            if (cmplUser.DepartmentId.HasValue && cmplUser.DepartmentId.Value > 0)
+            {
+                // FIX: Identify department using the foreign key relationship (DEPT_ID)
+                var department = await db.Departments
+                    .FirstOrDefaultAsync(d => d.Id == cmplUser.DepartmentId.Value);
+
+                if (department != null)
+                {
+                    // Map the compliance user details to the department DTO
+                    var departmentDto = new UpsertDepartmentDto(
+                        Name: department.Name ?? string.Empty,
+                        HodId: cmplUser.EmployeeId,
+                        Email: cmplUser.Email
+                    );
+
+                    // Invoke the department service
+                    var deptResult = await departmentService.UpdateAsync(
+                        department.Id,
+                        departmentDto,
+                        updatedBy
+                    );
+
+                    // Handle potential downstream service failures
+                    if (!deptResult.IsSuccess)
+                    {
+                        return Result.Failure(deptResult.Error);
+                    }
+                }
+                else
+                {
+                    return Result.Failure(Error.NotFound("DEPT_001", "Associated department not found."));
+                }
+            }
+        }
+
         return Result.Success();
     }
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Web.Application.Interfaces;
 using Web.Domain.Common;
 using Web.Domain.Dto.Notification;
 using Web.Domain.Entities;
@@ -22,7 +23,7 @@ public sealed class NotificationService(
 
         var dto = MapToDto(notification);
 
-        await QueueEmailNotificationAsync(userId, title, message, type);
+        await QueueEmailNotificationAsync(userId, requestId, itemId, title, message, type);
 
         // Push to the user's personal SignalR group
         await hubContext.Clients
@@ -42,10 +43,9 @@ public sealed class NotificationService(
         foreach (var uid in usersInRole)
         {
             await PersistAsync(uid, role, title, message, type, requestId, itemId, ticketNumber);
-            await QueueEmailNotificationAsync(uid, title, message, type);
+            await QueueEmailNotificationAsync(uid, requestId, itemId, title, message, type);
         }
 
-        // Broadcast to role group
         await hubContext.Clients
             .Group($"role_{role}")
             .SendAsync("ReceiveNotification", new
@@ -142,23 +142,54 @@ public sealed class NotificationService(
         return entity;
     }
 
-    private async Task QueueEmailNotificationAsync(int userId, string title, string message, string type)
+    private async Task QueueEmailNotificationAsync(int userId, int? requestId, int? itemId, string title, string message, string type)
     {
+        if (requestId is not { } validRequestId || validRequestId <= 0)
+            return;
+
         var user = await db.CmplUsers.FirstOrDefaultAsync(u => u.Id == userId);
         if (string.IsNullOrWhiteSpace(user?.Email))
             return;
 
-        var request = new EmailNotificationRequest
+        var request = await db.AccessRequests
+            .Include(r => r.AccessItems)
+            .FirstOrDefaultAsync(r => r.AccessReqId == validRequestId);
+
+        if (request is null)
+            return;
+
+        var requester = await db.CmplUsers
+            .FirstOrDefaultAsync(u => u.Id == request.UserId)
+            ?? new CmplUser { Id = request.UserId, Name = "Unknown Requester" };
+
+        var requestItem = itemId.HasValue
+            ? request.AccessItems.FirstOrDefault(i => i.AccessItemId == itemId.Value)
+            : request.AccessItems.FirstOrDefault();
+
+        var notification = new AccessRequestEmailNotification(
+            MailProgramSuffix: type,
+            Subject: message,
+            Heading: "Access Request Notification",
+            Summary: message,
+            Request: request,
+            Requester: requester,
+            Recipients: new[] { user },
+            Item: requestItem,
+            Comments: "No comments",
+            ExpirationDateUtc: requestItem?.ExpiresAtUtc
+        );
+
+        var emailRequest = new EmailNotificationRequest
         {
             MailFrom = "feedback@janatics.co.in",
             MailTo = user.Email.Trim(),
             MailCc = string.Empty,
             MailSubject = title,
-            MailBody = $"<p>{System.Net.WebUtility.HtmlEncode(message)}</p><p>Type: {System.Net.WebUtility.HtmlEncode(type)}</p>",
+            MailBody = EmailTemplateUtility.BuildAccessRequestEmailBody(notification),
             MailProgram = $"PortalNotification_{type}"
         };
 
-        await emailService.SendEmailAsync(request, CancellationToken.None);
+        await emailService.SendEmailAsync(emailRequest, CancellationToken.None);
     }
 
     private static NotificationDto MapToDto(AccessReqAuditEntity n) => new(

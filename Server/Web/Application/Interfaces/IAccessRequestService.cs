@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Web.Domain.Common;
 using Web.Domain.Dto.AccessRequest;
 
-namespace Web.Application.Services;
+namespace Web.Application.Interfaces;
 
 public interface IAccessRequestService
 {
