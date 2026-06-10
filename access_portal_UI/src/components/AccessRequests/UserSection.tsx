@@ -1,7 +1,9 @@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { ReactNode } from "react"
+import { HodSelect, type SelectedHod } from "../Hod/HodSelect"
 
+// Added hodId to keep employee tracking and HOD tracking separated
 export type UserSectionValue = {
   userId: number
   employeeId: string
@@ -10,14 +12,31 @@ export type UserSectionValue = {
   departmentName?: string | null
   hodName?: string | null
   itsrNumber?: string | null
+  hodId?: string | null 
 }
 
 type UserSectionProps = {
   value: UserSectionValue
-  onChange: (field: keyof UserSectionValue, value: string | number) => void
+  // Relaxed type configuration slightly to handle the custom hodId key injection safely
+  onChange: (field: keyof UserSectionValue | "hodId", value: string | number) => void
 }
 
 export function UserSection({ value, onChange }: UserSectionProps) {
+  // Construct structural value for HodSelect without using Employee Profile properties
+  const currentHodValue: SelectedHod | null = value.hodName
+    ? {
+        employeeId: value.hodId || "",
+        email: "", // Keep empty since email isn't cross-contaminating employee profile state
+        hodName: value.hodName,
+      }
+    : null
+
+  const handleHodChange = (selectedHod: SelectedHod) => {
+    // Only update HOD data blocks without touching user profile states
+    onChange("hodName", selectedHod.hodName)
+    onChange("hodId", selectedHod.employeeId)
+  }
+
   return (
     <section className="space-y-4 rounded-md border border-border bg-card p-4">
       <h3 className="text-sm font-semibold">Employee Information</h3>
@@ -40,7 +59,10 @@ export function UserSection({ value, onChange }: UserSectionProps) {
         </Field>
 
         <Field label="Employee Name">
-          <Input value={value.name} />
+          <Input 
+            value={value.name} 
+            onChange={(e) => onChange("name", e.target.value)}
+          />
         </Field>
 
         <Field label="Department">
@@ -48,11 +70,17 @@ export function UserSection({ value, onChange }: UserSectionProps) {
         </Field>
 
         <Field label="Department HOD">
-          <Input readOnly value={value.hodName ?? ""} />
+          <HodSelect 
+            value={currentHodValue} 
+            onChange={handleHodChange} 
+          />
         </Field>
 
         <Field label="ITSR Number">
-          <Input value={value.itsrNumber ?? ""} />
+          <Input 
+            value={value.itsrNumber ?? ""} 
+            onChange={(e) => onChange("itsrNumber", e.target.value)}
+          />
         </Field>
       </div>
     </section>

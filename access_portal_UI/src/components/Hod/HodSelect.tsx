@@ -3,11 +3,10 @@ import { Input } from "@/components/ui/input"
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll"
 import { useEffect, useState } from "react"
 
-// 1. Updated interface contract to strictly pass string keys to parent
 export interface SelectedHod {
-    employeeId: string // Unique identifier used by Department entity (hod_id)
-    email: string      // Assigned email identifier (email_id)
-    hodName: string    // Clean display name
+    employeeId: string 
+    email: string      
+    hodName: string    
 }
 
 interface HodSelectProps {
@@ -21,11 +20,19 @@ export const HodSelect = ({
     onChange,
     placeholder = "Search and select HOD...",
 }: HodSelectProps) => {
-    // Initialize search text using the incoming structural HOD display name
-    const [search, setSearch] = useState(value?.hodName || "")
+    // Structural helper tool formatting text elements cleanly as requested
+    const getDisplayString = (empId?: string, name?: string) => {
+        if (!empId && !name) return ""
+        if (!empId) return name || ""
+        if (!name) return empId
+        return `${empId} - ${name}`
+    }
+
+    const [search, setSearch] = useState(
+        value ? getDisplayString(value.employeeId, value.hodName) : ""
+    )
     const [openDropdown, setOpenDropdown] = useState(false)
 
-    // Using your existing infinite scroll hook, feeding search params to your API
     const {
         rowData: hodList,
         page,
@@ -46,7 +53,6 @@ export const HodSelect = ({
         },
     })
 
-    // Debounced layout search logic
     useEffect(() => {
         const timer = setTimeout(() => {
             loadData(1)
@@ -55,7 +61,6 @@ export const HodSelect = ({
         return () => clearTimeout(timer)
     }, [search])
 
-    // Global document click event handling to automatically clear dropdown overlay focus
     useEffect(() => {
         const close = () => setOpenDropdown(false)
         document.addEventListener("click", close)
@@ -64,61 +69,46 @@ export const HodSelect = ({
         }
     }, [])
 
-    // 2. Synchronize search text input overlay when parent values update dynamically
+    // Preserves local formatting patterns when initial payloads lock in
     useEffect(() => {
-        if (value && value.hodName) {
-            setSearch(value.hodName)
-        } else if (value && value.employeeId) {
-            setSearch(value.employeeId)
+        if (value) {
+            setSearch(getDisplayString(value.employeeId, value.hodName))
         } else {
             setSearch("")
         }
     }, [value])
 
-    const handleDropdownScroll = async (
-        e: React.UIEvent<HTMLDivElement>
-    ) => {
+    const handleDropdownScroll = async (e: React.UIEvent<HTMLDivElement>) => {
         const target = e.currentTarget
         const reachedBottom =
-            target.scrollTop + target.clientHeight >=
-            target.scrollHeight - 50
+            target.scrollTop + target.clientHeight >= target.scrollHeight - 50
 
         if (!loadingHods && page < totalPages && reachedBottom) {
             await loadMore(page + 1)
         }
     }
 
-    // 3. Selection handler returning string objects matching backend entities
-    const handleSelect = (
-        employeeId: string,
-        email: string,
-        hodName: string
-    ) => {
+    const handleSelect = (employeeId: string, email: string, hodName: string) => {
         onChange({
             employeeId: String(employeeId).trim(),
             email: String(email).trim(),
             hodName: hodName.trim(),
         })
-        setSearch(hodName)
+        setSearch(getDisplayString(employeeId, hodName))
         setOpenDropdown(false)
     }
 
     const normalizedSearch = search.trim().toLowerCase()
 
-    // Evaluates records locally to maximize UX responsivity
     const filteredHodList = hodList.filter((hod: any) => {
         const empIdStr = String(hod.employeeId || hod.id || "").trim().toLowerCase()
         const nameStr = String(hod.hodName || hod.name || "").trim().toLowerCase()
         const emailStr = String(hod.emailId || hod.email || "").trim().toLowerCase()
 
-        if (!normalizedSearch) {
-            return true
-        }
+        if (!normalizedSearch) return true
 
-        // Avoid filtering out items locally if the search text strictly matches the currently active selection
-        if (value && value.hodName?.toLowerCase() === normalizedSearch) {
-            return true
-        }
+        const currentCompound = getDisplayString(value?.employeeId, value?.hodName).toLowerCase()
+        if (value && currentCompound === normalizedSearch) return true
 
         return [empIdStr, nameStr, emailStr].some(val =>
             val.includes(normalizedSearch)
@@ -153,33 +143,29 @@ export const HodSelect = ({
                     )}
 
                     {filteredHodList.map((hod: any) => {
-                        // Extracting parameters dynamically according to varying backend property casing
                         const currentEmpId = String(hod.employeeId || hod.id || "")
                         const currentEmail = String(hod.emailId || hod.email || "")
                         const displayName = String(hod.hodName || hod.name || "N/A")
 
                         const isNoEmail =
-                            !currentEmail ||
-                            currentEmail.trim().toLowerCase() === "no email"
+                            !currentEmail || currentEmail.trim().toLowerCase() === "no email"
 
-                        // 4. Match values via string tracking expressions instead of integers
                         const isSelected =
-                            value?.employeeId?.toLowerCase() === currentEmpId.toLowerCase() ||
-                            (!!value?.email && value.email.toLowerCase() === currentEmail.toLowerCase())
+                            value?.employeeId?.toLowerCase() === currentEmpId.toLowerCase()
 
                         return (
                             <button
                                 type="button"
                                 key={`${currentEmpId}-${currentEmail}`}
-                                className={`w-full px-3 py-2 text-left hover:bg-accent text-sm ${isSelected ? "bg-accent font-medium text-accent-foreground" : ""
-                                    }`}
+                                className={`w-full px-3 py-2 text-left hover:bg-accent text-sm ${
+                                    isSelected ? "bg-accent font-medium text-accent-foreground" : ""
+                                }`}
                                 onClick={() => handleSelect(currentEmpId, currentEmail, displayName)}
                             >
-                                <div className="font-medium">{displayName}</div>
-                                <div className="flex justify-between text-xs mt-0.5">
-                                    <span>Code: {currentEmpId || "N/A"}</span>
+                                <div className="font-medium">
+                                    {currentEmpId} - {displayName}
                                 </div>
-                                <div className="flex justify-between text-xs mt-0.5">
+                                <div className="text-xs text-muted-foreground mt-0.5">
                                     <span className={isNoEmail ? "text-destructive" : ""}>
                                         Email: {currentEmail ? currentEmail : "No Email"}
                                     </span>
@@ -194,13 +180,11 @@ export const HodSelect = ({
                         </div>
                     )}
 
-                    {!loadingHods &&
-                        page >= totalPages &&
-                        hodList.length > 0 && (
-                            <div className="p-2 text-center text-xs text-muted-foreground">
-                                End of results
-                            </div>
-                        )}
+                    {!loadingHods && page >= totalPages && hodList.length > 0 && (
+                        <div className="p-2 text-center text-xs text-muted-foreground">
+                            End of results
+                        </div>
+                    )}
                 </div>
             )}
         </div>

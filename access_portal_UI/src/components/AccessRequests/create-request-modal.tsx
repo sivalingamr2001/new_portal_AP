@@ -43,11 +43,26 @@ export const CreateRequestModal = ({
     },
   ])
 
+  // Explicit initialization to prevent number-to-string type overlap assignments
+  const [value, setValue] = useState({
+    userId: currentUser?.user?.id ?? 0,
+    employeeId: currentUser?.user?.employeeId ?? "",
+    name: currentUser?.user?.name ?? "",
+    email: currentUser?.user?.email ?? "",
+    itsrNumber: "",
+    departmentName: currentUser?.department?.name ?? (currentUser?.department?.id ? String(currentUser.department.id) : ""),
+    hodId: currentUser?.headOfDepartment?.employeeId ?? currentUser?.headOfDepartment?.email ?? "",
+    hodName: currentUser?.headOfDepartment?.name ?? "",
+    location: currentUser?.user?.location ?? "",
+    mobile: currentUser?.user?.mobileNumber ?? "",
+    agreementAccepted: false,
+  })
+
   const handleUserChange = async (
-    field: keyof UserSectionValue,
-    fieldValue: string | number
+    field: keyof typeof value | keyof UserSectionValue,
+    fieldValue: any
   ) => {
-    updateValue(field, fieldValue)
+    updateValue(field as any, fieldValue)
 
     if (field !== "userId" || !fieldValue) return
 
@@ -68,22 +83,9 @@ export const CreateRequestModal = ({
       email: user.user?.email ?? "",
       departmentName: user.department?.name ?? "",
       hodName: user.headOfDepartment?.name ?? "",
+      hodId: user.headOfDepartment?.employeeId ?? user.headOfDepartment?.email ?? "",
     }))
   }
-
-  const [value, setValue] = useState({
-    userId: currentUser?.user?.id ?? 0,
-    employeeId: currentUser?.user?.employeeId ?? "",
-    name: currentUser?.user?.name ?? "",
-    email: currentUser?.user?.email ?? "",
-    itsrNumber: "",
-    departmentName: currentUser?.department?.name ?? "",
-    hodId: currentUser?.headOfDepartment?.employeeId ?? currentUser?.headOfDepartment?.email ?? "",
-    hodName: currentUser?.headOfDepartment?.name ?? "",
-    location: currentUser?.user?.location ?? "",
-    mobile: currentUser?.user?.mobileNumber ?? "",
-    agreementAccepted: false,
-  })
 
   const updateValue = (
     field: keyof typeof value,
@@ -108,11 +110,18 @@ export const CreateRequestModal = ({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // 1. Guard Statement: Terminate submission if HOD unique identifier is empty
+    if (!value.hodId || !value.hodId.trim()) {
+      toast.error("Please search and select a Department HOD before creating a request.")
+      return
+    }
+
     setIsLoading(true)
 
     try {
       const payload: SubmitAccessRequestDto = {
-        reqTo: value.hodId,
+        reqTo: value.hodId, 
         isAgreed: value.agreementAccepted,
         itsrNo: value.itsrNumber || null,
         items: requestItems.map((item) => ({
@@ -159,6 +168,9 @@ export const CreateRequestModal = ({
     }
   }
 
+  // 2. Evaluates checking criteria locally to keep button bindings accurate
+  const isHodInvalid = !value.hodId || !value.hodId.trim()
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-6xl">
@@ -187,9 +199,10 @@ export const CreateRequestModal = ({
           />
 
           <DialogFooter>
+            {/* 3. Combined disabled logic checking both the legal policy state and HOD selection */}
             <Button
               type="submit"
-              disabled={!value.agreementAccepted || isLoading}
+              disabled={!value.agreementAccepted || isLoading || isHodInvalid}
             >
               {isLoading ? "Submitting..." : "Create Request"}
             </Button>

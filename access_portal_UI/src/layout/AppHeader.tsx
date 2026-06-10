@@ -24,7 +24,7 @@ import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 export function AppHeader() {
-  const { currentUser, logout } = useAuth() // currentUser matches PortalUserDetails structure
+  const { currentUser, logout } = useAuth()
   const navigate = useNavigate()
 
   const [notifications, setNotifications] = useState<NotificationDto[]>([])
@@ -181,7 +181,7 @@ export function AppHeader() {
         }
       }
     }
-  }, [userId]) // Depend STRICTLY on userId stability
+  }, [userId])
 
   const handleMarkAsRead = async (auditId: number) => {
     try {
