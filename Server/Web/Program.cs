@@ -9,6 +9,8 @@ using Web.Infrastructure.Data;
 using Web.Infrastructure.Data.Seeding;
 using Web.Infrastructure.Hubs;
 using Web.Shared.Utilites.EmailService;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +32,6 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 
-// ✅ CRITICAL FIX: SignalR must be registered BEFORE custom scoped services try to request its HubContext
 builder.Services.AddSignalR();
 builder.Services.AddProblemDetails();
 
@@ -51,12 +52,19 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "ApiKeyScheme"
     });
 
-    // 2. Enforce requirements by passing a delegate function wrapper (doc => ...)
-    c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
+    // FIXED: Passed as a direct object initializer instead of a lambda expression delegate
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecuritySchemeReference(schemeId, doc),
-            new List<string>()
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = schemeId
+                }
+            },
+            new List<string>() // Empty list representing no specific OAuth scopes required
         }
     });
 });
@@ -155,7 +163,13 @@ using (var scope = app.Services.CreateScope())
             var cmplDb = services.GetRequiredService<CmplDbContext>();
             var hodDb = services.GetRequiredService<HodDbContext>();
 
-            await AppDataSeeder.SeedIfNeededAsync(db, env, logger);
+            logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
+
+            var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
+
+            await syncService.TriggerSyncAsync(CancellationToken.None);
+
+            logger.LogInformation("Initial baseline synchronization finished successfully.");
         }
         catch (Exception ex)
         {
@@ -169,13 +183,11 @@ using (var scope = app.Services.CreateScope())
             var databaseName = db.Database.GetDbConnection().Database;
             logger.LogInformation("Ensuring AppDbContext tables exist in MySQL database '{DatabaseName}'.", databaseName);
 
-            // 1. Creates all tables safely
             await db.Database.EnsureCreatedAsync();
             logger.LogInformation("AppDbContext schema ensured for MySQL database '{DatabaseName}'.", databaseName);
 
             var configuration = services.GetRequiredService<IConfiguration>();
 
-            // 2. High-speed CSV Folder Data Seeding Intercept
             logger.LogInformation("Checking if 'Folders' table requires initial high-speed data import...");
             if (!await db.Folders.AnyAsync())
             {
@@ -187,13 +199,10 @@ using (var scope = app.Services.CreateScope())
                 logger.LogInformation("'Folders' table already contains data records. Seeding skipped.");
             }
 
-            // 🎯 NEW INTERCEPTION: Trigger Initial User & Department Sync
             logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
 
-            // Resolve our manual interface directly from startup service provider
             var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
 
-            // Fire the sync method explicitly 
             await syncService.TriggerSyncAsync(CancellationToken.None);
 
             logger.LogInformation("Initial baseline synchronization finished successfully.");

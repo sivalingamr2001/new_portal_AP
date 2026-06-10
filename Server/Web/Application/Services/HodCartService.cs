@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Web.Application.Interfaces;
 using Web.Domain.Common;
@@ -83,47 +84,90 @@ public sealed class HodCartService(
         return Result.Success(responseList);
     }
 
-
     public async Task<PagedResult<HodCartItemDto>> GetCartAsync(int hodUserId, int page, int pageSize)
     {
-        bool isTestEnv = db.Database.IsSqlite();
+        Console.WriteLine($"[DEBUG] === Start GetCartAsync === Params -> hodUserId: {hodUserId}, page: {page}, pageSize: {pageSize}");
 
         // 1. Resolve the integer user ID into the alphanumeric Employee ID string
         var hodEmployeeId = await GetHodUserIdAsync(hodUserId);
         var cleanEmpId = hodEmployeeId?.Trim().ToLower() ?? string.Empty;
+        Console.WriteLine($"[DEBUG] Step 1: Resolved hodUserId '{hodUserId}' to cleanEmpId: '{cleanEmpId}'");
 
-        // 2. Fetch Departments matching the HOD's Employee ID using safe string matching
-        var deptIds = await db.Departments
-            .Where(d => d.HodId != null && d.HodId.ToLower() == cleanEmpId && d.IsActive)
-            .Select(d => d.Id)
-            .ToListAsync();
-
-        // 3. Fetch Department Users using the target environment context router
-        var cmplContext = isTestEnv ? db.CmplUsers : cmplDb.CmplUsers;
-        var deptUserIds = await cmplContext
-            .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
-            .Select(u => u.Id)
-            .ToListAsync();
-
-        // 4. Update folder mappings logic to evaluate by string EmployeeId, not integer UserId
+        // 2. Fetch the folder roots owned by this specific HOD
+        Console.WriteLine($"[DEBUG] Step 2: Fetching active folder mappings from DB for owner: '{cleanEmpId}'");
         var hodOwnedFolderPaths = await db.FolderMappings
             .Where(f => f.IsActive &&
                 ((f.PrimaryHodId != null && f.PrimaryHodId.ToLower() == cleanEmpId) ||
                  (f.SecondaryHodId != null && f.SecondaryHodId.ToLower() == cleanEmpId)))
             .Select(f => f.FolderName)
             .ToListAsync();
+        Console.WriteLine($"[DEBUG] Step 2 Result: Found {hodOwnedFolderPaths.Count} raw paths in database.");
 
-        // 5. Build the composite validation filter query
-        var query = db.AccessItems
+        // 3. Normalize paths to fix database typos (Changes "L:\Drive:\Skyfast" to "L:\Drive\Skyfast\")
+        var cleanHodPaths = hodOwnedFolderPaths
+            .Select(p => {
+                if (string.IsNullOrWhiteSpace(p)) return string.Empty;
+
+                // Step A: Replace the known typo pattern "Drive:\Skyfast" with "Drive\Skyfast"
+                string cleaned = p.Replace("Drive:\\", "Drive\\");
+
+                // Step B: Ensure the path always ends with a trailing backslash to prevent boundary mismatches
+                return cleaned.EndsWith("\\") ? cleaned : cleaned + "\\";
+            })
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        foreach (var path in cleanHodPaths)
+        {
+            Console.WriteLine($"[DEBUG] Step 3 (FIXED): Normalized path configuration target -> '{path}'");
+        }
+
+
+        // 4. STREAM A: Get items directly assigned to this HOD via the Department Request target
+        Console.WriteLine($"[DEBUG] Step 4: Initializing STREAM A (Direct assignment filter where ReqTo == '{cleanEmpId}')");
+        var assignedToMeQuery = db.AccessItems
             .Include(i => i.AccessRequest)
             .Where(i => i.Status == RequestStatus.PendingWithHod
-                && (deptUserIds.Contains(i.AccessRequest.UserId)
-                    || hodOwnedFolderPaths.Contains(i.FolderPath)))
-            .OrderBy(i => i.CreatedOn);
+                     && i.AccessRequest.ReqTo != null
+                     && i.AccessRequest.ReqTo.ToLower() == cleanEmpId);
 
-        var total = await query.CountAsync();
+        // 5. STREAM B: Get items where this HOD is the folder owner (even if assigned to another HOD)
+        Console.WriteLine($"[DEBUG] Step 5: Initializing STREAM B (Folder ownership pattern checks)");
+        var foldersIOwnQuery = db.AccessItems
+            .Include(i => i.AccessRequest)
+            .Where(i => i.Status == RequestStatus.PendingWithHod);
 
-        var items = await query
+        if (cleanHodPaths.Any())
+        {
+            // FIX: Combine paths into a single predicate expression string loop using EF.Functions.Like to avoid EF Core translation failures
+            Console.WriteLine($"[DEBUG] Step 5a: Building database translation filters for {cleanHodPaths.Count} directories.");
+
+            // We chain the path queries as an expression group translated directly on the DB server
+            var pathFilterQuery = db.AccessItems.AsQueryable();
+
+            // Alternative safe mapping translation for modern EF Core engines using parameterized Like masks
+            foldersIOwnQuery = foldersIOwnQuery.Where(i =>
+                cleanHodPaths.Select(p => p + "%").Any(mask => EF.Functions.Like(i.FolderPath, mask)));
+        }
+        else
+        {
+            Console.WriteLine("[DEBUG] Step 5b: HOD owns no folder hierarchies. Short-circuiting STREAM B to empty.");
+            foldersIOwnQuery = foldersIOwnQuery.Where(i => false);
+        }
+
+        // 6. UNION: Merge both streams at the database engine level.
+        Console.WriteLine("[DEBUG] Step 6: Unionizing STREAM A and STREAM B queries to discard duplicate rows.");
+        var combinedQuery = assignedToMeQuery
+            .Union(foldersIOwnQuery);
+
+        // 7. Paginate and execute the combined database operations
+        Console.WriteLine("[DEBUG] Step 7: Requesting total count calculation from database engine.");
+        var total = await combinedQuery.CountAsync();
+        Console.WriteLine($"[DEBUG] Step 7 Result: Database reports {total} total cross-domain pending items match criteria.");
+
+        Console.WriteLine($"[DEBUG] Step 8: Executing pagination window lookup -> Skip: {(page - 1) * pageSize}, Take: {pageSize}");
+        var items = await combinedQuery
+            .OrderBy(i => i.CreatedOn)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(i => new HodCartItemDto(
@@ -139,11 +183,20 @@ public sealed class HodCartService(
             ))
             .ToListAsync();
 
+        Console.WriteLine($"[DEBUG] Step 8 Result: Successfully loaded {items.Count} items for the current view page.");
+        foreach (var item in items)
+        {
+            Console.WriteLine($"[DEBUG] -> Rendered Dashboard Item: Ticket = {item.TicketNumber}, Path = '{item.FolderPath}'");
+        }
+
+        Console.WriteLine("[DEBUG] === End GetCartAsync ===");
         return new PagedResult<HodCartItemDto>(items, total, page, pageSize);
     }
 
     public async Task<Result> ApproveItemAsync(int accessItemId, AccessTypes ConfirmAccessType, string comments, int hodUserId)
     {
+        bool isSecurityViolation = false;
+
         // 1. Properly await the profile extraction and check the domain result status
         var hodProfileResult = await GetPortalHodProfileByIdAsync(hodUserId);
         if (hodProfileResult.IsFailure)
@@ -159,6 +212,12 @@ public sealed class HodCartService(
         var item = await GetOwnedItemAsync(accessItemId, hodProfile.EmployeeId, RequestStatus.PendingWithHod);
         if (item is null)
         {
+            if (!isSecurityViolation)
+            {
+                // Throws the exact short message when the flag is true
+                return Result.Failure(Error.Validation("AUTH_009", "This folder path belongs to another HOD."));
+            }
+
             return Result.Failure(Error.NotFound("ITEM_005", "Item not found or not in your cart."));
         }
 
@@ -447,42 +506,87 @@ public sealed class HodCartService(
         .FirstOrDefaultAsync();
 
     private async Task<AccessItemEntity?> GetOwnedItemAsync(
-    int accessItemId, string? hodIdentifier, RequestStatus requiredStatus)
+        int accessItemId, string? hodIdentifier, RequestStatus requiredStatus)
     {
-        if (string.IsNullOrWhiteSpace(hodIdentifier)) return null;
+        bool isSecurityViolation = false;
+
+        if (string.IsNullOrWhiteSpace(hodIdentifier))
+        {
+            Console.WriteLine("[DEBUG] GetOwnedItemAsync: Short-circuiting because hodIdentifier is null or empty.");
+            return null;
+        }
 
         bool isTestEnv = db.Database.IsSqlite();
         var cleanEmpId = hodIdentifier.Trim().ToLower();
+        Console.WriteLine($"[DEBUG] === GetOwnedItemAsync === Item ID: {accessItemId}, HOD Employee ID: '{cleanEmpId}'");
 
-        // A. Fetch departments managed by this HOD's string identifier
+        // 1. Fetch the target item first to analyze its path properties
+        var item = await db.AccessItems
+            .Include(i => i.AccessRequest)
+            .FirstOrDefaultAsync(i => i.AccessItemId == accessItemId && i.Status == requiredStatus);
+
+        if (item is null)
+        {
+            Console.WriteLine($"[DEBUG] Item {accessItemId} not found in database or status is not {requiredStatus}.");
+            return null;
+        }
+
+        // 2. Fetch ALL active folder mappings to evaluate absolute parent path boundaries
+        var allFolderMappings = await db.FolderMappings
+            .Where(f => f.IsActive)
+            .ToListAsync();
+
+        // Check if the requested folder path is explicitly owned by ANYONE in your mapping configuration
+        var specificFolderRule = allFolderMappings
+            .FirstOrDefault(f => {
+                string normalizedConfig = (f.FolderName ?? string.Empty).Replace("Drive:\\", "Drive\\");
+                string configPrefix = normalizedConfig.EndsWith("\\") ? normalizedConfig : normalizedConfig + "\\";
+                return (item.FolderPath ?? string.Empty).StartsWith(configPrefix, StringComparison.OrdinalIgnoreCase);
+            });
+
+        if (specificFolderRule != null)
+        {
+            // STRICT CASE: The path belongs to a registered folder tree mapping
+            var primaryOwner = specificFolderRule.PrimaryHodId?.Trim().ToLower();
+            var secondaryOwner = specificFolderRule.SecondaryHodId?.Trim().ToLower();
+
+            if (primaryOwner == cleanEmpId || secondaryOwner == cleanEmpId)
+            {
+                Console.WriteLine($"[DEBUG] Match Found: Current HOD '{cleanEmpId}' is the verified Folder Owner for '{item.FolderPath}'. Granting access.");
+                return item;
+            }
+
+            // SECURITY VIOLATION: Path belongs to a registered folder tree, but the current caller is not the owner
+            Console.WriteLine($"[SECURITY DENIED] Department HOD '{cleanEmpId}' blocked. Folder belongs exclusively to HOD '{primaryOwner}'.");
+
+            // Flip the flag to true before returning null
+            isSecurityViolation = true;
+            return null;
+        }
+
+        // 3. FALLBACK CASE: The folder path is unmapped. Revert to standard department workflow checks.
+        Console.WriteLine($"[DEBUG] Path '{item.FolderPath}' is unmapped. Checking fallback department access privileges...");
+
         var deptIds = await db.Departments
             .Where(d => d.HodId != null && d.HodId.ToLower() == cleanEmpId && d.IsActive)
             .Select(d => d.Id)
             .ToListAsync();
 
-        // B. Fetch user IDs belonging to those departments
         var cmplContext = isTestEnv ? db.CmplUsers : cmplDb.CmplUsers;
         var deptUserIds = await cmplContext
             .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
             .Select(u => u.Id)
             .ToListAsync();
 
-        // C. Fetch folder paths managed by this HOD's string identifier (Primary or Secondary)
-        var hodPaths = await db.FolderMappings
-            .Where(f => f.IsActive &&
-                ((f.PrimaryHodId != null && f.PrimaryHodId.ToLower() == cleanEmpId) ||
-                 (f.SecondaryHodId != null && f.SecondaryHodId.ToLower() == cleanEmpId)))
-            .Select(f => f.FolderName)
-            .ToListAsync();
+        if (deptUserIds.Contains(item.AccessRequest.UserId))
+        {
+            Console.WriteLine($"[DEBUG] Fallback Match: Item is unmapped, but requester {item.AccessRequest.UserId} belongs to HOD's department.");
+            return item;
+        }
 
-        // D. Fetch the single target item restricted to this manager's domain
-        return await db.AccessItems
-            .Include(i => i.AccessRequest)
-            .FirstOrDefaultAsync(i =>
-                i.AccessItemId == accessItemId
-                && i.Status == requiredStatus
-                && (deptUserIds.Contains(i.AccessRequest.UserId)
-                    || hodPaths.Contains(i.FolderPath)));
+        Console.WriteLine($"[DEBUG] Access Denied: HOD '{cleanEmpId}' has no ownership or department connection to Item {accessItemId}.");
+        return null;
     }
+
 
 }

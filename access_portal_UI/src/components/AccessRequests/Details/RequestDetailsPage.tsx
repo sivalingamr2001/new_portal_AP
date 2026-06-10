@@ -99,7 +99,7 @@ export const RequestDetailsPage = () => {
       fetchRequest()
     } catch (actionError) {
       console.error(actionError)
-      toast.error("Action failed. Please try again.")
+      toast.error(actionError instanceof Error ? actionError.message : "An error occurred.")
     }
   }
 

@@ -37,7 +37,7 @@ export const getUserId = () => {
 }
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: ENV_CONFIG?.BASE_API_URL ?? "/api",
+  baseURL: ENV_CONFIG?.BASE_API_URL ?? "/access-portal/api",
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 })
@@ -61,7 +61,14 @@ axiosInstance.interceptors.response.use(
       const data: any = response.data
       if (data && typeof data === "object" && "code" in data) {
         return Promise.reject(
-          new ApiException(data as ApiError, response.status)
+          new ApiException(
+            {
+              code: data.message,
+              message: data.message,
+              type: "Failure",
+            },
+            response.status
+          )
         )
       }
       return Promise.reject(

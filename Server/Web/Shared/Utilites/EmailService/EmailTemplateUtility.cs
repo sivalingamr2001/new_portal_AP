@@ -66,7 +66,7 @@ public static class EmailTemplateUtility
                                                 <!-- Request ID -->
                                                 <tr>
                                                     <td width=""30%"" style=""padding: 12px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Request ID</td>
-                                                    <td style=""padding: 12px 0 12px 12px; color: #172b4d; font-size: 14px; font-weight: 500; border-bottom: 1px solid #edf2f7; vertical-align: top;"">#{notification?.Item?.TicketNumber}</td>
+                                                    <td style=""padding: 12px 0 12px 12px; color: #172b4d; font-size: 14px; font-weight: 500; border-bottom: 1px solid #edf2f7; vertical-align: top;"">#{notification?.Item?.AccessReqId}</td>
                                                 </tr>
                                 
                                                 <!-- Requester -->
@@ -87,17 +87,13 @@ public static class EmailTemplateUtility
                                                 <!-- ITSR Number -->
                                                 <tr>
                                                     <td style=""padding: 12px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">ITSR Number</td>
-                                                    <td style=""padding: 12px 0 12px 12px; color: #172b4d; font-size: 14px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(notification.Request?.ItsrNo ?? string.Empty)}</td>
+                                                    <td style=""padding: 12px 0 12px 12px; color: #172b4d; font-size: 14px; border-bottom: 1px solid #edf2f7; vertical-align: top;""> {Html(string.IsNullOrWhiteSpace(notification.Request?.ItsrNo) ? "Not Provided" : notification.Request.ItsrNo)}</td>
                                                 </tr>
-                                
-                                                <!-- Recipients -->
-                                                <tr>
-                                                    <td style=""padding: 12px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Recipients</td>
-                                                    <td style=""padding: 12px 0 12px 12px; color: #172b4d; font-size: 14px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(string.Join("", "", recipients))}</td>
-                                                </tr>
+
                                             </table>
 
                                             <!-- Dynamic Comments Section -->
+                                            {itemSection}
                                             {commentsSection}
 
                                         </td>
@@ -136,25 +132,46 @@ public static class EmailTemplateUtility
     {
         if (item is null) return string.Empty;
 
-        // Call .ToString() on the enums safely to display their text value
+        // Safely evaluate potential null text variables with fallback options
+        string cleanFolderPath = string.IsNullOrWhiteSpace(item.FolderPath) ? "Not Provided" : item.FolderPath;
+        string cleanReason = string.IsNullOrWhiteSpace(item.Reason) ? "No Reason Provided" : item.Reason;
+
         return $@"
+        <h3 style=""margin: 24px 0 12px 0; color: #172b4d; font-size: 15px; font-weight: 600; line-height: 1.3; border-bottom: 2px solid #edf2f7; padding-bottom: 6px;"">Access Item Details</h3>
+        <table role=""presentation"" width=""100%"" cellspacing=""0"" cellpadding=""0"" border=""0"" style=""margin-bottom: 24px;"">
+            
+            <!-- Access Item ID -->
             <tr>
-                <td><strong>Access Item ID</strong></td>
-                <td>{item.AccessItemId}</td>
+                <td width=""30%"" style=""padding: 10px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Access Item ID</td>
+                <td style=""padding: 10px 0 10px 12px; color: #172b4d; font-size: 14px; font-weight: 500; border-bottom: 1px solid #edf2f7; vertical-align: top;"">#{item.AccessItemId}</td>
             </tr>
+
+            <!-- Folder Path -->
             <tr>
-                <td><strong>Folder Path</strong></td>
-                <td>{Html(item.FolderPath ?? string.Empty)}</td>
+                <td style=""padding: 10px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Folder Path</td>
+                <td style=""padding: 10px 0 10px 12px; color: #172b4d; font-size: 14px; font-family: monospace; background-color: #f7fafc; word-break: break-all; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(cleanFolderPath)}</td>
             </tr>
+
+            <!-- Access Type -->
             <tr>
-                <td><strong>Access Type</strong></td>
-                <td>{Html(item.AccessType.ToString())}</td>
+                <td style=""padding: 10px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Access Type</td>
+                <td style=""padding: 10px 0 10px 12px; color: #172b4d; font-size: 14px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(item.AccessType.ToString())}</td>
             </tr>
+
+            <!-- Justification Reason -->
             <tr>
-                <td><strong>Status</strong></td>
-                <td>{Html(item.Status.ToString())}</td>
-            </tr>";
+                <td style=""padding: 10px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Reason</td>
+                <td style=""padding: 10px 0 10px 12px; color: #4a5568; font-size: 14px; italic; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(cleanReason)}</td>
+            </tr>
+
+            <!-- Status Indicator -->
+            <tr>
+                <td style=""padding: 10px 0; color: #718096; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #edf2f7; vertical-align: top;"">Status</td>
+                <td style=""padding: 10px 0 10px 12px; color: #0052cc; font-size: 14px; font-weight: 600; border-bottom: 1px solid #edf2f7; vertical-align: top;"">{Html(item.Status.ToString())}</td>
+            </tr>
+        </table>";
     }
+
 
     private static string BuildExpirationSection(DateTime? expirationDateUtc)
     {

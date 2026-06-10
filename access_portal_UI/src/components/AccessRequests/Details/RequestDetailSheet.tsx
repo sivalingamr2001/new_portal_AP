@@ -52,7 +52,7 @@ const statusLabels: Record<RequestStatus, string> = {
   HodRejected: "HOD Rejected",
   ItRejected: "IT Rejected",
   Revoked: "Revoked",
-  Expired: "Expired",
+  Expired: "Expired", 
 }
 
 const accessTypeLabels: Record<AccessTypes, string> = {

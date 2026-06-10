@@ -74,7 +74,7 @@ public class EmailService : IEmailService
     {
         if (_db.Database.IsSqlite())
         {
-            return await InsertSqliteMailRecordAsync(mailFrom, mailTo, mailSubject, mailBody, mailProgram, mailCc, cancellationToken);
+            return await InsertMySqlMailRecordAsync(mailFrom, mailTo, mailSubject, mailBody, mailProgram, mailCc, cancellationToken);
         }
 
         if (_db.Database.IsMySql())

@@ -426,6 +426,7 @@ public sealed class UserService(
     public async Task<Result> DeletePortalUserAsync(int id, int deletedBy)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        
         if (user is null)
             return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
 
@@ -435,6 +436,17 @@ public sealed class UserService(
         user.ModifiedBy = deletedBy;
 
         await db.SaveChangesAsync();
+
+        var cmplUsers = await db.CmplUsers.FirstOrDefaultAsync(c => c.Id == id);
+
+        if (cmplUsers is null)
+            return Result.Failure(Error.NotFound("USR_002", "Portal user not found."));
+
+        db.CmplUsers.Remove(cmplUsers);
+
+        await db.SaveChangesAsync();
+
         return Result.Success();
+
     }
 }
