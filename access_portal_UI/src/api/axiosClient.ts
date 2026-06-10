@@ -37,7 +37,7 @@ export const getUserId = () => {
 }
 
 const axiosInstance: AxiosInstance = axios.create({
-  baseURL: ENV_CONFIG?.BASE_API_URL ?? "/access-portal/api",
+  baseURL: ENV_CONFIG?.BASE_API_URL,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 })

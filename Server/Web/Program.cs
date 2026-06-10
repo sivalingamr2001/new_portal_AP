@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
+using Microsoft.OpenApi.Models;
+using Serilog;
 using Server.Infrastructure.Oracle;
 using Web.Application.Interfaces;
 using Web.Application.Services;
@@ -9,20 +10,26 @@ using Web.Infrastructure.Data;
 using Web.Infrastructure.Data.Seeding;
 using Web.Infrastructure.Hubs;
 using Web.Shared.Utilites.EmailService;
-using Microsoft.AspNetCore.OpenApi;
-using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // =========================================================================
-// 1. CONFIGURATION & VARIABLES
+// SERILOG CONFIGURATION (Captures application-wide telemetry)
 // =========================================================================
-var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
-var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
-var dbProvider = builder.Configuration.GetValue<string>("Database:Provider");
+builder.Services.AddSerilog((services, lc) => lc
+    .Enrich.WithMachineName()
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services));
 
 // =========================================================================
-// 2. CORE SYSTEM SERVICES (DI Framework Foundations Must Load First!)
+// 1. CONFIGURATION & VARIABLES
+// =========================================================================
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionStringCmpl = builder.Configuration.GetConnectionString("MySQLConnection_CMPL");
+var connectionStringHod = builder.Configuration.GetConnectionString("MySQLConnection_HOD");
+
+// =========================================================================
+// 2. CORE SYSTEM SERVICES
 // =========================================================================
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -31,18 +38,15 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSignalR();
 builder.Services.AddProblemDetails();
 
-// Configured Swagger to accept and inject the X-User-Id header globally
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Web API", Version = "v1" });
 
     const string schemeId = "UserIdHeader";
 
-    // 1. Define the custom header input field configuration
     c.AddSecurityDefinition(schemeId, new OpenApiSecurityScheme
     {
         Description = "Enter your numeric User ID directly to authenticate requests (e.g., 1).",
@@ -52,7 +56,6 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "ApiKeyScheme"
     });
 
-    // FIXED: Passed as a direct object initializer instead of a lambda expression delegate
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -64,7 +67,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = schemeId
                 }
             },
-            new List<string>() // Empty list representing no specific OAuth scopes required
+            new List<string>()
         }
     });
 });
@@ -86,49 +89,26 @@ builder.Services.AddCors(options =>
 });
 
 // =========================================================================
-// 4. DATABASE CONTEXTS
+// 4. DATABASE CONTEXTS (STRICT MYSQL CONFIGURATION)
 // =========================================================================
-var providerName = dbProvider?.Trim();
-bool isMySql = !string.IsNullOrEmpty(providerName) && providerName.Equals("MySQL", StringComparison.OrdinalIgnoreCase);
+var mySqlServerVersion = new MySqlServerVersion(new Version(8, 0, 0));
 
-var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
-var sqliteConnection = builder.Configuration.GetConnectionString("SqliteConnection") ?? "Data Source=app.db";
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseMySql(defaultConnection, mySqlServerVersion));
 
-if (isMySql)
-{
-    var appServerVersion = ServerVersion.AutoDetect(defaultConnection);
-    var externalServerVersion = ServerVersion.AutoDetect(connectionStringCmpl);
+builder.Services.AddDbContext<CmplDbContext>(options =>
+    options.UseMySql(connectionStringCmpl, mySqlServerVersion));
 
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseMySql(defaultConnection, appServerVersion));
-
-    builder.Services.AddDbContext<CmplDbContext>(options =>
-        options.UseMySql(connectionStringCmpl, externalServerVersion));
-
-    builder.Services.AddDbContext<HodDbContext>(options =>
-        options.UseMySql(connectionStringHod, externalServerVersion));
-}
-else
-{
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(sqliteConnection));
-
-    builder.Services.AddDbContext<CmplDbContext>(options =>
-        options.UseSqlite(sqliteConnection));
-
-    builder.Services.AddDbContext<HodDbContext>(options =>
-        options.UseSqlite(sqliteConnection));
-}
+builder.Services.AddDbContext<HodDbContext>(options =>
+    options.UseMySql(connectionStringHod, mySqlServerVersion));
 
 // =========================================================================
 // 5. APPLICATION SERVICES (DI REGISTRATION)
 // =========================================================================
-// Register as both a manual utility service and a background engine task
 builder.Services.AddSingleton<DailyUserDeptSyncService>();
 builder.Services.AddSingleton<IDailyUserDeptSyncService>(sp => sp.GetRequiredService<DailyUserDeptSyncService>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DailyUserDeptSyncService>());
 
-// ✅ These services can now cleanly resolve IHubContext<NotificationHub> because AddSignalR() has executed above!
 builder.Services.AddScoped<IAccessRequestService, AccessRequestService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IHodCartService, HodCartService>();
@@ -149,103 +129,101 @@ builder.Services.AddScoped<IAccessRequestEmailNotificationService, AccessRequest
 // =========================================================================
 var app = builder.Build();
 
+// Wrap the entire startup verification sequence in a defensive try/catch block
+// This prevents unhandled database or I/O exceptions from causing an HTTP 500.30 crash.
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var env = services.GetRequiredService<IWebHostEnvironment>();
     var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseInitializer");
-    var db = services.GetRequiredService<AppDbContext>();
 
-    if (!isMySql)
+    try
     {
-        try
+        var db = services.GetRequiredService<AppDbContext>();
+        var cmplDb = services.GetRequiredService<CmplDbContext>();
+        var hodDb = services.GetRequiredService<HodDbContext>();
+
+        logger.LogInformation("Testing database connectivity for all environments...");
+
+        var appDbName = db.Database.GetDbConnection().Database;
+        if (await db.Database.CanConnectAsync())
         {
-            var cmplDb = services.GetRequiredService<CmplDbContext>();
-            var hodDb = services.GetRequiredService<HodDbContext>();
-
-            logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
-
-            var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
-
-            await syncService.TriggerSyncAsync(CancellationToken.None);
-
-            logger.LogInformation("Initial baseline synchronization finished successfully.");
+            logger.LogInformation("✅ Successfully connected to AppDbContext MySQL database: '{DatabaseName}'", appDbName);
         }
-        catch (Exception ex)
+        else
         {
-            logger.LogError(ex, "An error occurred during local database seed or data sync execution.");
+            logger.LogCritical("❌ CRITICAL: Could not connect to AppDbContext MySQL database: '{DatabaseName}'", appDbName);
         }
+
+        var cmplDbName = cmplDb.Database.GetDbConnection().Database;
+        if (await cmplDb.Database.CanConnectAsync())
+        {
+            logger.LogInformation("✅ Successfully connected to CmplDbContext MySQL database: '{DatabaseName}'", cmplDbName);
+        }
+        else
+        {
+            logger.LogError("❌ ERROR: Could not connect to CmplDbContext MySQL database: '{DatabaseName}'", cmplDbName);
+        }
+
+        var hodDbName = hodDb.Database.GetDbConnection().Database;
+        if (await hodDb.Database.CanConnectAsync())
+        {
+            logger.LogInformation("✅ Successfully connected to HodDbContext MySQL database: '{DatabaseName}'", hodDbName);
+        }
+        else
+        {
+            logger.LogError("❌ ERROR: Could not connect to HodDbContext MySQL database: '{DatabaseName}'", hodDbName);
+        }
+
+        // Execute table logic schema builds safely
+        logger.LogInformation("Ensuring AppDbContext tables exist in MySQL database '{DatabaseName}'.", appDbName);
+        await db.Database.EnsureCreatedAsync();
+        logger.LogInformation("AppDbContext schema ensured for MySQL database '{DatabaseName}'.", appDbName);
+
+        logger.LogInformation("Checking if 'Folders' table requires initial high-speed data import...");
+        if (!await db.Folders.AnyAsync())
+        {
+            logger.LogWarning("'Folders' table is empty. Initiating data importer routine...");
+            await FolderDataSeeding.ExecuteImportAsync();
+        }
+        else
+        {
+            logger.LogInformation("'Folders' table already contains data records. Seeding skipped.");
+        }
+
+        logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
+        var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
+        await syncService.TriggerSyncAsync(CancellationToken.None);
+        logger.LogInformation("Initial baseline synchronization finished successfully.");
     }
-    else
+    catch (Exception ex)
     {
-        try
-        {
-            var databaseName = db.Database.GetDbConnection().Database;
-            logger.LogInformation("Ensuring AppDbContext tables exist in MySQL database '{DatabaseName}'.", databaseName);
-
-            await db.Database.EnsureCreatedAsync();
-            logger.LogInformation("AppDbContext schema ensured for MySQL database '{DatabaseName}'.", databaseName);
-
-            var configuration = services.GetRequiredService<IConfiguration>();
-
-            logger.LogInformation("Checking if 'Folders' table requires initial high-speed data import...");
-            if (!await db.Folders.AnyAsync())
-            {
-                logger.LogWarning("'Folders' table is empty. Initiating data importer routine...");
-                await FolderDataSeeding.ExecuteImportAsync();
-            }
-            else
-            {
-                logger.LogInformation("'Folders' table already contains data records. Seeding skipped.");
-            }
-
-            logger.LogInformation("Database structure ready. Triggering initial User and Department baseline sync...");
-
-            var syncService = services.GetRequiredService<IDailyUserDeptSyncService>();
-
-            await syncService.TriggerSyncAsync(CancellationToken.None);
-
-            logger.LogInformation("Initial baseline synchronization finished successfully.");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "An error occurred while initializing AppDbContext tables, bulk seeding, or running baseline sync tasks.");
-        }
+        // Caught errors are pushed straight into your Serilog file output targets while letting the Web Server run smoothly
+        logger.LogCritical(ex, "FATAL STARTUP EXCEPTION: The database schema initialization or baseline sync failed, but the web host will stay alive.");
     }
-
 }
 
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Web API v1");
-        c.RoutePrefix = "swagger";
-    });
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Web API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.UseHttpsRedirection();
+app.UseSerilogRequestLogging();
 
+app.UseHttpsRedirection();
 app.UseCors(CorsPolicyName);
 
 // =========================================================================
 // 7. ENDPOINT MAPPINGS
 // =========================================================================
 app.UseDefaultFiles();
-
-// 2. Enables serving files directly from the wwwroot directory (js, css, images, html)
 app.UseStaticFiles();
-
 app.UseRouting();
 
-// Add app.UseAuthentication() and app.UseAuthorization() here if you have them
-
 app.MapControllers();
-
-// 3. Fallback route: Maps all non-API routing requests straight to your client-side index file
 app.MapFallbackToFile("index.html");
 app.MapHub<NotificationHub>("/hubs/notifications");
 

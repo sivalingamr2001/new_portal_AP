@@ -17,6 +17,9 @@
     <PackageVersion Include="Oracle.ManagedDataAccess" Version="23.26.200" />
     <PackageVersion Include="Oracle.ManagedDataAccess.Core" Version="23.26.200" />
     <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+    <PackageVersion Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageVersion Include="TypeGen" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup Label="Caching">

@@ -85,3 +85,10 @@ export const UnauthorizedPage = lazy(() =>
     default: m.UnauthorizedPage,
   }))
 )
+
+
+export const LogViewerDashboard = lazy(() =>
+  import("@/pages/common/LogViewerDashboard").then((m) => ({
+    default: m.LogViewerDashboard,
+  }))
+)

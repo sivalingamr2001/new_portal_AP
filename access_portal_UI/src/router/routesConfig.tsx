@@ -135,6 +135,10 @@ export const routesConfig: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="/login" replace /> },
       { path: "/login", element: withSuspense(Pages.LoginPage) },
+      {
+        path: "/logs",
+        element: withSuspense(Pages.LogViewerDashboard),
+      },
     ],
   },
 ]
