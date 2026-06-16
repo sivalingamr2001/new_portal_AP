@@ -9,13 +9,25 @@ import {
 
 import useSessionStorage from "@/hooks/useSessionStorage"
 
-const STORAGE_KEY = "jan_AP_user"
+const USER_STORAGE_KEY = "jan_AP_user"
+const REGION_STORAGE_KEY = "jan_AP_region"
+
+type UserType = {
+  username: string
+  role: "hod" | "user"
+}
+
+type RegionType = {
+  region: string
+  subRegion: string
+}
 
 type AuthContextType = {
-  currentUser: any | null
-  currentUserRole: string | null
+  currentUser: UserType | null
+  currentRegion: RegionType | null
+  currentUserRole: "hod" | "user" | null
   isAuthenticated: boolean
-  login: (user: any, expireInMinutes?: number) => void
+  login: (username: string, region: string, subRegion: string, expireInMinutes?: number) => void
   logout: () => void
 }
 
@@ -24,39 +36,48 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { get, set, remove } = useSessionStorage()
 
-  const [currentUser, setCurrentUser] = useState<any | null>(undefined)
+  const [currentUser, setCurrentUser] = useState<UserType | null | undefined>(undefined)
+  const [currentRegion, setCurrentRegion] = useState<RegionType | null>(null)
 
   useEffect(() => {
-    const user = get(STORAGE_KEY)
+    const user: any = get(USER_STORAGE_KEY)
+    const region: any = get(REGION_STORAGE_KEY)
 
     setCurrentUser(user)
+    setCurrentRegion(region)
   }, [get])
 
-  const login = (user: any, expireInMinutes = 30) => {
-    set(STORAGE_KEY, user, expireInMinutes)
+  const login = (username: string, region: string, subRegion: string, expireInMinutes = 30) => {
+    const role = username === "JANHPL" ? "hod" : "user"
 
-    setCurrentUser(user)
+    const userPayload: UserType = { username, role }
+    const regionPayload: RegionType = { region, subRegion }
+
+    set(USER_STORAGE_KEY, userPayload, expireInMinutes)
+    set(REGION_STORAGE_KEY, regionPayload, expireInMinutes)
+
+    setCurrentUser(userPayload)
+    setCurrentRegion(regionPayload)
   }
 
   const logout = () => {
-    remove(STORAGE_KEY)
+    remove(USER_STORAGE_KEY)
+    remove(REGION_STORAGE_KEY)
 
     setCurrentUser(null)
+    setCurrentRegion(null)
   }
 
   const value = useMemo(
     () => ({
-      currentUser,
-
-      currentUserRole: currentUser?.user?.role ?? null,
-
+      currentUser: currentUser ?? null,
+      currentRegion,
+      currentUserRole: currentUser?.role ?? null,
       isAuthenticated: !!currentUser,
-
       login,
-
       logout,
     }),
-    [currentUser]
+    [currentUser, currentRegion]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

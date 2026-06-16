@@ -1,376 +1,204 @@
-import { DataGrid } from "@/components/DynamicGrid/Index"
-import type { ColDef } from "ag-grid-community"
-import { useCallback, useMemo, useState, useEffect } from "react"
-import accessRequestApi from "@/api/accessRequestApi"
-import type { AccessRequestDto, AccessRequestItemDto, RequestStatus } from "@/api/types"
-import { useLoader } from "@/hooks/useLoader"
-import { getTitleFromSidebar } from "@/lib/getTitleFromSidebar"
-import { useLocation } from "react-router-dom"
-import { ChevronUp, Pencil, Plus, RefreshCw, TextQuote } from "lucide-react"
-import CreateRequestModal from "@/components/AccessRequest/Create/CreateRequestModal"
-import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Box, FileText, Globe, Plus, Search, Trash2, User } from "lucide-react";
+import { useState } from "react";
+import { AllocationHeader } from "./allocation/allocation-header";
 
-type RequestGridRow =
-  | AccessRequestDto
-  | {
-      __isItemRow: true
-      __parentData: AccessRequestDto
-      accessReqId: string
-      item: AccessRequestItemDto
-    }
-
-const statusLabels: Record<string, string> = {
-  "1": "Submitted",
-  "2": "Pending With HOD",
-  "3": "Pending With IT",
-  "4": "HOD Approved",
-  "5": "IT Approved",
-  "6": "HOD Rejected",
-  "7": "IT Rejected",
-  "8": "Revoked",
-  "9": "Expired",
-  Submitted: "Submitted",
-  PendingWithHod: "Pending With HOD",
-  PendingWithIt: "Pending With IT",
-  HodApproved: "HOD Approved",
-  ItApproved: "IT Approved",
-  HodRejected: "HOD Rejected",
-  ItRejected: "IT Rejected",
-  Revoked: "Revoked",
-  Expired: "Expired",
+interface ItemLine {
+    id: string
+    itemCode: string
+    itemName: string
+    qty: number
+    targetDate: string
 }
-
-const accessTypeLabels: Record<string, string> = {
-  "0": "Not Applicable",
-  "1": "Read Only",
-  "2": "Read and Write",
-  NotApplicable: "Not Applicable",
-  ReadOnly: "Read Only",
-  ReadandWrite: "Read and Write",
-}
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "-"
-  return new Date(value).toLocaleDateString()
-}
-
-const formatStatus = (value?: RequestStatus | null) =>
-  statusLabels[String(value ?? "")] ?? String(value ?? "-")
-
-const formatAccessType = (value: unknown) =>
-  accessTypeLabels[String(value ?? "")] ?? String(value ?? "-")
-
-const isRejected = (status: RequestStatus) =>
-  status === "HodRejected" || status === "ItRejected" || status === 6 || status === 7
-
-const isRenewable = (status: RequestStatus) =>
-  status === "Revoked" || status === "Expired" || status === 8 || status === 9
 
 export const MyRequestsPage = () => {
-  const location = useLocation()
+    const [allocationType, setAllocationType] = useState<"customer" | "open">("customer")
+    const [customer, setCustomer] = useState("")
+    const [region, setRegion] = useState("")
+    const [lines, setLines] = useState<ItemLine[]>([
+        { id: "1", itemCode: "", itemName: "— select item code first", qty: 0, targetDate: "" }
+    ])
 
-  const [requests, setRequests] = useState<AccessRequestDto[]>([])
-  const [expandedRowIds, setExpandedRowIds] = useState<number[]>([])
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [modalMode, setModalMode] = useState<"create" | "resubmit" | "renew">(
-    "create"
-  )
-  const [selectedRequest, setSelectedRequest] = useState<AccessRequestDto | null>(
-    null
-  )
-  const [selectedItem, setSelectedItem] = useState<AccessRequestItemDto | null>(
-    null
-  )
-
-  const { loading, withLoader } = useLoader()
-
-  const { title } = useMemo(
-    () => getTitleFromSidebar(location.pathname),
-    [location.pathname]
-  )
-
-  const fetchRequests = useCallback(async () => {
-    try {
-      const result = await withLoader(() =>
-        accessRequestApi.getAll()
-      )
-
-      if (
-        !result.isSuccess ||
-        !result.value
-      ) {
-        console.error(
-          "Failed to load requests:",
-          result.error?.message
-        )
-        return
-      }
-
-      setRequests(result.value.data)
-    } catch (error) {
-      console.error(
-        "Failed to load requests:",
-        error
-      )
+    const handleAddRow = () => {
+        setLines([
+            ...lines,
+            {
+                id: crypto.randomUUID(),
+                itemCode: "",
+                itemName: "— select item code first",
+                qty: 0,
+                targetDate: ""
+            }
+        ])
     }
-  }, [withLoader])
 
-  useEffect(() => {
-    fetchRequests()
-  }, [fetchRequests])
+    const handleUpdateLine = (id: string, field: keyof ItemLine, value: any) => {
+        setLines(lines.map(line => (line.id === id ? { ...line, [field]: value } : line)))
+    }
 
-  const toggleRowExpansion = useCallback((id: number) => {
-    setExpandedRowIds((previous) =>
-      previous.includes(id)
-        ? previous.filter((item) => item !== id)
-        : [...previous, id]
-    )
-  }, [])
-
-  const openCreateModal = useCallback(() => {
-    setModalMode("create")
-    setSelectedRequest(null)
-    setSelectedItem(null)
-    setIsCreateModalOpen(true)
-  }, [])
-
-  const openItemModal = useCallback(
-    (
-      mode: "resubmit" | "renew",
-      request: AccessRequestDto,
-      item: AccessRequestItemDto
-    ) => {
-      setModalMode(mode)
-      setSelectedRequest(request)
-      setSelectedItem(item)
-      setIsCreateModalOpen(true)
-    },
-    []
-  )
-
-  const computedRowData = useMemo<RequestGridRow[]>(() => {
-    const rows: RequestGridRow[] = []
-
-    requests.forEach((request) => {
-      rows.push(request)
-
-      if (expandedRowIds.includes(request.accessReqId)) {
-        request.items.forEach((item) => {
-          rows.push({
-            __isItemRow: true,
-            __parentData: request,
-            accessReqId: `item_${request.accessReqId}_${item.accessItemId}`,
-            item,
-          })
-        })
-      }
-    })
-
-    return rows
-  }, [expandedRowIds, requests])
-
-  const columns = useMemo<
-    (Omit<ColDef<any>, "field"> & {
-      field?: string
-    })[]
-  >(
-    () => [
-      {
-        headerName: "",
-        width: 72,
-        suppressMovable: true,
-        filter: false,
-        sortable: false,
-        cellRenderer: (params: any) => {
-          if (params.data?.__isItemRow) return null
-
-          const isExpanded = expandedRowIds.includes(params.data.accessReqId)
-
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => toggleRowExpansion(params.data.accessReqId)}
-                >
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <TextQuote className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {isExpanded ? "Collapse Items" : "Show Items"}
-              </TooltipContent>
-            </Tooltip>
-          )
-        },
-      },
-      {
-        headerName: "Request ID",
-        field: "accessReqId",
-        width: 100,
-        valueGetter: (params: any) =>
-          params.data?.__isItemRow ? params.data.item.ticketNumber : params.data?.accessReqId,
-      },
-      {
-        headerName: "User Name",
-        field: "userName",
-        width: 150,
-        valueGetter: (params: any) =>
-          params.data?.__isItemRow ? "Item" : params.data?.userName,
-      },
-      {
-        headerName: "Folder / Email",
-        field: "userEmail",
-        width: 240,
-        valueGetter: (params: any) =>
-          params.data?.__isItemRow ? params.data.item.folderPath : params.data?.userEmail,
-      },
-      {
-        headerName: "Status",
-        field: "currentStatus",
-        width: 120,
-        valueGetter: (params: any) =>
-          formatStatus(
-            params.data?.__isItemRow
-              ? params.data.item.status
-              : params.data?.currentStatus
-          ),
-      },
-      {
-        headerName: "Access Type",
-        field: "items",
-        width: 140,
-        valueGetter: (params: any) =>
-          params.data?.__isItemRow
-            ? formatAccessType(params.data.item.accessType)
-            : `${params.data?.items?.length ?? 0} item(s)`,
-      },
-      {
-        headerName: "Requested Date",
-        field: "requestedAtUtc",
-        width: 150,
-        valueGetter: (params: any) =>
-          formatDate(
-            params.data?.__isItemRow
-              ? params.data.item.requestedAtUtc
-              : params.data?.requestedAtUtc
-          ),
-      },
-      {
-        headerName: "Last Action",
-        field: "lastActionAtUtc",
-        width: 150,
-        valueGetter: (params: any) =>
-          formatDate(
-            params.data?.__isItemRow
-              ? params.data.item.lastActionAtUtc
-              : params.data?.lastActionAtUtc
-          ),
-      },
-      {
-        headerName: "Reason / ITSR",
-        field: "itsrNo",
-        width: 220,
-        valueGetter: (params: any) =>
-          params.data?.__isItemRow ? params.data.item.reason : params.data?.itsrNo ?? "-",
-      },
-      {
-        headerName: "Actions",
-        width: 140,
-        sortable: false,
-        filter: false,
-        cellRenderer: (params: any) => {
-          if (!params.data?.__isItemRow) return null
-
-          const item = params.data.item as AccessRequestItemDto
-          const request = params.data.__parentData as AccessRequestDto
-
-          if (isRejected(item.status)) {
-            return (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs"
-                onClick={() => openItemModal("resubmit", request, item)}
-              >
-                <Pencil className="mr-1 h-3.5 w-3.5" />
-                Resubmit
-              </Button>
-            )
-          }
-
-          if (isRenewable(item.status)) {
-            return (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2 text-xs"
-                onClick={() => openItemModal("renew", request, item)}
-              >
-                <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                Renew
-              </Button>
-            )
-          }
-
-          return null
-        },
-      },
-    ],
-    [expandedRowIds, openItemModal, toggleRowExpansion]
-  )
-
-  const globalCustomActions = useMemo(
-    () => [
-      {
-        label: "Create Request",
-        icon: <Plus className="h-4 w-4" />,
-        variant: "default" as const,
-        onClick: openCreateModal,
-      },
-    ],
-    [openCreateModal]
-  )
-
-  return (
-    <div className="space-y-4">
-      <DataGrid
-        rowData={computedRowData}
-        columnDefs={columns}
-        title={title}
-        loading={loading}
-        onRefresh={fetchRequests}
-        showRefreshButton
-        showSearch
-        showClearFiltersButton
-        customActions={globalCustomActions}
-        noRowsMessage="No access requests found"
-        pageSize={10}
-        rowSelection="none"
-      />
-
-      <CreateRequestModal
-        isOpen={isCreateModalOpen}
-        mode={modalMode}
-        request={selectedRequest}
-        item={selectedItem}
-        onClose={() =>
-          setIsCreateModalOpen(false)
+    const handleRemoveRow = (id: string) => {
+        if (lines.length > 1) {
+            setLines(lines.filter(line => line.id !== id))
         }
-        onSuccess={fetchRequests}
-      />
-    </div>
-  )
-}
+    }
 
-export default MyRequestsPage
+    const totalQty = lines.reduce((sum, line) => sum + (Number(line.qty) || 0), 0)
+
+    return (
+        <div>
+            <AllocationHeader />
+
+            <div className="w-full rounded-lg border bg-background p-4 shadow-sm text-slate-700">
+                <div className="space-y-4 border-b pb-4">
+                    <div>
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                            Allocation Type
+                        </label>
+                        <div className="mt-2 flex gap-2">
+                            <button
+                                onClick={() => setAllocationType("customer")}
+                                className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${allocationType === "customer"
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-slate-50 border text-slate-600 hover:bg-slate-100"
+                                    }`}
+                            >
+                                <User className="h-3.5 w-3.5" />
+                                Customer Specific
+                            </button>
+                            <button
+                                onClick={() => setAllocationType("open")}
+                                className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${allocationType === "open"
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-slate-50 border text-slate-600 hover:bg-slate-100"
+                                    }`}
+                            >
+                                <Globe className="h-3.5 w-3.5" />
+                                Open Pool (Any Customer)
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                                Customer <span className="text-destructive">*</span>
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                                <Input
+                                    type="text"
+                                    placeholder="Type customer name or code..."
+                                    value={customer}
+                                    onChange={(e) => setCustomer(e.target.value)}
+                                    className="pl-9 h-9 bg-slate-50/50 text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-medium text-slate-600">
+                                Region <span className="text-destructive">*</span>
+                            </label>
+                            <select
+                                value={region}
+                                onChange={(e) => setRegion(e.target.value)}
+                                className="flex h-9 w-full rounded-md border border-input bg-slate-50/50 px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                                <option value="">Select state / region...</option>
+                                <option value="HO">HO / HO</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <div className="flex items-center justify-between pb-2">
+                        <h3 className="text-xs font-bold text-slate-700">Item Lines</h3>
+                        <Button
+                            variant="ghost"
+                            onClick={handleAddRow}
+                            className="h-7 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2"
+                        >
+                            <Plus className="mr-1 h-3.5 w-3.5 stroke-[2.5]" />
+                            Add Row
+                        </Button>
+                    </div>
+
+                    <div className="overflow-x-auto border rounded">
+                        <table className="w-full border-collapse text-left text-xs">
+                            <thead>
+                                <tr className="border-b bg-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                    <th className="p-2 w-10 text-center">#</th>
+                                    <th className="p-2 w-10 text-center">ORG</th>
+                                    <th className="p-2 w-48">Item Code</th>
+                                    <th className="p-2">DESCRIPTION</th>
+                                    <th className="p-2 w-48">Weeks</th>
+                                    <th className="p-2 w-48">PEND Qty</th>
+                                    <th className="p-2 w-48">RSV Qty</th>
+                                    <th className="p-2 w-48">PICKED Qty</th>
+                                    <th className="p-2 w-48">BIN Qty</th>
+                                    <th className="p-2 w-48">BIN RSV Qty</th>
+                                    <th className="p-2 w-28">Qty (BIN)</th>
+                                    <th className="p-2 w-44">Target Date</th>
+                                    <th className="p-2 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {lines.map((line, index) => (
+                                    <tr key={line.id} className="border-b last:border-0 hover:bg-slate-50/50">
+                                        <td className="p-2 text-center text-slate-400 font-medium">{index + 1}</td>
+                                        <td className="p-2">
+                                            <Input
+                                                type="text"
+                                                placeholder="Code / name..."
+                                                value={line.itemCode}
+                                                onChange={(e) => handleUpdateLine(line.id, "itemCode", e.target.value)}
+                                                className="h-8 text-xs bg-white"
+                                            />
+                                        </td>
+                                        <td className="p-2 text-slate-400 font-medium">{line.itemName}</td>
+                                        <td className="p-2">
+                                            <Input
+                                                type="number"
+                                                value={line.qty || ""}
+                                                onChange={(e) => handleUpdateLine(line.id, "qty", Number(e.target.value))}
+                                                className="h-8 text-xs bg-white text-right"
+                                            />
+                                        </td>
+                                        <td className="p-2">
+                                            <div className="relative">
+                                                <Input
+                                                    type="date"
+                                                    value={line.targetDate}
+                                                    onChange={(e) => handleUpdateLine(line.id, "targetDate", e.target.value)}
+                                                    className="h-8 text-xs bg-white pr-8"
+                                                />
+                                            </div>
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled={lines.length === 1}
+                                                onClick={() => handleRemoveRow(line.id)}
+                                                className="h-7 w-7 text-slate-300 hover:text-destructive disabled:opacity-30"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 text-[11px] font-medium text-slate-400 px-1">
+                        <div>{lines.length} item line(s)</div>
+                        <div className="font-bold text-slate-600">Total Qty: <span className="text-blue-600">{totalQty}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

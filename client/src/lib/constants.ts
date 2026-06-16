@@ -17,10 +17,3 @@ export function useDebounce<T>(value: T, delay?: number): T {
 
   return debouncedValue
 }
-
-export const UserRole = {
-  Admin: 1,
-  Operator: 2,
-  Hod: 3,
-  User: 4,
-} as const

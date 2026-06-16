@@ -1,8 +1,6 @@
 import RoleGuard from "@/components/RoleGuard"
-import { UserRole } from "@/lib/constants"
-import { roleStringToNumeric } from "@/lib/roleMapper"
-import { Navigate, type RouteObject } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
+import { Navigate, type RouteObject } from "react-router-dom"
 
 import AppLayout from "@/layout/AppLayout"
 import { AuthLayout } from "@/layout/AuthLayout"
@@ -19,16 +17,10 @@ const HomeRedirect = () => {
     return <Navigate to="/login" replace />
   }
 
-  const userRoleNumeric = roleStringToNumeric(currentUserRole)
-
-  switch (userRoleNumeric) {
-    case UserRole.Admin:
+  switch (currentUserRole) {
+    case "hod":
       return <Navigate to="/dashboard" replace />
-    case UserRole.Operator:
-      return <Navigate to="/operator/dashboard" replace />
-    case UserRole.Hod:
-      return <Navigate to="/hod/pending-approvals" replace />
-    case UserRole.User:
+    case "user":
       return <Navigate to="/my-requests" replace />
     default:
       return <Navigate to="/unauthorized" replace />
@@ -49,10 +41,8 @@ export const routesConfig: RouteObject[] = [
             path: "/unauthorized",
             element: withSuspense(Pages.UnauthorizedPage),
           },
-
-          // --- USER PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.User]} />,
+            element: <RoleGuard allowedRoles={["user"]} />,
             children: [
               {
                 path: "/my-requests",
@@ -60,65 +50,12 @@ export const routesConfig: RouteObject[] = [
               },
             ],
           },
-
-          // --- HOD PATHS ---
           {
-            element: <RoleGuard allowedRoles={[UserRole.Hod]} />,
-            children: [
-              {
-                path: "/hod/pending-approvals",
-                element: withSuspense(Pages.PendingApprovalsPage),
-              },
-              {
-                path: "/hod/all-requests",
-                element: withSuspense(Pages.HodAllRequestsPage),
-              },
-            ],
-          },
-
-          // --- OPERATOR PATHS ---
-          {
-            element: <RoleGuard allowedRoles={[UserRole.Operator]} />,
-            children: [
-              {
-                path: "/operator/dashboard",
-                element: withSuspense(Pages.DashboardPage),
-              },
-              {
-                path: "/operator/approval-queue",
-                element: withSuspense(Pages.ApprovalQueuePage),
-              },
-              {
-                path: "/operator/active-access",
-                element: withSuspense(Pages.ActiveAccessPage),
-              },
-              {
-                path: "/operator/all-requests",
-                element: withSuspense(Pages.OperatorAllRequestsPage),
-              },
-            ],
-          },
-
-          // --- ADMIN PATHS ---
-          {
-            element: <RoleGuard allowedRoles={[UserRole.Admin]} />,
+            element: <RoleGuard allowedRoles={["hod"]} />,
             children: [
               {
                 path: "/dashboard",
                 element: withSuspense(Pages.DashboardPage),
-              },
-              { path: "/users", element: withSuspense(Pages.UsersPage) },
-              {
-                path: "/departments",
-                element: withSuspense(Pages.DepartmentsPage),
-              },
-              {
-                path: "/folder-mapping",
-                element: withSuspense(Pages.FolderMappingPage),
-              },
-              {
-                path: "/admin/audit-logs",
-                element: withSuspense(Pages.AuditLogsPage),
               },
             ],
           },

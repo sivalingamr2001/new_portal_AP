@@ -1,10 +1,8 @@
 import { useAuth } from "@/context/AuthContext"
-import { UserRole } from "@/lib/constants"
-import { roleStringToNumeric } from "@/lib/roleMapper"
 import React from "react"
 import { Navigate, Outlet } from "react-router-dom"
 
-export type UserRoleType = (typeof UserRole)[keyof typeof UserRole]
+export type UserRoleType = "hod" | "user"
 
 interface RoleGuardProps {
   allowedRoles: UserRoleType[]
@@ -18,11 +16,9 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     return <Navigate to="/login" replace />
   }
 
-  const activeRole: any = roleStringToNumeric(currentUserRole)
-
-  if (!allowedRoles.includes(activeRole)) {
+  if (!allowedRoles.includes(currentUserRole)) {
     console.warn(
-      `User with role '${currentUserRole}' (${activeRole}) does not have access to allowed roles: ${allowedRoles.join(", ")}`
+      `User with role '${currentUserRole}' does not have access to allowed roles: ${allowedRoles.join(", ")}`
     )
     return <Navigate to="/unauthorized" replace />
   }

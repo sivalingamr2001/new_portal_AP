@@ -1,5 +1,4 @@
 import React, { useState } from "react"
-import { loginApi } from "@/api/loginApi"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -15,31 +14,24 @@ import { useLoader } from "@/hooks/useLoader"
 import { useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
+import { loginApi } from "@/api/authApi"
 
 export const LoginPage = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
   const { withLoader, loading } = useLoader()
 
-  const [identifier, setIdentifier] = useState("")
-  const [password, setPassword] = useState("")
+  const [username, setUsername] = useState("CBE25225")
+  const [password, setPassword] = useState("cbe2janatics")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     try {
-      const values = {
-        identifier,
-        password,
-      }
+      const data = await withLoader(() => loginApi(username, password))
 
-      // TypeScript now infers 'data' as LoginResponse
-      const data = await withLoader(() => loginApi.login(values))
-
-      if (data && data.isSuccess) {
-
-        login(data.value, 30)
-
+      if (data) {
+        login(username, data.region, data.subRegion, 30)
         navigate("/", {
           replace: true,
         })
@@ -75,13 +67,13 @@ export const LoginPage = () => {
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="identifier">Username or Email</FieldLabel>
+                <FieldLabel htmlFor="username">Username or Email</FieldLabel>
                 <Input
-                  id="identifier"
+                  id="username"
                   type="text"
                   placeholder="Username/Email"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </Field>

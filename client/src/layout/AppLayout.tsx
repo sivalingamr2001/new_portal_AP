@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom"
 import AppSidebar from "./AppSidebar"
-import AppHeader from "./AppHeader"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppHeader } from "./AppHeader"
 
 export default function AppLayout() {
   return (
@@ -12,8 +12,8 @@ export default function AppLayout() {
         <SidebarInset className="flex flex-col overflow-hidden">
           <AppHeader />
 
-          <main className="flex-1 overflow-y-auto p-4">
-            <div className="h-[89vh] rounded-4xl bg-sidebar p-6 shadow-lg">
+          <main className="flex-1 overflow-y-auto">
+            <div className="p-2">
               <Outlet />
             </div>
           </main>
