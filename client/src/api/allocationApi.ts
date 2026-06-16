@@ -1,4 +1,5 @@
 import { axiosClient } from "@/lib/axiosClient"
+import type { ItemLine } from "@/layout/AppLayout"
 import type {
   RegionDetailsDto,
   CustomerDto,
@@ -7,8 +8,14 @@ import type {
   OperatingUnitDto,
   DemandMetricsDto,
   InventoryItemDto,
+  OrganizationDto,
   RrsCategoryResponseDto,
-  AllocationLineDto,
+  ItemByCodeDto,
+  CreateAllocationRequest,
+  CreateAllocationResponse,
+  ApprovalRequest,
+  RejectRequest,
+  CancellationRequest,
 } from "./types/allocationDto"
 import type { PagedResult } from "./types/pagedResult"
 
@@ -119,8 +126,8 @@ export const getOperatingUnitsApi = async (): Promise<OperatingUnitDto[]> => {
  * Fetches the list of valid operational organization units for item rows.
  * Maps to: GET /api/allocations/organizations
  */
-export const getItemOperatingUnits = async (): Promise<InventoryItemDto[]> => {
-  const response = await axiosClient.get<InventoryItemDto[]>(
+export const getItemOperatingUnits = async (): Promise<OrganizationDto[]> => {
+  const response = await axiosClient.get<OrganizationDto[]>(
     "/allocations/organizations"
   )
   return response.data
@@ -171,11 +178,55 @@ export const getPaginatedItems = async (
  */
 export const getItemByCode = async (
   itemCode: string
-): Promise<AllocationLineDto> => {
-  const response = await axiosClient.get<AllocationLineDto>(
+): Promise<ItemByCodeDto> => {
+  const response = await axiosClient.get<ItemByCodeDto>(
     `/allocations/items/${encodeURIComponent(itemCode.trim())}`
   )
   return response.data
+}
+
+/**
+ * Creates a BIN allocation header and line records (JAN_B3_HEADER / JAN_B3_LINES).
+ * Maps to: POST /api/allocations
+ */
+export const createAllocationApi = async (
+  payload: CreateAllocationRequest
+): Promise<CreateAllocationResponse> => {
+  const response = await axiosClient.post<CreateAllocationResponse>(
+    "/allocations",
+    payload
+  )
+  return response.data
+}
+
+/**
+ * Approves an allocation line (JAN_B3_LINES approval fields).
+ * Maps to: POST /api/allocations/approve
+ */
+export const approveAllocationLineApi = async (
+  payload: ApprovalRequest
+): Promise<void> => {
+  await axiosClient.post("/allocations/approve", payload)
+}
+
+/**
+ * Rejects an allocation line.
+ * Maps to: POST /api/allocations/reject
+ */
+export const rejectAllocationLineApi = async (
+  payload: RejectRequest
+): Promise<void> => {
+  await axiosClient.post("/allocations/reject", payload)
+}
+
+/**
+ * Cancels quantity on an allocation line (JAN_B3_CANCELLATION).
+ * Maps to: POST /api/allocations/cancel
+ */
+export const cancelAllocationLineApi = async (
+  payload: CancellationRequest
+): Promise<void> => {
+  await axiosClient.post("/allocations/cancel", payload)
 }
 
 /**
@@ -194,4 +245,25 @@ export const getDemandMetricsApi = async (
     }
   )
   return response.data
+}
+
+/**
+ * Retrieves a list of all created allocations.
+ * Maps to: GET /api/allocations
+ */
+export const getAllAllocationsApi = async (): Promise<ItemLine[]> => {
+  const response = await axiosClient.get<ItemLine[]>("/allocations")
+  return response.data
+}
+
+export interface AmendRequest {
+  lineId: number
+  newQty: number
+  reason: string
+}
+
+export const amendAllocationLineApi = async (
+  payload: AmendRequest
+): Promise<void> => {
+  await axiosClient.post("/allocations/amend", payload)
 }

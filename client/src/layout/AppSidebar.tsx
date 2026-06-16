@@ -1,138 +1,72 @@
-import { AnimatePresence, motion } from "framer-motion"
-import * as React from "react"
-import { Link, useLocation } from "react-router-dom"
+import { Layers, CheckCircle, Edit3, Truck } from 'lucide-react'
 
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useAuth } from "@/context/AuthContext"
-import { sidebarItems } from "@/lib/config/sidebar-config"
+interface AppSidebarProps {
+  currentScreen: 'allocation' | 'approval' | 'amendment' | 'fulfillment'
+  setCurrentScreen: (screen: 'allocation' | 'approval' | 'amendment' | 'fulfillment') => void
+  pendingCount: number
+  amendCount: number
+}
 
-export function AppSidebar() {
-  const location = useLocation()
-  const pathname = location.pathname
-  const { currentUserRole } = useAuth()
-
-  const [hoveredItemTo, setHoveredItemTo] = React.useState<string | null>(null)
-
-  const visibleMenuGroups = React.useMemo(() => {
-    if (!currentUserRole) return []
-
-    return sidebarItems
-      .map((group) => {
-        const filteredItems = group.items.filter((item) =>
-          item.roles.includes(currentUserRole)
-        )
-        return { ...group, items: filteredItems }
-      })
-      .filter((group) => group.items.length > 0)
-  }, [currentUserRole])
-
+export function AppSidebar({ currentScreen, setCurrentScreen, pendingCount, amendCount }: AppSidebarProps) {
   return (
-    <TooltipProvider delayDuration={0}>
-      <Sidebar collapsible="none" className="w-[48px]">
-        <div className="flex h-10 items-center justify-center border-b">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-primary/5 font-black tracking-wider text-primary">
-            <span className="animate-in text-base font-extrabold duration-300 select-none fade-in">
-              B
-            </span>
-          </div>
+    <aside className="w-64 bg-card border-r border-border flex flex-col justify-between">
+      <div>
+        <div className="p-4 border-b border-border">
+          <h1 className="text-lg font-bold tracking-wider text-primary">JANATICS</h1>
+          <p className="text-xs text-muted-foreground">BIN Portal · Sales</p>
         </div>
+        
+        <div className="p-3">
+          <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 mb-2">Screens</p>
+          <nav className="space-y-1">
+            <button 
+              onClick={() => setCurrentScreen('allocation')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer ${currentScreen === 'allocation' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Layers size={16} />
+                <span>BIN Allocation</span>
+              </div>
+            </button>
 
-        <SidebarContent>
-          <SidebarMenu onMouseLeave={() => setHoveredItemTo(null)}>
-            {visibleMenuGroups.map((group) => (
-              <SidebarGroup key={group.title} className="px-2">
-                <SidebarGroupContent>
-                  {group.items.map((item) => {
-                    const isActive = pathname === item.to
-                    const Icon = item.icon
+            <button 
+              onClick={() => setCurrentScreen('approval')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer ${currentScreen === 'approval' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <CheckCircle size={16} />
+                <span>Approval</span>
+              </div>
+              {pendingCount > 0 && <span className="bg-destructive text-destructive-foreground text-[11px] font-bold px-2 py-0.5 rounded-full">{pendingCount}</span>}
+            </button>
 
-                    const menuItemButton = (
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive}
-                        className="relative bg-transparent text-muted-foreground transition-colors duration-200 hover:bg-transparent hover:text-foreground data-[active=true]:bg-transparent data-[active=true]:text-primary-foreground"
-                      >
-                        <Link
-                          to={item.to}
-                          className="z-10 flex w-full items-center justify-center"
-                        >
-                          <Icon className="h-4 w-4 shrink-0" />
-                        </Link>
-                      </SidebarMenuButton>
-                    )
+            <button 
+              onClick={() => setCurrentScreen('amendment')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer ${currentScreen === 'amendment' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Edit3 size={16} />
+                <span>Amendment</span>
+              </div>
+              {amendCount > 0 && <span className="bg-destructive text-destructive-foreground text-[11px] font-bold px-2 py-0.5 rounded-full">{amendCount}</span>}
+            </button>
 
-                    return (
-                      <SidebarMenuItem
-                        key={item.to}
-                        className="relative my-0.5"
-                        onMouseEnter={() => setHoveredItemTo(item.to)}
-                      >
-                        {isActive && (
-                          <motion.div
-                            layoutId="activeBackground"
-                            className="absolute inset-0 rounded-md bg-primary"
-                            transition={{
-                              type: "spring",
-                              stiffness: 380,
-                              damping: 30,
-                            }}
-                          />
-                        )}
+            <button 
+              onClick={() => setCurrentScreen('fulfillment')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-medium transition-all cursor-pointer ${currentScreen === 'fulfillment' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <Truck size={16} />
+              <span>Fulfillment</span>
+            </button>
+          </nav>
+        </div>
+      </div>
 
-                        <AnimatePresence>
-                          {hoveredItemTo === item.to && !isActive && (
-                            <motion.div
-                              layoutId="hoverBackground"
-                              className="absolute inset-0 rounded-md bg-accent"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{
-                                type: "spring",
-                                stiffness: 350,
-                                damping: 32,
-                              }}
-                            />
-                          )}
-                        </AnimatePresence>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="w-full">{menuItemButton}</div>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="right"
-                            align="center"
-                            className="font-medium"
-                          >
-                            {item.label}
-                          </TooltipContent>
-                        </Tooltip>
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarGroupContent>
-              </SidebarGroup>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-    </TooltipProvider>
+      <div className="p-4 border-t border-border text-xs text-muted-foreground/60 flex justify-between items-center">
+        <span>v2.4.1-Prod</span>
+        <span>16 Jun 2026</span>
+      </div>
+    </aside>
   )
 }
 
-export default AppSidebar

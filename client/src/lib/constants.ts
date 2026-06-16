@@ -4,7 +4,9 @@ import { useState, useEffect } from "react"
 export default Logo
 
 export const ENV_CONFIG = {
-  BASE_API_URL: import.meta.env.VITE_BASE_API_URL || "/api",
+  BASE_API_URL: import.meta.env.DEV
+    ? import.meta.env.VITE_BASE_API_URL
+    : "/portal/api",
 }
 
 export function useDebounce<T>(value: T, delay?: number): T {

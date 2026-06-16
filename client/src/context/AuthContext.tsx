@@ -8,6 +8,7 @@ import {
 } from "react"
 
 import useSessionStorage from "@/hooks/useSessionStorage"
+import { DEV_BYPASS_AUTH } from "@/lib/config/auth-config"
 
 const USER_STORAGE_KEY = "jan_AP_user"
 const REGION_STORAGE_KEY = "jan_AP_region"
@@ -29,6 +30,7 @@ type AuthContextType = {
   isAuthenticated: boolean
   login: (username: string, region: string, subRegion: string, expireInMinutes?: number) => void
   logout: () => void
+  bypassLogin: (role: "hod" | "user") => void
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -43,9 +45,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const user: any = get(USER_STORAGE_KEY)
     const region: any = get(REGION_STORAGE_KEY)
 
-    setCurrentUser(user)
+    if (user) {
+      setCurrentUser(user)
+      setCurrentRegion(region)
+      return
+    }
+
+    if (DEV_BYPASS_AUTH) {
+      const userPayload: UserType = { username: "JANHPL", role: "hod" }
+      const regionPayload: RegionType = { region: "Default", subRegion: "Default" }
+
+      set(USER_STORAGE_KEY, userPayload, 480)
+      set(REGION_STORAGE_KEY, regionPayload, 480)
+      setCurrentUser(userPayload)
+      setCurrentRegion(regionPayload)
+      return
+    }
+
+    setCurrentUser(null)
     setCurrentRegion(region)
-  }, [get])
+  }, [get, set])
 
   const login = (username: string, region: string, subRegion: string, expireInMinutes = 30) => {
     const role = username === "JANHPL" ? "hod" : "user"
@@ -58,6 +77,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setCurrentUser(userPayload)
     setCurrentRegion(regionPayload)
+  }
+
+  const bypassLogin = (role: "hod" | "user") => {
+    const username = role === "hod" ? "JANHPL" : "CBE25225"
+    login(username, "Default", "Default", 480)
   }
 
   const logout = () => {
@@ -73,9 +97,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       currentUser: currentUser ?? null,
       currentRegion,
       currentUserRole: currentUser?.role ?? null,
-      isAuthenticated: !!currentUser,
+      isAuthenticated: DEV_BYPASS_AUTH || !!currentUser,
       login,
       logout,
+      bypassLogin,
     }),
     [currentUser, currentRegion]
   )

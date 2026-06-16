@@ -1,1 +1,0 @@
-// External db its only readble access to get data only tables CmplUser, HodMaster

@@ -1,5 +1,5 @@
-import RoleGuard from "@/components/RoleGuard"
 import { useAuth } from "@/context/AuthContext"
+import { DEV_BYPASS_AUTH } from "@/lib/config/auth-config"
 import { Navigate, type RouteObject } from "react-router-dom"
 
 import AppLayout from "@/layout/AppLayout"
@@ -11,20 +11,13 @@ import * as Pages from "./pages"
 import { withSuspense } from "./withSuspense"
 
 const HomeRedirect = () => {
-  const { currentUserRole, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
 
-  if (!isAuthenticated) {
+  if (!DEV_BYPASS_AUTH && !isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
-  switch (currentUserRole) {
-    case "hod":
-      return <Navigate to="/dashboard" replace />
-    case "user":
-      return <Navigate to="/my-requests" replace />
-    default:
-      return <Navigate to="/unauthorized" replace />
-  }
+  return <Navigate to="/allocation" replace />
 }
 
 export const routesConfig: RouteObject[] = [
@@ -39,25 +32,31 @@ export const routesConfig: RouteObject[] = [
           { index: true, element: <HomeRedirect /> },
           {
             path: "/unauthorized",
-            element: withSuspense(Pages.UnauthorizedPage),
+            element: DEV_BYPASS_AUTH ? (
+              <Navigate to="/allocation" replace />
+            ) : (
+              withSuspense(Pages.UnauthorizedPage)
+            ),
           },
           {
-            element: <RoleGuard allowedRoles={["user"]} />,
-            children: [
-              {
-                path: "/my-requests",
-                element: withSuspense(Pages.MyRequestsPage),
-              },
-            ],
+            path: "/dashboard",
+            element: withSuspense(Pages.DashboardPage),
           },
           {
-            element: <RoleGuard allowedRoles={["hod"]} />,
-            children: [
-              {
-                path: "/dashboard",
-                element: withSuspense(Pages.DashboardPage),
-              },
-            ],
+            path: "/allocation",
+            element: withSuspense(Pages.AllocationPage),
+          },
+          {
+            path: "/approval",
+            element: withSuspense(Pages.ApprovalPage),
+          },
+          {
+            path: "/amendment",
+            element: withSuspense(Pages.AmendmentPage),
+          },
+          {
+            path: "/fulfillment",
+            element: withSuspense(Pages.FulfillmentPage),
           },
         ],
       },

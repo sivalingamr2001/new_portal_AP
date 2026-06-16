@@ -8,12 +8,24 @@ export const RootRedirect = lazy(() =>
   import("@/pages/RootRedirect").then((m) => ({ default: m.RootRedirect }))
 )
 
-export const MyRequestsPage = lazy(() =>
-  import("@/pages/MyRequestsPage").then((m) => ({ default: m.MyRequestsPage }))
+export const DashboardPage = lazy(() =>
+  import("@/pages/Dashboard").then((m) => ({ default: m.default }))
 )
 
-export const DashboardPage = lazy(() =>
-  import("@/pages/Dashboard").then((m) => ({ default: m.Dashboard }))
+export const AllocationPage = lazy(() =>
+  import("@/pages/Allocation").then((m) => ({ default: m.AllocationScreen }))
+)
+
+export const ApprovalPage = lazy(() =>
+  import("@/pages/Approval").then((m) => ({ default: m.ApprovalScreen }))
+)
+
+export const AmendmentPage = lazy(() =>
+  import("@/pages/Amendment").then((m) => ({ default: m.AmendmentScreen }))
+)
+
+export const FulfillmentPage = lazy(() =>
+  import("@/pages/Fulfillment").then((m) => ({ default: m.FulfillmentScreen }))
 )
 
 // Fallback Utilities
