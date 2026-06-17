@@ -17,17 +17,12 @@ import { Loader } from "@/components/Loader"
 import { loginApi } from "@/api/authApi"
 
 export const LoginPage = () => {
-  const { login, bypassLogin } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const { withLoader, loading } = useLoader()
 
   const [username, setUsername] = useState("CBE25225")
   const [password, setPassword] = useState("cbe2janatics")
-
-  const handleBypassLogin = (role: "hod" | "user") => {
-    bypassLogin(role)
-    navigate("/", { replace: true })
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,26 +95,6 @@ export const LoginPage = () => {
                   {loading ? "Logging in..." : "Login"}
                 </Button>
               </Field>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleBypassLogin("hod")}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  HOD Bypass
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => handleBypassLogin("user")}
-                  disabled={loading}
-                  className="flex-1"
-                >
-                  User Bypass
-                </Button>
-              </div>
             </FieldGroup>
           </form>
         </CardContent>

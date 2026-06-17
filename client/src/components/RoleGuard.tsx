@@ -1,5 +1,4 @@
 import { useAuth } from "@/context/AuthContext"
-import { DEV_BYPASS_AUTH } from "@/lib/config/auth-config"
 import React from "react"
 import { Navigate, Outlet } from "react-router-dom"
 
@@ -12,10 +11,6 @@ interface RoleGuardProps {
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { isAuthenticated, currentUserRole } = useAuth()
-
-  if (DEV_BYPASS_AUTH) {
-    return children ? <>{children}</> : <Outlet />
-  }
 
   if (!isAuthenticated || !currentUserRole) {
     return <Navigate to="/login" replace />

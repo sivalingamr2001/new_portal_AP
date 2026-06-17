@@ -1,5 +1,6 @@
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, LogOut } from 'lucide-react'
 import { useTheme } from '../context/theme-provider'
+import { useAuth } from '@/context/AuthContext'
 
 interface AppHeaderProps {
   currentScreen: 'allocation' | 'approval' | 'amendment' | 'fulfillment'
@@ -11,6 +12,15 @@ interface AppHeaderProps {
 
 export function AppHeader({ currentScreen, totalItemsCount, pendingCount, amendCount, approvedCount }: AppHeaderProps) {
   const { theme, setTheme } = useTheme()
+  const { logout } = useAuth()
+
+  const handleLogout = () => {
+    try {
+      logout()
+    } catch (error) {
+      console.error("Logout failed:", error)
+    }
+  }
 
   return (
     <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 z-10">
@@ -39,6 +49,13 @@ export function AppHeader({ currentScreen, totalItemsCount, pendingCount, amendC
           title="Toggle Theme (Press 'd')"
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+        <button
+          onClick={() => handleLogout()}
+          className="p-1.5 rounded-md hover:bg-muted border border-destructive text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4 text-destructive" />
         </button>
       </div>
     </header>

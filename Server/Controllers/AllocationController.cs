@@ -1,6 +1,7 @@
 using Backend.Interfaces;
 using Backend.Models;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace Backend.Controllers;
 
@@ -84,5 +85,55 @@ public sealed class AllocationController(IAllocationService allocationService) :
     {
         var units = await _allocationService.GetOperatingUnitsAsync(cancellationToken);
         return Ok(units);
+    }
+
+    [HttpGet("demand-metrics")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DemandMetricsDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<DemandMetricsDto>> GetDemandMetrics(
+    [FromQuery] int customerId,
+    [FromQuery] int organizationId,
+    [FromQuery] int inventoryItemId,
+    CancellationToken cancellationToken)
+    {
+        if (customerId <= 0 || organizationId <= 0 || inventoryItemId <= 0)
+            throw new ValidationException("Invalid lookup query parameters supplied.");
+
+        var metrics = await _allocationService.GetDemandMetricsAsync(
+            customerId, organizationId, inventoryItemId, cancellationToken);
+
+        return Ok(metrics ?? new DemandMetricsDto());
+    }
+
+    [HttpGet("organizations")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<OrganizationDto>))]
+    public async Task<ActionResult<IEnumerable<OrganizationDto>>> GetOrganizations(
+        CancellationToken cancellationToken)
+    {
+        var result = await _allocationService.GetInventoryOrganizationsAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("items")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedResult<InventoryItemDto>))]
+    public async Task<ActionResult<PagedResult<InventoryItemDto>>> GetItemDetails(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _allocationService.GetInventoryItemDetailsAsync(page, pageSize, search, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("rrs-category")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRrsCategory(
+        [FromQuery] int organizationId,
+        [FromQuery] int inventoryItemId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _allocationService.GetSalesRrsCategoryAsync(organizationId, inventoryItemId, cancellationToken);
+        return Ok(new { rrsCategory = result });
     }
 }

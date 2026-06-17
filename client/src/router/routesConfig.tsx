@@ -1,5 +1,4 @@
 import { useAuth } from "@/context/AuthContext"
-import { DEV_BYPASS_AUTH } from "@/lib/config/auth-config"
 import { Navigate, type RouteObject } from "react-router-dom"
 
 import AppLayout from "@/layout/AppLayout"
@@ -13,7 +12,7 @@ import { withSuspense } from "./withSuspense"
 const HomeRedirect = () => {
   const { isAuthenticated } = useAuth()
 
-  if (!DEV_BYPASS_AUTH && !isAuthenticated) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
@@ -32,11 +31,7 @@ export const routesConfig: RouteObject[] = [
           { index: true, element: <HomeRedirect /> },
           {
             path: "/unauthorized",
-            element: DEV_BYPASS_AUTH ? (
-              <Navigate to="/allocation" replace />
-            ) : (
-              withSuspense(Pages.UnauthorizedPage)
-            ),
+            element: withSuspense(Pages.UnauthorizedPage),
           },
           {
             path: "/dashboard",

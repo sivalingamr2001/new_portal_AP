@@ -61,18 +61,20 @@ public class InventoryItemDto
 public class AllocationHeaderDto
 {
     public DateTime RequestDate { get; set; }
-    public string AllocationBasis { get; set; }
+    public int AllocationBasis { get; set; }
     public int? CustomerId { get; set; }
     public int TerritoryId { get; set; }
+    public int? BillToCustomerId { get; set; }
+    public int? ShipToCustomerId { get; set; }
     public string Remarks { get; set; }
-    public int CreatedBy { get; set; }
+    public string CreatedBy { get; set; }
 }
 
 public class AllocationLineDto
 {
     public int LineId { get; set; }
-    public string ItemCode { get; set; }
-    public string WarehouseId { get; set; }
+    public int OrganizationId { get; set; }
+    public int InventoryItemId { get; set; }
     public int RequestedQty { get; set; }
     public DateTime TargetDate { get; set; }
 }
@@ -86,7 +88,7 @@ public class CreateAllocationRequest
 public class ApprovalRequest
 {
     public int LineId { get; set; }
-    public int ApproverId { get; set; }
+    public string ApproverBy { get; set; }
     public int ApprovedQty { get; set; }
     public string Decision { get; set; }
     public string Remarks { get; set; }
@@ -141,3 +143,4 @@ public class AmendRequest
     public int NewQty { get; set; }
     public string Reason { get; set; } = string.Empty;
 }
+

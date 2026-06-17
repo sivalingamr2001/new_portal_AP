@@ -1,206 +1,238 @@
-using Backend.Exceptions;
+﻿using Backend.DB;
 using Backend.Interfaces;
 using Backend.Models;
 using Backend.Shared;
+using Dapper;
+using Oracle.ManagedDataAccess.Client;
+using System.Data;
 
-namespace Backend.Services;
-
-/// <summary>
-/// Bin allocation business logic backed by <see cref="IDynamicQueryExecutor"/>.
-/// </summary>
-public sealed class BinAllocationService(IDynamicQueryExecutor queryExecutor) : IBinAllocationService
+namespace Backend.Services
 {
-    private readonly IDynamicQueryExecutor _query = queryExecutor;
-
-    public Task<IEnumerable<OrganizationDto>> GetInventoryOrganizationsAsync(CancellationToken cancellationToken = default)
-        => _query.QueryAsync<OrganizationDto>(Queries.GetInventoryOrganizations, cancellationToken: cancellationToken);
-
-    public async Task<PagedResult<InventoryItemDto>> GetInventoryItemDetailsAsync(
-        int page, int pageSize, string? search, CancellationToken cancellationToken = default)
+    public class BinAllocationService(OracleService oracleService) : IBinAllocationService
     {
-        page = Math.Max(page, 1);
-        pageSize = Math.Max(pageSize, 1);
-        int offset = (page - 1) * pageSize;
-        string? searchParam = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
+        private readonly string _connectionString = oracleService.GetConnectionString()
+                ?? throw new InvalidOperationException("OracleDb connection string missing.");
 
-        var parameters = new { Offset = offset, PageSize = pageSize, Search = searchParam };
-
-        var (data, totalCount) = await _query.QueryPagedAsync<InventoryItemDto>(
-            Queries.GetInventoryItemDetails,
-            Queries.CountInventoryItems,
-            parameters,
-            cancellationToken: cancellationToken);
-
-        return new PagedResult<InventoryItemDto>(data.ToList(), totalCount, page, pageSize);
-    }
-
-    public Task<string?> GetSalesRrsCategoryAsync(
-        int organizationId, int inventoryItemId, CancellationToken cancellationToken = default)
-        => _query.QuerySingleOrDefaultAsync<string>(
-            Queries.GetSalesRrsCategory,
-            new { OrganizationId = organizationId, InventoryItemId = inventoryItemId },
-            cancellationToken: cancellationToken);
-
-    public async Task<int> CreateAllocationAsync(CreateAllocationRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(request.Header);
-
-        int headerId = 0;
-
-        await _query.ExecuteInTransactionAsync(async tx =>
+        private IDbConnection CreateConnection()
         {
-            headerId = await _query.ExecuteScalarAsync<int>(
-                Queries.InsertAllocationHeader,
+            return new OracleConnection(_connectionString);
+        }
+
+        // ── CREATE ───────────────────────────────────────────────────────────
+
+        public async Task<decimal> CreateAllocationAsync(CreateAllocationRequestV2 req)
+        {
+            using var conn = CreateConnection();
+            conn.Open();
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                // 1. Insert Header
+                var headerParams = new DynamicParameters();
+                headerParams.Add("p_transaction_date", req.TransactionDate);
+                headerParams.Add("p_customer_or_item_specific", req.CustomerOrItemSpecific);
+                headerParams.Add("p_customer_id", req.CustomerId);
+                headerParams.Add("p_territory_id", req.TerritoryId);
+                headerParams.Add("p_bill_to_customer", req.BillToCustomer);
+                headerParams.Add("p_ship_to_customer", req.ShipToCustomer);
+                headerParams.Add("p_created_by", req.CreatedBy);
+                headerParams.Add("p_remarks", req.Remarks);
+                headerParams.Add("p_header_id", dbType: DbType.Decimal,
+                                 direction: ParameterDirection.Output);
+
+                await conn.ExecuteAsync(QueriesV2.CreateBinAllocationHeader,
+                                        headerParams, transaction: tx);
+                decimal headerId = headerParams.Get<decimal>("p_header_id");
+
+                // 2. Insert each Line
+                foreach (var line in req.Lines)
+                {
+                    var lineParams = new DynamicParameters();
+                    lineParams.Add("p_header_id", headerId);
+                    lineParams.Add("p_organization_id", line.OrganizationId);
+                    lineParams.Add("p_inventory_item_id", line.InventoryItemId);
+                    lineParams.Add("p_b3_quantity", line.B3Quantity);
+                    lineParams.Add("p_target_date", line.TargetDate);
+                    lineParams.Add("p_line_id", dbType: DbType.Decimal,
+                                   direction: ParameterDirection.Output);
+
+                    await conn.ExecuteAsync(QueriesV2.CreateBinAllocationLine,
+                                            lineParams, transaction: tx);
+                }
+
+                tx.Commit();
+                return headerId;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        // ── READ ─────────────────────────────────────────────────────────────
+
+        public async Task<IEnumerable<AllocationRow>> GetAllAllocationsAsync()
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<AllocationRow>(QueriesV2.GetAllAllocations);
+        }
+
+        public async Task<IEnumerable<AllocationRow>> GetAllocationByHeaderIdAsync(decimal headerId)
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<AllocationRow>(
+                QueriesV2.GetAllocationByHeaderId,
+                new { p_header_id = headerId });
+        }
+
+        public async Task<IEnumerable<B3Line>> GetPendingApprovalLinesAsync()
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<B3Line>(QueriesV2.GetPendingApprovalLines);
+        }
+
+        public async Task<IEnumerable<B3Cancellation>> GetAllCancellationsAsync()
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<B3Cancellation>(QueriesV2.GetAllCancellations);
+        }
+
+        public async Task<IEnumerable<AllocationSummary>> GetAllocationSummaryAsync()
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<AllocationSummary>(QueriesV2.GetAllocationSummary);
+        }
+
+        // ── REVISE ───────────────────────────────────────────────────────────
+
+        public async Task<decimal> ReviseQuantityAsync(ReviseQuantityRequest req)
+        {
+            using var conn = CreateConnection();
+            conn.Open();
+
+            var p = new DynamicParameters();
+            p.Add("p_new_b3_quantity", req.NewB3Quantity);
+            p.Add("p_original_line_id", req.OriginalLineId);
+
+            // The INSERT..SELECT returns the new LINE_ID via RETURNING
+            p.Add("p_line_id", dbType: DbType.Decimal,
+                  direction: ParameterDirection.Output);
+
+            await conn.ExecuteAsync(QueriesV2.CreateQuantityRevision, p);
+            return p.Get<decimal>("p_line_id");
+        }
+
+        public async Task<IEnumerable<B3Line>> GetLineRevisionHistoryAsync(decimal originalLineId)
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<B3Line>(
+                QueriesV2.GetLineRevisionHistory,
+                new { p_original_line_id = originalLineId });
+        }
+
+        // ── APPROVE ──────────────────────────────────────────────────────────
+
+        public async Task<bool> ApproveLineAsync(ApproveLineRequest req)
+        {
+            using var conn = CreateConnection();
+            var rows = await conn.ExecuteAsync(
+                QueriesV2.HodApproveAllocationLine,
                 new
                 {
-                    request.Header.RequestDate,
-                    request.Header.AllocationBasis,
-                    request.Header.CustomerId,
-                    request.Header.TerritoryId,
-                    request.Header.Remarks,
-                    request.Header.CreatedBy
-                },
-                transaction: tx,
-                cancellationToken: cancellationToken);
+                    p_approved_quantity = req.ApprovedQuantity,
+                    p_approved_by = req.ApprovedBy,
+                    p_line_id = req.LineId
+                });
+            return rows > 0;
+        }
 
-            foreach (var line in request.Lines)
+        // ── AMEND ────────────────────────────────────────────────────────────
+
+        public async Task<bool> AmendApprovedQuantityAsync(AmendQuantityRequest req)
+        {
+            using var conn = CreateConnection();
+            var rows = await conn.ExecuteAsync(
+                QueriesV2.AmendApprovedQuantity,
+                new
+                {
+                    p_amended_quantity = req.AmendedQuantity,
+                    p_amended_by = req.AmendedBy,
+                    p_line_id = req.LineId
+                });
+            return rows > 0;
+        }
+
+        // ── CANCEL ───────────────────────────────────────────────────────────
+
+        public async Task<bool> CancelLineAsync(CancelLineRequest req)
+        {
+            using var conn = CreateConnection();
+            conn.Open();
+            using var tx = conn.BeginTransaction();
+
+            try
             {
-                await _query.ExecuteAsync(
-                    Queries.InsertAllocationLine,
+                // 1. Insert cancellation record
+                await conn.ExecuteAsync(
+                    QueriesV2.InsertCancellationRecord,
                     new
                     {
-                        HeaderId = headerId,
-                        line.ItemCode,
-                        line.WarehouseId,
-                        line.RequestedQty,
-                        line.TargetDate
+                        p_line_id = req.LineId,
+                        p_cancelled_qty = req.CancelledQty,
+                        p_cancel_reason = req.CancelReason,
+                        p_created_by = req.CreatedBy
                     },
-                    transaction: tx,
-                    cancellationToken: cancellationToken);
+                    transaction: tx);
+
+                // 2. Close the line
+                await conn.ExecuteAsync(
+                    QueriesV2.CloseCancelledLine,
+                    new { p_line_id = req.LineId },
+                    transaction: tx);
+
+                tx.Commit();
+                return true;
             }
-        }, cancellationToken: cancellationToken);
-
-        return headerId;
-    }
-
-    public Task<DemandMetricsDto?> GetDemandMetricsAsync(
-        int customerId, int organizationId, int inventoryItemId, CancellationToken cancellationToken = default)
-        => _query.QuerySingleOrDefaultAsync<DemandMetricsDto>(
-            Queries.GetDemandMetrics,
-            new { CustomerId = customerId, OrganizationId = organizationId, InventoryItemId = inventoryItemId },
-            cancellationToken: cancellationToken);
-
-    public async Task UpdateAllocationAsync(
-        int headerId, CreateAllocationRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var rowsUpdated = 0;
-
-        await _query.ExecuteInTransactionAsync(async tx =>
-        {
-            foreach (var line in request.Lines.Where(l => l.LineId > 0))
+            catch
             {
-                rowsUpdated += await _query.ExecuteAsync(
-                    Queries.UpdateAllocationLine,
-                    new { line.LineId, line.RequestedQty, line.TargetDate },
-                    transaction: tx,
-                    cancellationToken: cancellationToken);
+                tx.Rollback();
+                throw;
             }
-        }, cancellationToken: cancellationToken);
+        }
 
-        if (rowsUpdated == 0)
-            throw new BusinessException($"No pending allocation lines were updated for header {headerId}.");
-    }
-
-    public async Task ProcessApprovalAsync(ApprovalRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var status = request.Decision == "Approve" ? "Approved" : "Hold";
-
-        await _query.ExecuteInTransactionAsync(async tx =>
+        public async Task<bool> CancelAllLinesAsync(CancelHeaderRequest req)
         {
-            await _query.ExecuteAsync(
-                Queries.InsertApprovalRecord,
-                new
+            using var conn = CreateConnection();
+            conn.Open();
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                var p = new
                 {
-                    request.LineId,
-                    request.ApproverId,
-                    request.ApprovedQty,
-                    request.Decision,
-                    request.Remarks
-                },
-                transaction: tx,
-                cancellationToken: cancellationToken);
+                    p_header_id = req.HeaderId,
+                    p_cancel_reason = req.CancelReason,
+                    p_created_by = req.CreatedBy
+                };
 
-            var affected = await _query.ExecuteAsync(
-                Queries.UpdateLineStatus,
-                new { Status = status, request.ApprovedQty, request.LineId },
-                transaction: tx,
-                cancellationToken: cancellationToken);
+                // 1. Insert cancellation rows for all open lines
+                await conn.ExecuteAsync(
+                    QueriesV2.InsertCancellationForAllLines, p, transaction: tx);
 
-            if (affected == 0)
-                throw new NotFoundException($"Allocation line {request.LineId} was not found.");
-        }, cancellationToken: cancellationToken);
-    }
+                // 2. Close all open lines
+                await conn.ExecuteAsync(
+                    QueriesV2.CloseAllLinesForHeader, p, transaction: tx);
 
-    public async Task ProcessCancellationAsync(CancellationRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        await _query.ExecuteInTransactionAsync(async tx =>
-        {
-            await _query.ExecuteAsync(
-                Queries.InsertCancellationRecord,
-                new
-                {
-                    request.LineId,
-                    request.CancelledQty,
-                    request.Reason,
-                    request.CancelledBy
-                },
-                transaction: tx,
-                cancellationToken: cancellationToken);
-
-            var affected = await _query.ExecuteAsync(
-                Queries.UpdateLineStatus,
-                new { Status = "Cancelled", ApprovedQty = 0, request.LineId },
-                transaction: tx,
-                cancellationToken: cancellationToken);
-
-            if (affected == 0)
-                throw new NotFoundException($"Allocation line {request.LineId} was not found.");
-        }, cancellationToken: cancellationToken);
-    }
-
-    public async Task RejectAllocationAsync(RejectRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var affected = await _query.ExecuteAsync(
-            Queries.RejectAllocationLine,
-            new { request.LineId },
-            cancellationToken: cancellationToken);
-
-        if (affected == 0)
-            throw new NotFoundException($"Allocation line {request.LineId} was not found.");
-    }
-
-    public Task<IEnumerable<AllocationDetailsDto>> GetAllocationsAsync(CancellationToken cancellationToken = default)
-        => _query.QueryAsync<AllocationDetailsDto>(Queries.GetAllAllocations, cancellationToken: cancellationToken);
-
-    public async Task ProcessAmendmentAsync(AmendRequest request, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var affected = await _query.ExecuteAsync(
-            Queries.AmendAllocationLine,
-            new { request.NewQty, request.LineId },
-            cancellationToken: cancellationToken);
-
-        if (affected == 0)
-            throw new NotFoundException($"Allocation line {request.LineId} was not found.");
+                tx.Commit();
+                return true;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ import {
   getItemByCode,
   getItemOperatingUnits,
   getItemRrsCategory,
+  getPaginatedItems,
   getOperatingUnitsApi,
   getShipToCustomersApi,
   getWeeksDropdownApi,
@@ -18,10 +19,12 @@ import type {
   CreateAllocationRequest,
   CustomerDto,
   DemandMetricsDto,
+  InventoryItemDto,
   OperatingUnitDto,
   OrganizationDto,
   RegionDetailsDto,
 } from "@/api/types/allocationDto"
+import { useDebounce } from "@/lib/constants"
 import { useAuth } from "@/context/AuthContext"
 import {
   ALLOCATION_SUBMIT_TO_CONSOLE,
@@ -84,11 +87,12 @@ function groupRegions(data: RegionDetailsDto[]) {
   const regionNames = [...new Set(data.map((r) => r.region))].sort()
   const subRegionsByRegion = regionNames.reduce<Record<string, string[]>>(
     (acc, region) => {
-      acc[region] = [
-        ...new Set(
-          data.filter((r) => r.region === region).map((r) => r.subRegion)
-        ),
-      ].sort()
+      const rawSubRegions = data
+        .filter((r) => r.region === region)
+        .flatMap((r) => r.subRegion.split(",").map((sub) => sub.trim()))
+        .filter(Boolean)
+
+      acc[region] = [...new Set(rawSubRegions)].sort()
       return acc
     },
     {}
@@ -238,6 +242,9 @@ export function useAllocationForm() {
   const [billToLocation, setBillToLocation] = useState<AddressDto | null>(null)
   const [shipToLocation, setShipToLocation] = useState<AddressDto | null>(null)
   const [remarks, setRemarks] = useState("")
+  const [itemSearch, setItemSearch] = useState("")
+  const [itemOptions, setItemOptions] = useState<InventoryItemDto[]>([])
+  const [itemOptionsLoading, setItemOptionsLoading] = useState(false)
 
   const [lines, setLines] = useState<AllocationFormLine[]>([emptyLine()])
 
@@ -252,17 +259,44 @@ export function useAllocationForm() {
   )
 
   const subRegionDisplay =
-    subRegionsForSelected.length > 1
-      ? subRegionsForSelected.join(", ")
-      : subRegionsForSelected[0] ?? ""
+    selectedSubRegion || subRegionsForSelected[0] || ""
 
-  /** When multiple sub-regions exist, show comma list and use first for API filters. */
+  /** Only use the selected sub-region when there are multiple options. */
   const effectiveSubRegion =
-    subRegionsForSelected.length === 0
-      ? selectedSubRegion
-      : subRegionsForSelected.length === 1
-        ? subRegionsForSelected[0]
-        : subRegionsForSelected[0]
+    selectedSubRegion || (subRegionsForSelected.length === 1 ? subRegionsForSelected[0] : "")
+
+  const debouncedItemSearch = useDebounce(itemSearch, 300)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadItems() {
+      setItemOptionsLoading(true)
+      try {
+        const pagedItems = await getPaginatedItems(
+          1,
+          50,
+          debouncedItemSearch.trim() ? debouncedItemSearch : undefined
+        )
+        if (!cancelled) {
+          setItemOptions(pagedItems.data)
+        }
+      } catch {
+        if (!cancelled) {
+          setItemOptions([])
+        }
+      } finally {
+        if (!cancelled) {
+          setItemOptionsLoading(false)
+        }
+      }
+    }
+
+    loadItems()
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedItemSearch])
 
   useEffect(() => {
     let cancelled = false
@@ -459,25 +493,17 @@ export function useAllocationForm() {
     }
   }, [shipToCustomer, operatingUnit])
 
-  const lineItemKeys = useMemo(
-    () =>
-      lines
-        .filter((l) => l.organizationId && l.inventoryItemId && !l.isRunnerItem)
-        .map((l) => `${l.id}:${l.organizationId}:${l.inventoryItemId}`)
-        .join("|"),
-    [lines]
-  )
-
   useEffect(() => {
-    if (allocationBasis !== "customer" || !billToCustomer || !lineItemKeys) return
+    if (allocationBasis !== "customer" || !billToCustomer) return
+
+    const eligible = lines.filter(
+      (l) => l.organizationId && l.inventoryItemId && !l.isRunnerItem
+    )
+    if (eligible.length === 0) return
 
     let cancelled = false
 
     async function refreshMetrics() {
-      const eligible = lines.filter(
-        (l) => l.organizationId && l.inventoryItemId && !l.isRunnerItem
-      )
-
       const updates = await Promise.all(
         eligible.map(async (line) => {
           try {
@@ -507,10 +533,15 @@ export function useAllocationForm() {
     return () => {
       cancelled = true
     }
-  }, [allocationBasis, billToCustomer, lineItemKeys])
+  }, [allocationBasis, billToCustomer])
 
   const resolveItemForLine = useCallback(
-    async (lineId: string, organizationId: number, itemCode: string) => {
+    async (
+      lineId: string,
+      organizationId: number,
+      itemCode: string,
+      selectedItem?: InventoryItemDto
+    ) => {
       const trimmed = itemCode.trim()
       if (!trimmed) return
 
@@ -524,13 +555,20 @@ export function useAllocationForm() {
                 isRunnerItem: false,
                 rrsCategory: null,
                 metrics: null,
+                ...(selectedItem
+                  ? {
+                      inventoryItemId: selectedItem.inventoryItemId,
+                      itemCode: selectedItem.itemCode,
+                      description: selectedItem.description,
+                    }
+                  : {}),
               }
             : line
         )
       )
 
       try {
-        const item = await getItemByCode(trimmed)
+        const item = selectedItem ?? (await getItemByCode(trimmed))
         const rrs = await getItemRrsCategory(organizationId, item.inventoryItemId)
 
         if (isRunnerRrsCategory(rrs.rrsCategory)) {
@@ -609,8 +647,10 @@ export function useAllocationForm() {
   )
 
   const setLineOrganization = useCallback(
-    (lineId: string, orgId: string) => {
-      const org = organizations.find((o) => String(o.organizationId) === orgId)
+    (lineId: string, value: string) => {
+      const org = organizations.find(
+        (o) => String(o.organizationId) === value || o.organizationCode === value
+      )
       setLines((prev) =>
         prev.map((line) =>
           line.id === lineId
@@ -822,6 +862,11 @@ export function useAllocationForm() {
     organizations,
     weekOptions,
     lines,
+    itemSearch,
+    setItemSearch,
+    itemOptions,
+    itemOptionsLoading,
+    resolveItemForLine,
     updateLine,
     setLineOrganization,
     setLineItemCode,

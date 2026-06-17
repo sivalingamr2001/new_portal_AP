@@ -10,6 +10,7 @@ interface ItemLine {
   region: string
   binQty: number
   approvedQty?: number
+  isApproved?: boolean
   targetDate: string
   status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
   oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
@@ -23,7 +24,7 @@ export function FulfillmentScreen() {
   const { items } = useOutletContext<DashboardContext>()
   const [expandedId, setExpandedId] = useState<string | null>('2')
 
-  const activeFulfillmentItems = items.filter(i => ['Approved', 'Fulfilled', 'Partial'].includes(i.status))
+  const activeFulfillmentItems = items.filter(i => i.isApproved || ['Fulfilled', 'Partial'].includes(i.status))
 
   const totalApprovedUnits = activeFulfillmentItems.reduce((acc, curr) => acc + (curr.approvedQty || curr.binQty), 0)
   const totalAllocatedOAUnits = activeFulfillmentItems.reduce((acc, curr) => {

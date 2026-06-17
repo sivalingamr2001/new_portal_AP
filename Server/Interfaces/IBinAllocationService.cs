@@ -1,21 +1,54 @@
-using Backend.Models;
+﻿using Backend.Models;
 
 namespace Backend.Interfaces;
 
-/// <summary>
-/// Service contract for bin allocation CRUD, demand metrics, and inventory lookups.
-/// </summary>
 public interface IBinAllocationService
 {
-    Task<IEnumerable<OrganizationDto>> GetInventoryOrganizationsAsync(CancellationToken cancellationToken = default);
-    Task<PagedResult<InventoryItemDto>> GetInventoryItemDetailsAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default);
-    Task<string?> GetSalesRrsCategoryAsync(int organizationId, int inventoryItemId, CancellationToken cancellationToken = default);
-    Task<int> CreateAllocationAsync(CreateAllocationRequest request, CancellationToken cancellationToken = default);
-    Task UpdateAllocationAsync(int headerId, CreateAllocationRequest request, CancellationToken cancellationToken = default);
-    Task ProcessApprovalAsync(ApprovalRequest request, CancellationToken cancellationToken = default);
-    Task ProcessCancellationAsync(CancellationRequest request, CancellationToken cancellationToken = default);
-    Task RejectAllocationAsync(RejectRequest request, CancellationToken cancellationToken = default);
-    Task<DemandMetricsDto?> GetDemandMetricsAsync(int customerId, int organizationId, int inventoryItemId, CancellationToken cancellationToken = default);
-    Task<IEnumerable<AllocationDetailsDto>> GetAllocationsAsync(CancellationToken cancellationToken = default);
-    Task ProcessAmendmentAsync(AmendRequest request, CancellationToken cancellationToken = default);
+    // ── CREATE ───────────────────────────────────────────────
+    /// <summary>
+    /// Creates one header + N line items in a single transaction.
+    /// Returns the generated HEADER_ID.
+    /// </summary>
+    Task<decimal> CreateAllocationAsync(CreateAllocationRequestV2 request);
+
+    // ── READ ─────────────────────────────────────────────────
+    /// <summary>All allocations — header + lines joined.</summary>
+    Task<IEnumerable<AllocationRow>> GetAllAllocationsAsync();
+
+    /// <summary>Single allocation by header ID.</summary>
+    Task<IEnumerable<AllocationRow>> GetAllocationByHeaderIdAsync(decimal headerId);
+
+    /// <summary>All lines currently pending HOD approval.</summary>
+    Task<IEnumerable<B3Line>> GetPendingApprovalLinesAsync();
+
+    /// <summary>All cancellation records with context.</summary>
+    Task<IEnumerable<B3Cancellation>> GetAllCancellationsAsync();
+
+    /// <summary>Per-header summary (totals, approved, pending, cancelled).</summary>
+    Task<IEnumerable<AllocationSummary>> GetAllocationSummaryAsync();
+
+    // ── REVISE (User role — new row, not update) ─────────────
+    /// <summary>
+    /// Creates a new revision row for the given line.
+    /// Does NOT modify the original row.
+    /// </summary>
+    Task<decimal> ReviseQuantityAsync(ReviseQuantityRequest request);
+
+    /// <summary>Full revision history for a line (all revisions).</summary>
+    Task<IEnumerable<B3Line>> GetLineRevisionHistoryAsync(decimal originalLineId);
+
+    // ── APPROVE (HOD) ─────────────────────────────────────────
+    /// <summary>HOD approves a pending line with approved quantity.</summary>
+    Task<bool> ApproveLineAsync(ApproveLineRequest request);
+
+    // ── AMEND (HOD post-approval) ─────────────────────────────
+    /// <summary>HOD amends the approved quantity of an already-approved line.</summary>
+    Task<bool> AmendApprovedQuantityAsync(AmendQuantityRequest request);
+
+    // ── CANCEL ────────────────────────────────────────────────
+    /// <summary>Cancels a single line — inserts cancellation + closes line.</summary>
+    Task<bool> CancelLineAsync(CancelLineRequest request);
+
+    /// <summary>Cancels all open lines under a header.</summary>
+    Task<bool> CancelAllLinesAsync(CancelHeaderRequest request);
 }

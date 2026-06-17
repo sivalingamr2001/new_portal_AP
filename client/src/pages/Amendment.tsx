@@ -12,6 +12,8 @@ interface ItemLine {
   region: string
   binQty: number
   approvedQty?: number
+  amendedQty?: number
+  isApproved?: boolean
   targetDate: string
   status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
   oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
@@ -28,6 +30,7 @@ export function AmendmentScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [amendQty, setAmendQty] = useState<number>(0)
   const [reason, setReason] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
 
   const targetItem = items.find(i => i.id === selectedId)
 
@@ -35,6 +38,14 @@ export function AmendmentScreen() {
     setSelectedId(item.id)
     setAmendQty(item.approvedQty || item.binQty)
     setReason('')
+    setCancelReason('')
+  }
+
+  const prepareCancel = (item: ItemLine) => {
+    setSelectedId(item.id)
+    setAmendQty(item.approvedQty || item.binQty)
+    setReason('')
+    setCancelReason('')
   }
 
   const processAmendment = async () => {
@@ -48,31 +59,36 @@ export function AmendmentScreen() {
       await reloadAllocations()
       alert('Amendment request queued and dispatched back to authorization matrix!')
       setSelectedId(null)
+      setReason('')
+      setCancelReason('')
     } catch (error) {
       console.error("Failed to submit amendment:", error)
     }
   }
 
-  const processCancellation = async (id: string) => {
-    if (confirm('Are you absolutely sure you want to completely erase this allocation payload entry?')) {
-      try {
-        const lineId = Number(id)
-        const item = items.find(i => i.id === id)
-        await cancelAllocationLineApi({
-          lineId,
-          cancelledQty: item?.binQty || 0,
-          reason: "Cancelled via BIN Portal UI",
-          cancelledBy: "1" // Default System User ID as string
-        })
-        await reloadAllocations()
-        if (selectedId === id) setSelectedId(null)
-      } catch (error) {
-        console.error("Failed to cancel allocation line:", error)
-      }
+  const processCancellation = async () => {
+    if (!selectedId || !cancelReason) return
+    if (!confirm('Are you absolutely sure you want to cancel this allocation entry?')) return
+
+    try {
+      const lineId = Number(selectedId)
+      const item = items.find(i => i.id === selectedId)
+      await cancelAllocationLineApi({
+        lineId,
+        cancelledQty: item?.binQty || 0,
+        reason: cancelReason,
+        cancelledBy: 1
+      })
+      await reloadAllocations()
+      setSelectedId(null)
+      setReason('')
+      setCancelReason('')
+    } catch (error) {
+      console.error("Failed to cancel allocation line:", error)
     }
   }
 
-  const allowedItems = items.filter(i => i.status === 'Approved' || i.status === 'Amend Pending')
+  const allowedItems = items.filter(i => i.isApproved || i.status === 'Amend Pending')
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -110,7 +126,7 @@ export function AmendmentScreen() {
                       Amend Qty
                     </button>
                     <button 
-                      onClick={() => processCancellation(item.id)}
+                      onClick={() => prepareCancel(item)}
                       className="bg-destructive/10 hover:bg-destructive/20 text-destructive text-[11px] font-medium px-2.5 py-1 rounded border border-destructive/20 transition-colors cursor-pointer"
                     >
                       Cancel
@@ -124,44 +140,84 @@ export function AmendmentScreen() {
 
         {targetItem && (
           <div className="mt-6 bg-muted/40 border border-border p-4 rounded-xl space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Configure Amendment: {targetItem.itemCode}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">New Quantity</label>
-                <input 
-                  type="number"
-                  value={amendQty}
-                  onChange={(e) => setAmendQty(Number(e.target.value))}
-                  className="w-full bg-background border border-border rounded px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-primary"
-                />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Configure Amendment / Cancellation: {targetItem.itemCode}</h3>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+                <p className="text-xs font-semibold text-foreground">Amend Quantity</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Current Approved Qty</label>
+                    <div className="bg-background border border-border rounded px-3 py-2 text-xs font-mono text-foreground">{targetItem.approvedQty || targetItem.binQty}</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">New Quantity</label>
+                    <input 
+                      type="number"
+                      value={amendQty}
+                      min={0}
+                      onChange={(e) => setAmendQty(Number(e.target.value))}
+                      className="w-full bg-background border border-border rounded px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Reason *</label>
+                  <select 
+                    value={reason} 
+                    onChange={(e) => setReason(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Select reason...</option>
+                    <option value="Production schedule change">Production schedule change</option>
+                    <option value="Client order revision">Client order revision</option>
+                    <option value="Logistics/Supply delay">Logistics/Supply delay</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={processAmendment}
+                    disabled={!reason || amendQty <= 0}
+                    className="flex-1 bg-orange-600 hover:bg-orange-500 disabled:bg-muted disabled:text-muted-foreground text-white text-xs font-semibold px-4 py-1.5 rounded transition-all h-9 cursor-pointer"
+                  >
+                    Submit Amend
+                  </button>
+                  <button 
+                    onClick={() => setSelectedId(null)}
+                    className="bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs px-3 py-1.5 rounded cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">Reason *</label>
-                <select 
-                  value={reason} 
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full bg-background border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
-                >
-                  <option value="">Select reason...</option>
-                  <option value="Production schedule change">Production schedule change</option>
-                  <option value="Client order revision">Client order revision</option>
-                  <option value="Logistics/Supply delay">Logistics/Supply delay</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={processAmendment}
-                  disabled={!reason}
-                  className="flex-1 bg-orange-600 hover:bg-orange-500 disabled:bg-muted disabled:text-muted-foreground text-white text-xs font-semibold px-4 py-1.5 rounded transition-all h-9 cursor-pointer"
-                >
-                  Submit Amend
-                </button>
-                <button 
-                  onClick={() => setSelectedId(null)}
-                  className="bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs px-3 py-1.5 rounded cursor-pointer"
-                >
-                  Cancel
-                </button>
+
+              <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+                <p className="text-xs font-semibold text-foreground">Cancel Allocation</p>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Reason *</label>
+                  <select 
+                    value={cancelReason} 
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+                  >
+                    <option value="">Select cancellation reason...</option>
+                    <option value="Customer changed delivery schedule">Customer changed delivery schedule</option>
+                    <option value="Production plan revised">Production plan revised</option>
+                    <option value="Raw material delay">Raw material delay</option>
+                    <option value="Quality hold">Quality hold</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={processCancellation}
+                    disabled={!cancelReason}
+                    className="flex-1 bg-destructive/90 hover:bg-destructive text-white text-xs font-semibold px-4 py-1.5 rounded transition-all h-9 cursor-pointer disabled:bg-muted disabled:text-muted-foreground"
+                  >
+                    Confirm Cancellation
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -16,6 +16,7 @@ import type {
   ApprovalRequest,
   RejectRequest,
   CancellationRequest,
+  AllocationGroupResponseDto,
 } from "./types/allocationDto"
 import type { PagedResult } from "./types/pagedResult"
 
@@ -251,9 +252,33 @@ export const getDemandMetricsApi = async (
  * Retrieves a list of all created allocations.
  * Maps to: GET /api/allocations
  */
+const deriveAllocationStatus = (approvalFlag: string | undefined): ItemLine["status"] => {
+  const flag = String(approvalFlag ?? "").trim().toUpperCase()
+  if (flag === "Y") return "Approved"
+  if (flag === "A") return "Amend Pending"
+  return "Pending"
+}
+
 export const getAllAllocationsApi = async (): Promise<ItemLine[]> => {
-  const response = await axiosClient.get<ItemLine[]>("/allocations")
-  return response.data
+  const response = await axiosClient.get<AllocationGroupResponseDto[]>("/allocations")
+  return response.data.flatMap((group) =>
+    group.items.map((item) => {
+      const status = deriveAllocationStatus(item.isApproved)
+      return {
+        id: String(item.id),
+        itemCode: String(item.itemCode),
+        itemName: "",
+        customer: String(group.header.billToCustomer ?? group.header.customerId ?? ""),
+        region: String(group.header.territoryId ?? ""),
+        requestedQty: item.binQty,
+        binQty: item.binQty,
+        approvedQty: item.approvedQty,
+        targetDate: item.targetDate,
+        status,
+        isApproved: status === "Approved",
+      }
+    })
+  )
 }
 
 export interface AmendRequest {

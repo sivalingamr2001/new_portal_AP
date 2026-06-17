@@ -3,14 +3,14 @@ import type { RegionDetailsDto } from "./types/allocationDto"
 
 /**
  * Validates user credentials and retrieves matching region configurations.
- * Maps to: POST /api/Allocation/login-details
+ * Maps to: POST /api/Auth/login-details
  */
 export const loginApi = async (
   username: string,
   password?: string
 ): Promise<RegionDetailsDto> => {
   const response = await axiosClient.post<RegionDetailsDto>(
-    "/Allocation/login-details",
+    "/Auth/login-details",
     { username, password }
   )
   return response.data

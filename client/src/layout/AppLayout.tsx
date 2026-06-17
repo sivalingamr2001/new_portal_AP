@@ -11,8 +11,11 @@ export interface ItemLine {
   itemName: string
   customer: string
   region: string
+  requestedQty: number
   binQty: number
   approvedQty?: number
+  amendedQty?: number
+  isApproved?: boolean
   targetDate: string
   status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
   oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
@@ -56,7 +59,7 @@ export default function AppLayout() {
 
   const pendingCount = items.filter(i => i.status === 'Pending').length
   const amendCount = items.filter(i => i.status === 'Amend Pending').length
-  const approvedCount = items.filter(i => i.status === 'Approved').length
+  const approvedCount = items.filter(i => i.isApproved).length
 
   return (
     <SidebarProvider>

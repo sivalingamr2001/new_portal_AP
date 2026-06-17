@@ -105,7 +105,7 @@ export interface AllocationLineDto {
 
 export interface ApprovalRequest {
   lineId: number
-  approverId: number
+  approverBy: string | any
   /** B3_APPROVED_QUANTITY */
   approvedQty: number
   decision: string
@@ -122,7 +122,7 @@ export interface CancellationRequest {
   /** CANCELLED_QTY */
   cancelledQty: number
   reason: string
-  cancelledBy: string
+  cancelledBy: number
 }
 
 export interface DemandMetricsDto {
@@ -131,4 +131,33 @@ export interface DemandMetricsDto {
   oaPickedQty: number
   binQty: number
   binRsvQty: number
+}
+
+export interface AllocationHeaderGroupDto {
+  headerId: number
+  transactionDate: string
+  allocationBasis: number
+  customerId: number
+  territoryId: number
+  billToCustomer: number
+  shipToCustomer: number
+  remarks: string
+  createdBy: string
+  createdDate: string
+}
+
+export interface AllocationGroupItemDto {
+  id: number
+  isApproved: string
+  approvedQty: number
+  binQty: number
+  parentHeaderId: number
+  itemCode: number | string
+  organizationId: number
+  targetDate: string
+}
+
+export interface AllocationGroupResponseDto {
+  header: AllocationHeaderGroupDto
+  items: AllocationGroupItemDto[]
 }

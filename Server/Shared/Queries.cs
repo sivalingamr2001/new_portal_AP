@@ -152,58 +152,126 @@ public static class Queries
     // --- BIN ALLOCATION DML QUERIES ---
 
     public const string InsertAllocationHeader = @"
-            INSERT INTO ALLOCATION_HEADERS (HeaderId, RequestDate, AllocationBasis, CustomerId, TerritoryId, Remarks, CreatedBy, Status, CreatedAt)
-            VALUES (:HeaderId, :RequestDate, :AllocationBasis, :CustomerId, :TerritoryId, :Remarks, :CreatedBy, 'Pending', SYSDATE)";
+        INSERT INTO JAN_B3_HEADER (
+            HEADER_ID,
+            TRANSACTION_DATE, 
+            CUSTOMER_OR_ITEM_SPECIFIC, 
+            CUSTOMER_ID, 
+            TERRITORY_ID, 
+            BILL_TO_CUSTOMER, 
+            SHIP_TO_CUSTOMER, 
+            REMARKS, 
+            CREATED_BY, 
+            CREATED_DATE
+        )
+        VALUES (
+            JAN_B3_HEADERID_SEQ.NEXTVAL,
+            SYSDATE, 
+            :AllocationBasis, 
+            :CustomerId, 
+            :TerritoryId, 
+            :BillToCustomerId, 
+            :ShipToCustomerId, 
+            :Remarks, 
+            :CreatedBy, 
+            SYSDATE
+        )
+        RETURNING HEADER_ID INTO :HeaderId";
 
     public const string InsertAllocationLine = @"
-            INSERT INTO ALLOCATION_LINES (LineId, HeaderId, ItemCode, WarehouseId, RequestedQty, ApprovedQty, TargetDate, Status, CreatedAt)
-            VALUES (:LineId, :HeaderId, :ItemCode, :WarehouseId, :RequestedQty, 0, :TargetDate, 'Pending', SYSDATE)";
+        INSERT INTO JAN_B3_LINES (
+            HEADER_ID,
+            LINE_ID,
+            ORGANIZATION_ID,
+            INVENTORY_ITEM_ID,
+            B3_QUANTITY,
+            TARGET_DATE,
+            B3_APPROVED_QUANTITY,
+            APPROVAL_FLAG
+        )
+        VALUES (
+            :HeaderId,
+            JAN_B3_LINESID_SEQ.NEXTVAL,
+            :OrganizationId,
+            :InventoryItemId,
+            :RequestedQty,
+            :TargetDate,
+            0,
+            'N'
+        )";
 
     public const string UpdateAllocationLine = @"
-            UPDATE ALLOCATION_LINES 
-            SET RequestedQty = :RequestedQty, TargetDate = :TargetDate, UpdatedAt = SYSDATE 
-            WHERE LineId = :LineId AND Status = 'Pending'";
+        UPDATE JAN_B3_LINES 
+        SET B3_QUANTITY = :RequestedQty, TARGET_DATE = :TargetDate, APPROVED_DATE = SYSDATE 
+        WHERE LINE_ID = :LineId AND APPROVAL_FLAG = 'N'";
 
     public const string InsertApprovalRecord = @"
-            INSERT INTO APPROVALS (ApprovalId, LineId, ApproverId, ApprovedQty, Decision, Remarks, ActionDate)
-            VALUES (:ApprovalId, :LineId, :ApproverId, :ApprovedQty, :Decision, :Remarks, SYSDATE)";
+        INSERT INTO APPROVALS (ApprovalId, LineId, ApproverId, ApprovedQty, Decision, Remarks, ActionDate)
+        VALUES (:APPROVAL_ID, :LINE_ID, :APPROVER_ID, :APPROVED_QTY, :DECISION, :REMARKS, SYSDATE)";
 
     public const string UpdateLineStatus = @"
-            UPDATE ALLOCATION_LINES 
-            SET Status = :Status, ApprovedQty = :ApprovedQty, UpdatedAt = SYSDATE 
-            WHERE LineId = :LineId";
+        UPDATE JAN_B3_LINES 
+        SET APPROVAL_FLAG = :STATUS, B3_APPROVED_QUANTITY = :APPROVED_QTY, APPROVED_DATE = SYSDATE 
+        WHERE LINE_ID = :LINE_ID";
 
     public const string InsertCancellationRecord = @"
-            INSERT INTO CANCELLATIONS (CancellationId, LineId, CancelledQty, Reason, CancelledBy, CancelDate)
-            VALUES (:CancellationId, :LineId, :CancelledQty, :Reason, :CancelledBy, SYSDATE)";
+        INSERT INTO JAN_B3_CANCELLATION (
+            CANCEL_ID,
+            LINE_ID,
+            CANCELLED_QTY,
+            CANCEL_REASON,
+            CREATED_BY,
+            CANCELLED_DATE,
+            CREATED_DATE
+        )
+        VALUES (
+            JAN_B3_CANCELLATION_SEQ.NEXTVAL,
+            :LineId,
+            :CancelledQty,
+            :Reason,
+            :CancelledBy,
+            SYSDATE,
+            SYSDATE
+        )";
 
     public const string RejectAllocationLine = @"
-            UPDATE ALLOCATION_LINES 
-            SET Status = 'Rejected', UpdatedAt = SYSDATE 
-            WHERE LineId = :LineId";
+        UPDATE JAN_B3_LINES 
+        SET APPROVAL_FLAG = 'R', APPROVED_DATE = SYSDATE 
+        WHERE LINE_ID = :LINE_ID";
 
     public const string CountInventoryItems = @"
         SELECT COUNT(*) 
         FROM MTL_SYSTEM_ITEMS 
-        WHERE (:Search IS NULL OR UPPER(SEGMENT1) LIKE UPPER(:Search))";
+        WHERE (:SEARCH IS NULL OR UPPER(SEGMENT1) LIKE UPPER(:SEARCH))";
 
-    public const string GetAllAllocations = @"
-            SELECT 
-                l.LineId AS Id,
-                l.ItemCode AS ItemCode,
-                NVL((SELECT TRIM(REPLACE(DESCRIPTION, '""', '')) FROM MTL_SYSTEM_ITEMS WHERE SEGMENT1 = l.ItemCode AND ROWNUM = 1), 'Pneumatic Valve') AS ItemName,
-                NVL((SELECT customer_name FROM ra_customers WHERE customer_id = h.CustomerId AND ROWNUM = 1), 'Tata Motors') AS Customer,
-                NVL((SELECT DISTINCT segment14 FROM ra_territories WHERE territory_id = h.TerritoryId AND ROWNUM = 1), 'Maharashtra') AS Region,
-                l.RequestedQty AS BinQty,
-                l.ApprovedQty AS ApprovedQty,
-                TO_CHAR(l.TargetDate, 'YYYY-MM-DD') AS TargetDate,
-                l.Status AS Status
-            FROM ALLOCATION_LINES l
-            JOIN ALLOCATION_HEADERS h ON l.HeaderId = h.HeaderId
-            ORDER BY l.CreatedAt DESC";
+    public const string GetAllAllocationsGrouped = @"
+    SELECT 
+        h.BILL_TO_CUSTOMER AS BillToCustomer,
+        h.CREATED_BY AS CreatedBy,
+        TO_CHAR(h.CREATED_DATE, 'YYYY-MM-DD') AS CreatedDate,
+        h.CUSTOMER_ID AS CustomerId,
+        h.CUSTOMER_OR_ITEM_SPECIFIC AS AllocationBasis,
+        h.HEADER_ID AS HeaderId,
+        h.REMARKS AS Remarks,
+        h.SHIP_TO_CUSTOMER AS ShipToCustomer,
+        h.TERRITORY_ID AS TerritoryId,
+        TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
+        
+        l.LINE_ID AS Id,
+        l.APPROVAL_FLAG AS IsApproved,
+        l.B3_APPROVED_QUANTITY AS ApprovedQty,
+        l.B3_QUANTITY AS BinQty,
+        l.HEADER_ID AS ParentHeaderId,
+        l.INVENTORY_ITEM_ID AS ItemCode,
+        l.ORGANIZATION_ID AS OrganizationId,
+        TO_CHAR(l.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate
+    FROM JAN_B3_HEADER h
+    LEFT JOIN JAN_B3_LINES l ON h.HEADER_ID = l.HEADER_ID
+    ORDER BY h.HEADER_ID DESC, l.LINE_ID ASC";
 
     public const string AmendAllocationLine = @"
-            UPDATE ALLOCATION_LINES 
-            SET Status = 'Amend Pending', RequestedQty = :NewQty, UpdatedAt = SYSDATE 
-            WHERE LineId = :LineId";
+        UPDATE JAN_B3_LINES 
+        SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
+        WHERE LINE_ID = :LINE_ID";
+
 }

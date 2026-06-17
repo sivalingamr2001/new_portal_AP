@@ -1,0 +1,20 @@
+{
+    "header": {
+        "requestDate": "2026-06-17",
+        "allocationBasis": 1,
+        "customerId": 1722,
+        "territoryId": 0,
+        "billToCustomerId": 1722,
+        "shipToCustomerId": 2869590,
+        "remarks": "Add Remarks",
+        "createdBy": "JANHPL"
+    },
+    "lines": [
+        {
+            "organizationId": 1025,
+            "inventoryItemId": 22033262,
+            "requestedQty": 100,
+            "targetDate": "2026-06-30"
+        }
+    ]
+}
