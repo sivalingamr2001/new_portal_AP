@@ -1,294 +1,556 @@
 import { axiosClient } from "@/lib/axiosClient"
-import type { ItemLine } from "@/layout/AppLayout"
-import type {
-  RegionDetailsDto,
-  CustomerDto,
-  EmployeeDto,
-  AddressDto,
-  OperatingUnitDto,
-  DemandMetricsDto,
-  InventoryItemDto,
-  OrganizationDto,
-  RrsCategoryResponseDto,
-  ItemByCodeDto,
-  CreateAllocationRequest,
-  CreateAllocationResponse,
-  ApprovalRequest,
-  RejectRequest,
-  CancellationRequest,
-  AllocationGroupResponseDto,
-} from "./types/allocationDto"
-import type { PagedResult } from "./types/pagedResult"
 
-/**
- * Returns a unique array list of all system regions and sub-regions.
- * Maps to: GET /api/Allocation/regions
- */
-export const getAllRegionsApi = async (): Promise<RegionDetailsDto[]> => {
-  const response = await axiosClient.get<RegionDetailsDto[]>(
-    "/Allocation/regions"
-  )
-  return response.data
-}
+const BASE = "/api/Allocation"
+const BIN_BASE = "/binallocation"
 
-/**
- * Gets unique customer billing assignments matching a specific region and sub-region.
- * Maps to: GET /api/Allocation/customers/bill-to
- */
-export const getBillToCustomersApi = async (
-  region: string,
-  subRegion: string
-): Promise<CustomerDto[]> => {
-  const response = await axiosClient.get<CustomerDto[]>(
-    "/Allocation/customers/bill-to",
-    {
-      params: { region, subRegion },
-    }
-  )
-  return response.data
-}
+// ==================== TYPES ====================
 
-/**
- * Gets unique shipping configurations for customers matching a specific region and sub-region.
- * Maps to: GET /api/Allocation/customers/ship-to
- */
-export const getShipToCustomersApi = async (
-  region: string,
-  subRegion: string
-): Promise<CustomerDto[]> => {
-  const response = await axiosClient.get<CustomerDto[]>(
-    "/Allocation/customers/ship-to",
-    {
-      params: { region, subRegion },
-    }
-  )
-  return response.data
-}
-
-/**
- * Pulls qualified executive employee profiles working out of a specific region.
- * Maps to: GET /api/Allocation/employees/prepared-by
- */
-export const getPreparedByEmployeesApi = async (
+export interface Region {
   region: string
-): Promise<EmployeeDto[]> => {
-  const response = await axiosClient.get<EmployeeDto[]>(
-    "/Allocation/employees/prepared-by",
-    {
-      params: { region },
-    }
-  )
-  return response.data
+  subRegion: string
 }
 
-/**
- * Queries multi-location structures matching a specific client, operational unit, and context.
- * Maps to: GET /api/Allocation/customers/{customerId}/addresses
- */
-export const getCustomerAddressesApi = async (
-  customerId: number,
-  siteUseCode: "BILL_TO" | "SHIP_TO",
+export interface Customer {
+  customerId: number
+  customerName: string
+  region: string
+}
+
+export interface Employee {
+  lastName: string
+  employeeNumber: string
+}
+
+export interface CustomerAddress {
+  address1: string
+  address2: string
+  address3: string
+  city: string
+  postalCode: string
   orgId: number
-): Promise<AddressDto[]> => {
-  const response = await axiosClient.get<AddressDto[]>(
-    `/Allocation/customers/${customerId}/addresses`,
-    {
-      params: { siteUseCode, orgId },
-    }
-  )
-  return response.data
+  location: string
 }
 
-/**
- * Generates system standard upcoming sequence loops for UI selector dropdown items.
- * Maps to: GET /api/Allocation/weeks/dropdown
- */
-export const getWeeksDropdownApi = async (): Promise<string[]> => {
-  const response = await axiosClient.get<string[]>("/Allocation/weeks/dropdown")
-  return response.data
+export interface OperatingUnit {
+  organizationId: number
+  name: string
 }
 
-/**
- * Retrieves targeted corporate operational unit profiles filtered by core organization identifiers.
- * Maps to: GET /api/Allocation/operating-units
- */
-export const getOperatingUnitsApi = async (): Promise<OperatingUnitDto[]> => {
-  const response = await axiosClient.get<OperatingUnitDto[]>(
-    "/Allocation/operating-units"
-  )
-  return response.data
+export interface DemandMetrics {
+  oaPendingQuantity: number
+  oaRsvQty: number
+  oaPickedQty: number
+  binQty: number
+  binRsvQty: number
 }
 
-// =========================================================================
-// TRANSACTION GRID DETAIL LAYER (ALLOCATIONS ENDPOINTS)
-// =========================================================================
-
-/**
- * Fetches the list of valid operational organization units for item rows.
- * Maps to: GET /api/allocations/organizations
- */
-export const getItemOperatingUnits = async (): Promise<OrganizationDto[]> => {
-  const response = await axiosClient.get<OrganizationDto[]>(
-    "/allocations/organizations"
-  )
-  return response.data
+export interface Organization {
+  organizationId: number
+  organizationCode: string
 }
 
-/**
- * Retrieves the designated RRS Category string for a specific organization item match.
- * Maps to: GET /api/allocations/rrs-category
- */
-export const getItemRrsCategory = async (
-  organizationId: number | string,
-  inventoryItemId: number | string
-): Promise<RrsCategoryResponseDto> => {
-  const response = await axiosClient.get<RrsCategoryResponseDto>(
-    "/allocations/rrs-category",
-    {
-      params: { organizationId, inventoryItemId },
-    }
-  )
-  return response.data
-}
-
-/**
- * Fetches a paginated, filterable collection of inventory items.
- * Maps to: GET /api/allocations/items
- */
-export const getPaginatedItems = async (
-  page: number,
-  pageSize: number,
-  search?: string
-): Promise<PagedResult<InventoryItemDto>> => {
-  const response = await axiosClient.get<PagedResult<InventoryItemDto>>(
-    "/allocations/items",
-    {
-      params: {
-        page,
-        pageSize,
-        search: search?.trim() || undefined,
-      },
-    }
-  )
-  return response.data
-}
-
-/**
- * Resolves item identifiers and details based on a single exact item code string.
- * Maps to: GET /api/allocations/items/{itemCode}
- */
-export const getItemByCode = async (
+export interface InventoryItem {
+  inventoryItemId: number
   itemCode: string
-): Promise<ItemByCodeDto> => {
-  const response = await axiosClient.get<ItemByCodeDto>(
-    `/allocations/items/${encodeURIComponent(itemCode.trim())}`
+  description: string
+}
+
+export interface PaginatedItems {
+  data: InventoryItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+export interface RrsCategory {
+  rrsCategory: string
+}
+
+export interface CreateAllocationRequest {
+  [key: string]: unknown
+}
+
+export interface CreateAllocationResponse {
+  [key: string]: unknown
+}
+
+export interface ErrorResponse {
+  type: string
+  title: string
+  status: number
+  detail: string
+  instance: string
+  additionalProp1?: string
+  additionalProp2?: string
+  additionalProp3?: string
+}
+
+export interface B3Header {
+  headerId: number
+  transactionDate: string
+  customerOrItemSpecific: number | null
+  customerId: number | null
+  territoryId: number | null
+  billToCustomer: number | null
+  shipToCustomer: number | null
+  createdBy: string
+  createdDate: string
+  updatedBy: string | null
+  updatedDate: string | null
+  remarks: string | null
+}
+
+export interface B3Line {
+  lineId: number
+  headerId: number
+  organizationId: number | null
+  inventoryItemId: number
+  b3Quantity: number
+  targetDate: string | null
+  b3ApprovedQuantity: number | null
+  approvalFlag: "Y" | "N"
+  approvedDate: string | null
+  approvedBy: string | null
+  closureFlag: "Y" | "N"
+  revision: number
+  parentLineId: number | null
+}
+
+export interface B3Cancellation {
+  cancelId: number
+  lineId: number
+  cancelledQty: number
+  cancelledDate: string
+  cancelReason: string | null
+  createdBy: string
+  createdDate: string
+  headerId?: number
+  inventoryItemId?: number
+  organizationId?: number | null
+  originalQuantity?: number
+  approvedQuantity?: number | null
+  customerId?: number | null
+  transactionDate?: string
+}
+
+export interface AllocationRow extends B3Header {
+  lineId: number
+  organizationId: number | null
+  inventoryItemId: number
+  b3Quantity: number
+  targetDate: string | null
+  b3ApprovedQuantity: number | null
+  approvalFlag: "Y" | "N"
+  approvedDate: string | null
+  approvedBy: string | null
+  closureFlag: "Y" | "N"
+  revision: number
+}
+
+export interface AllocationSummary {
+  headerId: number
+  transactionDate: string
+  customerId: number | null
+  totalLines: number
+  totalRequestedQty: number
+  totalApprovedQty: number
+  approvedLines: number
+  pendingLines: number
+  cancelledLines: number
+}
+
+export interface CreateLineRequest {
+  organizationId?: number | null
+  inventoryItemId: number
+  b3Quantity: number
+  targetDate?: string | null // ISO date string
+}
+
+export interface CreateAllocationRequest {
+  transactionDate: string // ISO date string
+  customerOrItemSpecific?: number | null
+  customerId?: number | null
+  territoryId?: number | null
+  billToCustomer?: number | null
+  shipToCustomer?: number | null
+  createdBy: string
+  remarks?: string | null
+  lines: CreateLineRequest[]
+}
+
+export interface ReviseQuantityRequest {
+  originalLineId: number
+  newB3Quantity: number
+}
+
+export interface ApproveLineRequest {
+  lineId: number
+  approvedQuantity: number
+  approvedBy: string
+}
+
+export interface AmendQuantityRequest {
+  lineId: number
+  amendedQuantity: number
+  amendedBy: string
+}
+
+export interface CancelLineRequest {
+  lineId: number
+  cancelledQty: number
+  cancelReason: string
+  createdBy: string
+}
+
+export interface CancelHeaderRequest {
+  headerId: number
+  cancelReason: string
+  createdBy: string
+}
+
+// ─────────────────────────────────────────────────────────────
+// TYPES — Generic API Responses
+// ─────────────────────────────────────────────────────────────
+
+export interface CreateAllocationResponse {
+  headerId: number
+}
+
+export interface ReviseQuantityResponse {
+  newLineId: number
+  message: string
+}
+
+export interface ActionResponse {
+  message: string
+}
+
+export interface RegionDetailsDto {
+  region: string
+  subRegion: string
+}
+
+export interface PagedResult<T> {
+  data: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
+}
+
+// ==================== API FUNCTIONS ====================
+
+export const loginApi = async (
+  username: string,
+  password?: string
+): Promise<RegionDetailsDto> => {
+  const response = await axiosClient.post<RegionDetailsDto>(
+    "/Auth/login-details",
+    { username, password }
   )
   return response.data
 }
 
 /**
- * Creates a BIN allocation header and line records (JAN_B3_HEADER / JAN_B3_LINES).
- * Maps to: POST /api/allocations
+ * GET /api/Allocation/regions
+ * Get all regions and sub-regions
  */
-export const createAllocationApi = async (
-  payload: CreateAllocationRequest
-): Promise<CreateAllocationResponse> => {
-  const response = await axiosClient.post<CreateAllocationResponse>(
-    "/allocations",
-    payload
+export const getRegions = async (): Promise<Region[]> => {
+  const { data } = await axiosClient.get<Region[]>(`${BASE}/regions`)
+  return data
+}
+
+/**
+ * GET /api/Allocation/customers/bill-to
+ * Get bill-to customers by region and sub-region
+ */
+export const getBillToCustomers = async (
+  region: string,
+  subRegion: string
+): Promise<Customer[]> => {
+  const { data } = await axiosClient.get<Customer[]>(
+    `${BASE}/customers/bill-to`,
+    { params: { region, subRegion } }
   )
-  return response.data
+  return data
 }
 
 /**
- * Approves an allocation line (JAN_B3_LINES approval fields).
- * Maps to: POST /api/allocations/approve
+ * GET /api/Allocation/customers/ship-to
+ * Get ship-to customers by region and sub-region
  */
-export const approveAllocationLineApi = async (
-  payload: ApprovalRequest
-): Promise<void> => {
-  await axiosClient.post("/allocations/approve", payload)
+export const getShipToCustomers = async (
+  region: string,
+  subRegion: string
+): Promise<Customer[]> => {
+  const { data } = await axiosClient.get<Customer[]>(
+    `${BASE}/customers/ship-to`,
+    { params: { region, subRegion } }
+  )
+  return data
 }
 
 /**
- * Rejects an allocation line.
- * Maps to: POST /api/allocations/reject
+ * GET /api/Allocation/employees/prepared-by
+ * Get employees prepared by region
  */
-export const rejectAllocationLineApi = async (
-  payload: RejectRequest
-): Promise<void> => {
-  await axiosClient.post("/allocations/reject", payload)
+export const getPreparedByEmployees = async (
+  region: string
+): Promise<Employee[]> => {
+  const { data } = await axiosClient.get<Employee[]>(
+    `${BASE}/employees/prepared-by`,
+    { params: { region } }
+  )
+  return data
 }
 
 /**
- * Cancels quantity on an allocation line (JAN_B3_CANCELLATION).
- * Maps to: POST /api/allocations/cancel
+ * GET /api/Allocation/customers/{customerId}/addresses
+ * Get customer addresses
  */
-export const cancelAllocationLineApi = async (
-  payload: CancellationRequest
-): Promise<void> => {
-  await axiosClient.post("/allocations/cancel", payload)
+export const getCustomerAddresses = async (
+  customerId: number,
+  siteUseCode?: string,
+  orgId?: number
+): Promise<CustomerAddress[]> => {
+  const { data } = await axiosClient.get<CustomerAddress[]>(
+    `${BASE}/customers/${customerId}/addresses`,
+    { params: { siteUseCode, orgId } }
+  )
+  return data
 }
 
 /**
- * Retrieves reference totals, balances, and demand metrics from your Oracle views.
- * Maps exactly to: GET /api/allocations/demand-metrics?customerId=X&organizationId=Y&inventoryItemId=Z
+ * GET /api/Allocation/weeks/dropdown
+ * Get available weeks dropdown
  */
-export const getDemandMetricsApi = async (
+export const getWeeksDropdown = async (): Promise<string[]> => {
+  const { data } = await axiosClient.get<string[]>(`${BASE}/weeks/dropdown`)
+  return data
+}
+
+/**
+ * GET /api/Allocation/operating-units
+ * Get all operating units
+ */
+export const getOperatingUnits = async (): Promise<OperatingUnit[]> => {
+  const { data } = await axiosClient.get<OperatingUnit[]>(
+    `${BASE}/operating-units`
+  )
+  return data
+}
+
+/**
+ * GET /api/Allocation/demand-metrics
+ * Get demand metrics for a customer, organization, and item
+ */
+export const getDemandMetrics = async (
   customerId: number,
   organizationId: number,
   inventoryItemId: number
-): Promise<DemandMetricsDto> => {
-  const response = await axiosClient.get<DemandMetricsDto>(
-    "/allocations/demand-metrics",
-    {
-      params: { customerId, organizationId, inventoryItemId },
-    }
+): Promise<DemandMetrics> => {
+  const { data } = await axiosClient.get<DemandMetrics>(
+    `${BASE}/demand-metrics`,
+    { params: { customerId, organizationId, inventoryItemId } }
   )
-  return response.data
+  return data
 }
 
 /**
- * Retrieves a list of all created allocations.
- * Maps to: GET /api/allocations
+ * GET /api/Allocation/organizations
+ * Get all organizations
  */
-const deriveAllocationStatus = (approvalFlag: string | undefined): ItemLine["status"] => {
-  const flag = String(approvalFlag ?? "").trim().toUpperCase()
-  if (flag === "Y") return "Approved"
-  if (flag === "A") return "Amend Pending"
-  return "Pending"
-}
-
-export const getAllAllocationsApi = async (): Promise<ItemLine[]> => {
-  const response = await axiosClient.get<AllocationGroupResponseDto[]>("/allocations")
-  return response.data.flatMap((group) =>
-    group.items.map((item) => {
-      const status = deriveAllocationStatus(item.isApproved)
-      return {
-        id: String(item.id),
-        itemCode: String(item.itemCode),
-        itemName: "",
-        customer: String(group.header.billToCustomer ?? group.header.customerId ?? ""),
-        region: String(group.header.territoryId ?? ""),
-        requestedQty: item.binQty,
-        binQty: item.binQty,
-        approvedQty: item.approvedQty,
-        targetDate: item.targetDate,
-        status,
-        isApproved: status === "Approved",
-      }
-    })
+export const getOrganizations = async (): Promise<Organization[]> => {
+  const { data } = await axiosClient.get<Organization[]>(
+    `${BASE}/organizations`
   )
+  return data
 }
 
-export interface AmendRequest {
+/**
+ * GET /api/Allocation/items
+ * Get paginated inventory items with optional search
+ */
+export const getItems = async (
+  page: number = 1,
+  pageSize: number = 10,
+  search?: string
+): Promise<PaginatedItems> => {
+  const { data } = await axiosClient.get<PaginatedItems>(`${BASE}/items`, {
+    params: { page, pageSize, search },
+  })
+  return data
+}
+
+/**
+ * GET /api/Allocation/rrs-category
+ * Get RRS category for an organization and item
+ */
+export const getRrsCategory = async (
+  organizationId: number,
+  inventoryItemId: number
+): Promise<RrsCategory> => {
+  const { data } = await axiosClient.get<RrsCategory>(`${BASE}/rrs-category`, {
+    params: { organizationId, inventoryItemId },
+  })
+  return data
+}
+
+/**
+ * Create a bin allocation — one header with multiple line items.
+ * POST /api/binallocation
+ */
+export const createAllocation = async (
+  payload: CreateAllocationRequest
+): Promise<CreateAllocationResponse> => {
+  const { data } = await axiosClient.post<CreateAllocationResponse>(
+    BIN_BASE,
+    payload
+  )
+  return data
+}
+
+/**
+ * Get all bin allocations (header + lines joined).
+ * GET /api/binallocation
+ */
+export const getAllAllocations = async (): Promise<AllocationRow[]> => {
+  const { data } = await axiosClient.get<AllocationRow[]>(BIN_BASE)
+  return data
+}
+
+/**
+ * Get a single allocation by header ID.
+ * GET /api/binallocation/{headerId}
+ */
+export const getAllocationByHeaderId = async (
+  headerId: number
+): Promise<AllocationRow[]> => {
+  const { data } = await axiosClient.get<AllocationRow[]>(
+    `${BIN_BASE}/${headerId}`
+  )
+  return data
+}
+
+/**
+ * Get dashboard summary per header (totals, approved, pending, cancelled).
+ * GET /api/binallocation/summary
+ */
+export const getAllocationSummary = async (): Promise<AllocationSummary[]> => {
+  const { data } = await axiosClient.get<AllocationSummary[]>(
+    `${BIN_BASE}/summary`
+  )
+  return data
+}
+
+/**
+ * Get all lines currently pending HOD approval.
+ * GET /api/binallocation/pending-approval
+ */
+export const getPendingApprovalLines = async (): Promise<B3Line[]> => {
+  const { data } = await axiosClient.get<B3Line[]>(
+    `${BIN_BASE}/pending-approval`
+  )
+  return data
+}
+
+/**
+ * User role: revise requested quantity.
+ * Creates a NEW revision row — does NOT modify the original line.
+ * POST /api/binallocation/revise
+ */
+export const reviseQuantity = async (
+  payload: ReviseQuantityRequest
+): Promise<ReviseQuantityResponse> => {
+  const { data } = await axiosClient.post<ReviseQuantityResponse>(
+    `${BIN_BASE}/revise`,
+    payload
+  )
+  return data
+}
+
+/**
+ * Get full revision history for a line (all revisions by original line ID).
+ * GET /api/binallocation/revisions/{lineId}
+ */
+export const getLineRevisionHistory = async (
   lineId: number
-  newQty: number
-  reason: string
+): Promise<B3Line[]> => {
+  const { data } = await axiosClient.get<B3Line[]>(
+    `${BIN_BASE}/revisions/${lineId}`
+  )
+  return data
 }
 
-export const amendAllocationLineApi = async (
-  payload: AmendRequest
-): Promise<void> => {
-  await axiosClient.post("/allocations/amend", payload)
+/**
+ * HOD approves a pending line with approved quantity.
+ * PUT /api/binallocation/approve
+ */
+export const approveLine = async (
+  payload: ApproveLineRequest
+): Promise<ActionResponse> => {
+  const { data } = await axiosClient.put<ActionResponse>(
+    `${BIN_BASE}/approve`,
+    payload
+  )
+  return data
+}
+
+/**
+ * HOD amends the approved quantity of an already-approved line.
+ * PUT /api/binallocation/amend
+ */
+export const amendApprovedQuantity = async (
+  payload: AmendQuantityRequest
+): Promise<ActionResponse> => {
+  const { data } = await axiosClient.put<ActionResponse>(
+    `${BIN_BASE}/amend`,
+    payload
+  )
+  return data
+}
+
+/**
+ * Cancel a single allocation line.
+ * Inserts cancellation record + closes line in one transaction.
+ * POST /api/binallocation/cancel/line
+ */
+export const cancelLine = async (
+  payload: CancelLineRequest
+): Promise<ActionResponse> => {
+  const { data } = await axiosClient.post<ActionResponse>(
+    `${BIN_BASE}/cancel/line`,
+    payload
+  )
+  return data
+}
+
+/**
+ * Cancel all open lines under a header.
+ * POST /api/binallocation/cancel/header
+ */
+export const cancelAllLines = async (
+  payload: CancelHeaderRequest
+): Promise<ActionResponse> => {
+  const { data } = await axiosClient.post<ActionResponse>(
+    `${BIN_BASE}/cancel/header`,
+    payload
+  )
+  return data
+}
+
+/**
+ * Fetch all cancellation records with header and line context.
+ * GET /api/binallocation/cancellations
+ */
+export const getAllCancellations = async (): Promise<B3Cancellation[]> => {
+  const { data } = await axiosClient.get<B3Cancellation[]>(
+    `${BIN_BASE}/cancellations`
+  )
+  return data
 }

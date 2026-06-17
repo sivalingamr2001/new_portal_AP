@@ -741,93 +741,6 @@ export function useAllocationForm() {
 
   const canSubmit = headerComplete && validLines.length > 0 && !submitting && !loadingInitial
 
-  const resetForm = useCallback(() => {
-    setBillToCustomer(null)
-    setShipToCustomer(null)
-    setBillToLocation(null)
-    setShipToLocation(null)
-    setOperatingUnit(null)
-    setRemarks("")
-    setLines([emptyLine()])
-  }, [])
-
-  const submitForApproval = useCallback(async () => {
-    if (!canSubmit) return
-
-    setSubmitting(true)
-    try {
-      const payload = buildSubmitPayload(
-        allocationBasis,
-        billToCustomer,
-        shipToCustomer,
-        remarks,
-        currentUser,
-        validLines,
-        {
-          region: selectedRegion,
-          subRegion: subRegionDisplay,
-          operatingUnit,
-          billToLocation,
-          shipToLocation,
-          formatAddress,
-        }
-      )
-
-      if (ALLOCATION_SUBMIT_TO_CONSOLE) {
-        console.log("Allocation submit payload:", JSON.stringify(payload, null, 2))
-        toast.success("Allocation payload logged to console (DevTools)")
-        resetForm()
-        if (ALLOCATION_USE_MOCK_DATA) {
-          applyMockDropdownData(
-            setRegionData,
-            setOperatingUnits,
-            setOrganizations,
-            setWeekOptions,
-            setSelectedRegion,
-            setSelectedSubRegion,
-            setOperatingUnit,
-            setBillToCustomers,
-            setShipToCustomers,
-            setBillToCustomer,
-            setShipToCustomer,
-            setBillToAddresses,
-            setShipToAddresses,
-            setBillToLocation,
-            setShipToLocation,
-            setRemarks,
-            setLines
-          )
-        }
-        return
-      }
-
-      const { uiOnly: _uiOnly, ...savePayload } = payload
-      void _uiOnly
-      const { createAllocationApi } = await import("@/api/allocationApi")
-      await createAllocationApi(savePayload)
-      toast.success("Allocation submitted for approval")
-      resetForm()
-    } catch {
-      /* axios interceptor handles toast */
-    } finally {
-      setSubmitting(false)
-    }
-  }, [
-    canSubmit,
-    allocationBasis,
-    billToCustomer,
-    shipToCustomer,
-    remarks,
-    currentUser,
-    validLines,
-    resetForm,
-    selectedRegion,
-    subRegionDisplay,
-    operatingUnit,
-    billToLocation,
-    shipToLocation,
-  ])
-
   return {
     loadingInitial,
     submitting,
@@ -876,6 +789,5 @@ export function useAllocationForm() {
     headerComplete,
     validLines,
     canSubmit,
-    submitForApproval,
   }
 }

@@ -14,7 +14,7 @@ import { useLoader } from "@/hooks/useLoader"
 import { useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
-import { loginApi } from "@/api/authApi"
+import { loginApi } from "@/api/allocationApi"
 
 export const LoginPage = () => {
   const { login } = useAuth()

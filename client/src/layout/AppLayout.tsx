@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppHeader } from "./AppHeader"
-import { getAllAllocationsApi } from "@/api/allocationApi"
+import { getAllAllocations } from "@/api/allocationApi"
 
 export interface ItemLine {
   id: string
@@ -11,11 +11,8 @@ export interface ItemLine {
   itemName: string
   customer: string
   region: string
-  requestedQty: number
   binQty: number
   approvedQty?: number
-  amendedQty?: number
-  isApproved?: boolean
   targetDate: string
   status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
   oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
@@ -46,8 +43,8 @@ export default function AppLayout() {
 
   const reloadAllocations = useCallback(async () => {
     try {
-      const data = await getAllAllocationsApi()
-      setItems(data.map(item => ({ ...item, id: String(item.id) })))
+      const data = await getAllAllocations()
+      setItems(data)
     } catch (error) {
       console.error("Failed to load allocations:", error)
     }
@@ -59,25 +56,25 @@ export default function AppLayout() {
 
   const pendingCount = items.filter(i => i.status === 'Pending').length
   const amendCount = items.filter(i => i.status === 'Amend Pending').length
-  const approvedCount = items.filter(i => i.isApproved).length
+  const approvedCount = items.filter(i => i.status === 'Approved').length
 
   return (
     <SidebarProvider>
       <div className="flex h-screen w-screen overflow-hidden bg-background">
-        <AppSidebar 
-          currentScreen={currentScreen} 
-          setCurrentScreen={setCurrentScreen} 
-          pendingCount={pendingCount} 
-          amendCount={amendCount} 
+        <AppSidebar
+          currentScreen={currentScreen}
+          setCurrentScreen={setCurrentScreen}
+          pendingCount={pendingCount}
+          amendCount={amendCount}
         />
 
         <SidebarInset className="flex flex-col overflow-hidden">
-          <AppHeader 
-            currentScreen={currentScreen} 
-            totalItemsCount={items.length} 
-            pendingCount={pendingCount} 
-            amendCount={amendCount} 
-            approvedCount={approvedCount} 
+          <AppHeader
+            currentScreen={currentScreen}
+            totalItemsCount={items.length}
+            pendingCount={pendingCount}
+            amendCount={amendCount}
+            approvedCount={approvedCount}
           />
 
           <main className="flex-1 overflow-y-auto">
