@@ -68,6 +68,7 @@ export function clearAllocationCache(): void {
 
 interface UseApiOptions<T> {
   immediate?: boolean
+  immediateParams?: unknown[]
   initialData?: T
   cacheEnabled?: boolean
   cacheKey?: string
@@ -87,6 +88,7 @@ function useApi<T, P extends unknown[]>(
 ): UseApiReturn<T, P> {
   const {
     immediate = false,
+    immediateParams,
     initialData,
     cacheEnabled = true,
     cacheKey,
@@ -136,9 +138,13 @@ function useApi<T, P extends unknown[]>(
 
   useEffect(() => {
     if (immediate) {
-      execute(...([] as any))
+      if (immediateParams) {
+        execute(...(immediateParams as P))
+      } else {
+        execute(...([] as any))
+      }
     }
-  }, [immediate, execute])
+  }, [immediate, immediateParams?.length, execute])
 
   return { data, loading, error, execute, reset }
 }
@@ -162,17 +168,25 @@ export function useRegions() {
 export function useBillToCustomers(region: string, subRegion: string) {
   return useApi(getBillToCustomers, {
     immediate: !!region && !!subRegion,
+    immediateParams: [region, subRegion],
+    cacheKey: getCacheKey("getBillToCustomers", { region, subRegion }),
   })
 }
 
 export function useShipToCustomers(region: string, subRegion: string) {
   return useApi(getShipToCustomers, {
     immediate: !!region && !!subRegion,
+    immediateParams: [region, subRegion],
+    cacheKey: getCacheKey("getShipToCustomers", { region, subRegion }),
   })
 }
 
 export function usePreparedByEmployees(region: string) {
-  return useApi(getPreparedByEmployees, { immediate: !!region })
+  return useApi(getPreparedByEmployees, {
+    immediate: !!region,
+    immediateParams: [region],
+    cacheKey: getCacheKey("getPreparedByEmployees", { region }),
+  })
 }
 
 export function useCustomerAddresses(

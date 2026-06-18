@@ -44,6 +44,8 @@ const INITIAL_STATE: AllocationFormState = {
   shipToCustomerId: null,
   preparedBy: "",
   remarks: "",
+  billToLocation: null,
+  shipToLocation: null,
   lines: [emptyLine()],
 }
 
@@ -56,16 +58,26 @@ export function useAllocationForm() {
   // ── Reference data ──────────────────────────────────────────
   const { data: regions, loading: regionsLoading } = useRegions()
 
-  const { data: billToCustomers, loading: billToLoading, execute: fetchBillTo } =
+  //Add operation unit get api here to load OperatingUnit[]
+
+  const { data: billToCustomers, loading: billToLoading } =
     useBillToCustomers(form.region, form.subRegion)
 
-  const { data: shipToCustomers, loading: shipToLoading, execute: fetchShipTo } =
+  const { data: shipToCustomers, loading: shipToLoading } =
     useShipToCustomers(form.region, form.subRegion)
 
-  const { data: employees, loading: employeesLoading, execute: fetchEmployees } =
+  const { data: employees, loading: employeesLoading } =
     usePreparedByEmployees(form.region)
 
+  // getCustomerAddresses() call address api to load location first after selected location address both bill to and ship to
+
+  //for Items
   const { data: organizations, loading: orgsLoading } = useOrganizations()
+
+  //getItems() to load item this dropdown needs a api seach optin to load data
+  //after select this call metrics api to autopoulte the metric qty
+  //call rrs-categroy pass respective params and it retrun Rn shoe error
+  //call weeks api to load weeks
 
   const { data: summary, loading: summaryLoading, execute: refreshSummary } =
     useAllocationSummary()
@@ -95,37 +107,27 @@ export function useAllocationForm() {
     }))
   }, [])
 
-  const setRegion = useCallback(
-    (region: string) => {
-      setForm((prev) => ({
-        ...prev,
-        region,
-        subRegion: "",
-        billToCustomerId: null,
-        shipToCustomerId: null,
-        preparedBy: "",
-      }))
-      // Employees are keyed to region, prefetch
-      if (region) fetchEmployees(region)
-    },
-    [fetchEmployees]
-  )
+  const setRegion = useCallback((region: string) => {
+    setForm((prev) => ({
+      ...prev,
+      region,
+      subRegion: "",
+      billToCustomerId: null,
+      shipToCustomerId: null,
+      preparedBy: "",
+      billToLocation: null,
+      shipToLocation: null,
+    }))
+  }, [])
 
-  const setSubRegion = useCallback(
-    (subRegion: string) => {
-      setForm((prev) => ({
-        ...prev,
-        subRegion,
-        billToCustomerId: null,
-        shipToCustomerId: null,
-      }))
-      if (form.region && subRegion) {
-        fetchBillTo(form.region, subRegion)
-        fetchShipTo(form.region, subRegion)
-      }
-    },
-    [form.region, fetchBillTo, fetchShipTo]
-  )
+  const setSubRegion = useCallback((subRegion: string) => {
+    setForm((prev) => ({
+      ...prev,
+      subRegion,
+      billToCustomerId: null,
+      shipToCustomerId: null,
+    }))
+  }, [])
 
   const setField = useCallback(
     <K extends keyof AllocationFormState>(key: K, value: AllocationFormState[K]) => {

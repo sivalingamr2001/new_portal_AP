@@ -1,5 +1,4 @@
-import React from "react"
-import { CheckCircle, AlertTriangle, X, Loader2 } from "lucide-react"
+import { AlertTriangle, CheckCircle, Loader2, X } from "lucide-react"
 import type { SubmitStatus } from "../types"
 
 interface Props {

@@ -1,4 +1,3 @@
-import React from "react"
 import { Loader2 } from "lucide-react"
 import { AllocationTypeToggle } from "./AllocationTypeToggle"
 import { CustomerSection } from "./CustomerSection"
@@ -46,7 +45,7 @@ export function AllocationForm({ hook }: Props) {
             Forecast stock commitment — allocate to a specific customer or open pool.
           </p>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 shrink-0">
           <button
             type="button"
             onClick={resetForm}

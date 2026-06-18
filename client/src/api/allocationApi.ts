@@ -1,6 +1,6 @@
 import { axiosClient } from "@/lib/axiosClient"
 
-const BASE = "/api/Allocation"
+const BASE = "/Allocation"
 const BIN_BASE = "/binallocation"
 
 // ==================== TYPES ====================
@@ -67,14 +67,6 @@ export interface PaginatedItems {
 
 export interface RrsCategory {
   rrsCategory: string
-}
-
-export interface CreateAllocationRequest {
-  [key: string]: unknown
-}
-
-export interface CreateAllocationResponse {
-  [key: string]: unknown
 }
 
 export interface ErrorResponse {
@@ -258,16 +250,19 @@ export const loginApi = async (
 
 /**
  * GET /api/Allocation/regions
- * Get all regions and sub-regions
+ * Get all regions and sub-regions — sorted by region asc, then subRegion asc
  */
 export const getRegions = async (): Promise<Region[]> => {
   const { data } = await axiosClient.get<Region[]>(`${BASE}/regions`)
-  return data
+  return data.sort((a, b) => {
+    const regionCompare = a.region.localeCompare(b.region)
+    return regionCompare !== 0 ? regionCompare : a.subRegion.localeCompare(b.subRegion)
+  })
 }
 
 /**
  * GET /api/Allocation/customers/bill-to
- * Get bill-to customers by region and sub-region
+ * Get bill-to customers by region and sub-region — sorted by customerName asc
  */
 export const getBillToCustomers = async (
   region: string,
@@ -277,12 +272,12 @@ export const getBillToCustomers = async (
     `${BASE}/customers/bill-to`,
     { params: { region, subRegion } }
   )
-  return data
+  return data.sort((a, b) => a.customerName.localeCompare(b.customerName))
 }
 
 /**
  * GET /api/Allocation/customers/ship-to
- * Get ship-to customers by region and sub-region
+ * Get ship-to customers by region and sub-region — sorted by customerName asc
  */
 export const getShipToCustomers = async (
   region: string,
@@ -292,12 +287,12 @@ export const getShipToCustomers = async (
     `${BASE}/customers/ship-to`,
     { params: { region, subRegion } }
   )
-  return data
+  return data.sort((a, b) => a.customerName.localeCompare(b.customerName))
 }
 
 /**
  * GET /api/Allocation/employees/prepared-by
- * Get employees prepared by region
+ * Get employees prepared by region — sorted by lastName asc
  */
 export const getPreparedByEmployees = async (
   region: string
@@ -306,12 +301,12 @@ export const getPreparedByEmployees = async (
     `${BASE}/employees/prepared-by`,
     { params: { region } }
   )
-  return data
+  return data.sort((a, b) => a.lastName.localeCompare(b.lastName))
 }
 
 /**
  * GET /api/Allocation/customers/{customerId}/addresses
- * Get customer addresses
+ * Get customer addresses — sorted by location asc
  */
 export const getCustomerAddresses = async (
   customerId: number,
@@ -322,32 +317,33 @@ export const getCustomerAddresses = async (
     `${BASE}/customers/${customerId}/addresses`,
     { params: { siteUseCode, orgId } }
   )
-  return data
+  return data.sort((a, b) => a.location.localeCompare(b.location))
 }
 
 /**
  * GET /api/Allocation/weeks/dropdown
- * Get available weeks dropdown
+ * Get available weeks dropdown — sorted by week value asc
  */
 export const getWeeksDropdown = async (): Promise<string[]> => {
   const { data } = await axiosClient.get<string[]>(`${BASE}/weeks/dropdown`)
-  return data
+  return data.sort((a, b) => a.localeCompare(b))
 }
 
 /**
  * GET /api/Allocation/operating-units
- * Get all operating units
+ * Get all operating units — sorted by name asc
  */
 export const getOperatingUnits = async (): Promise<OperatingUnit[]> => {
   const { data } = await axiosClient.get<OperatingUnit[]>(
     `${BASE}/operating-units`
   )
-  return data
+  return data.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /**
  * GET /api/Allocation/demand-metrics
  * Get demand metrics for a customer, organization, and item
+ * (single object, no sort needed)
  */
 export const getDemandMetrics = async (
   customerId: number,
@@ -363,18 +359,18 @@ export const getDemandMetrics = async (
 
 /**
  * GET /api/Allocation/organizations
- * Get all organizations
+ * Get all organizations — sorted by organizationCode asc
  */
 export const getOrganizations = async (): Promise<Organization[]> => {
   const { data } = await axiosClient.get<Organization[]>(
     `${BASE}/organizations`
   )
-  return data
+  return data.sort((a, b) => a.organizationCode.localeCompare(b.organizationCode))
 }
 
 /**
  * GET /api/Allocation/items
- * Get paginated inventory items with optional search
+ * Get paginated inventory items with optional search — sorted by itemCode asc
  */
 export const getItems = async (
   page: number = 1,
@@ -384,12 +380,16 @@ export const getItems = async (
   const { data } = await axiosClient.get<PaginatedItems>(`${BASE}/items`, {
     params: { page, pageSize, search },
   })
-  return data
+  return {
+    ...data,
+    data: data.data.sort((a, b) => a.itemCode.localeCompare(b.itemCode)),
+  }
 }
 
 /**
  * GET /api/Allocation/rrs-category
  * Get RRS category for an organization and item
+ * (single object, no sort needed)
  */
 export const getRrsCategory = async (
   organizationId: number,
@@ -416,17 +416,18 @@ export const createAllocation = async (
 }
 
 /**
- * Get all bin allocations (header + lines joined).
- * GET /api/binallocation
+ * Get all bin allocations (header + lines joined) — sorted by headerId asc, then lineId asc
  */
 export const getAllAllocations = async (): Promise<AllocationRow[]> => {
   const { data } = await axiosClient.get<AllocationRow[]>(BIN_BASE)
-  return data
+  return data.sort((a, b) => {
+    const headerCompare = a.headerId - b.headerId
+    return headerCompare !== 0 ? headerCompare : a.lineId - b.lineId
+  })
 }
 
 /**
- * Get a single allocation by header ID.
- * GET /api/binallocation/{headerId}
+ * Get a single allocation by header ID — sorted by lineId asc
  */
 export const getAllocationByHeaderId = async (
   headerId: number
@@ -434,29 +435,27 @@ export const getAllocationByHeaderId = async (
   const { data } = await axiosClient.get<AllocationRow[]>(
     `${BIN_BASE}/${headerId}`
   )
-  return data
+  return data.sort((a, b) => a.lineId - b.lineId)
 }
 
 /**
- * Get dashboard summary per header (totals, approved, pending, cancelled).
- * GET /api/binallocation/summary
+ * Get dashboard summary per header — sorted by headerId asc
  */
 export const getAllocationSummary = async (): Promise<AllocationSummary[]> => {
   const { data } = await axiosClient.get<AllocationSummary[]>(
     `${BIN_BASE}/summary`
   )
-  return data
+  return data.sort((a, b) => a.headerId - b.headerId)
 }
 
 /**
- * Get all lines currently pending HOD approval.
- * GET /api/binallocation/pending-approval
+ * Get all lines currently pending HOD approval — sorted by lineId asc
  */
 export const getPendingApprovalLines = async (): Promise<B3Line[]> => {
   const { data } = await axiosClient.get<B3Line[]>(
     `${BIN_BASE}/pending-approval`
   )
-  return data
+  return data.sort((a, b) => a.lineId - b.lineId)
 }
 
 /**
@@ -475,8 +474,7 @@ export const reviseQuantity = async (
 }
 
 /**
- * Get full revision history for a line (all revisions by original line ID).
- * GET /api/binallocation/revisions/{lineId}
+ * Get full revision history for a line — sorted by revision asc
  */
 export const getLineRevisionHistory = async (
   lineId: number
@@ -484,7 +482,7 @@ export const getLineRevisionHistory = async (
   const { data } = await axiosClient.get<B3Line[]>(
     `${BIN_BASE}/revisions/${lineId}`
   )
-  return data
+  return data.sort((a, b) => a.revision - b.revision)
 }
 
 /**
@@ -517,7 +515,6 @@ export const amendApprovedQuantity = async (
 
 /**
  * Cancel a single allocation line.
- * Inserts cancellation record + closes line in one transaction.
  * POST /api/binallocation/cancel/line
  */
 export const cancelLine = async (
@@ -545,12 +542,11 @@ export const cancelAllLines = async (
 }
 
 /**
- * Fetch all cancellation records with header and line context.
- * GET /api/binallocation/cancellations
+ * Fetch all cancellation records — sorted by cancelId asc
  */
 export const getAllCancellations = async (): Promise<B3Cancellation[]> => {
   const { data } = await axiosClient.get<B3Cancellation[]>(
     `${BIN_BASE}/cancellations`
   )
-  return data
+  return data.sort((a, b) => a.cancelId - b.cancelId)
 }

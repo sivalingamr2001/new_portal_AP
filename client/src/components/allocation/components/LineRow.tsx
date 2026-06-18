@@ -1,7 +1,7 @@
-import React, { useRef, useEffect } from "react"
-import { Trash2, Search, Loader2 } from "lucide-react"
-import type { FormLineItem } from "../types"
 import type { InventoryItem, OperatingUnit } from "@/api/allocationApi"
+import { Loader2, Search, Trash2 } from "lucide-react"
+import { useEffect, useRef } from "react"
+import type { FormLineItem } from "../types"
 
 interface Props {
   index: number

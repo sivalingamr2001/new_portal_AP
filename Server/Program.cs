@@ -1,4 +1,5 @@
 using Backend.Extensions;
+using Dapper;
 
 namespace Backend;
 
@@ -8,6 +9,9 @@ public static class Program
     {
         try
         {
+            // Enable mapping from underscore-separated column names to PascalCase properties
+            DefaultTypeMap.MatchNamesWithUnderscores = true;
+
             var builder = WebApplication.CreateBuilder(args);
 
             builder.AddSerilogLogging();

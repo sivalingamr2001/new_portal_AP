@@ -1,13 +1,13 @@
-import React, { useCallback, useEffect, useState } from "react"
-import { Plus } from "lucide-react"
-import { LineRow } from "./LineRow"
+import type { InventoryItem, Organization } from "@/api/allocationApi"
 import { useItems } from "@/hooks/useAllocationApi"
+import { Plus } from "lucide-react"
+import { useCallback, useState } from "react"
 import type { FormLineItem } from "../types"
-import type { InventoryItem, OperatingUnit } from "@/api/allocationApi"
+import { LineRow } from "./LineRow"
 
 interface Props {
   lines: FormLineItem[]
-  organizations: OperatingUnit[]
+  organizations: Organization[]
   onAdd: () => void
   onRemove: (key: string) => void
   onUpdate: (key: string, patch: Partial<FormLineItem>) => void
@@ -49,14 +49,32 @@ export function LinesTable({ lines, organizations, onAdd, onRemove, onUpdate, on
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-2 px-2.5 mb-1.5">
         <div className="col-span-1" />
+        <div className="col-span-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          Org
+        </div>
         <div className="col-span-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           Item Code
         </div>
         <div className="col-span-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
           Description
         </div>
-        <div className="col-span-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-          Org
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          Week
+        </div>
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          OA PEND
+        </div>
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          OA RSV
+        </div>
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          OA Picked
+        </div>
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          BIN Qty
+        </div>
+        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+          BIN Rsv
         </div>
         <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
           Qty
