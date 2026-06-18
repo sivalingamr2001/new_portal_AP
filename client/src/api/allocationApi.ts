@@ -69,14 +69,6 @@ export interface RrsCategory {
   rrsCategory: string
 }
 
-export interface CreateAllocationRequest {
-  [key: string]: unknown
-}
-
-export interface CreateAllocationResponse {
-  [key: string]: unknown
-}
-
 export interface ErrorResponse {
   type: string
   title: string
@@ -385,6 +377,19 @@ export const getItems = async (
     params: { page, pageSize, search },
   })
   return data
+}
+
+/**
+ * Look up a single inventory item by item code.
+ */
+export const getItemByCode = async (itemCode: string): Promise<InventoryItem> => {
+  const result = await getItems(1, 10, itemCode.trim())
+  const normalized = itemCode.trim().toUpperCase()
+  const item = result.data.find((i) => i.itemCode.toUpperCase() === normalized)
+  if (!item) {
+    throw new Error(`Item "${itemCode}" not found`)
+  }
+  return item
 }
 
 /**

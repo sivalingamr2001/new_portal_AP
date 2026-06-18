@@ -3,7 +3,8 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppHeader } from "./AppHeader"
-import { getAllAllocations } from "@/api/allocationApi"
+import { useAllAllocations } from "@/hooks/useAllocationApi"
+import { mapAllocationRowsToItemLines } from "@/lib/allocationMappers"
 
 export interface ItemLine {
   id: string
@@ -12,7 +13,10 @@ export interface ItemLine {
   customer: string
   region: string
   binQty: number
+  requestedQty: number
   approvedQty?: number
+  amendedQty?: number
+  isApproved?: boolean
   targetDate: string
   status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
   oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
@@ -39,20 +43,24 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const currentScreen = screenFromPath(location.pathname)
   const setCurrentScreen = (screen: Screen) => navigate(SCREEN_PATHS[screen])
+  
+  const { data: rawAllocations, execute: fetchAllocations } = useAllAllocations()
   const [items, setItems] = useState<ItemLine[]>([])
 
   const reloadAllocations = useCallback(async () => {
     try {
-      const data = await getAllAllocations()
-      setItems(data)
+      const data = await fetchAllocations()
+      setItems(mapAllocationRowsToItemLines(data))
     } catch (error) {
       console.error("Failed to load allocations:", error)
     }
-  }, [])
+  }, [fetchAllocations])
 
   useEffect(() => {
-    reloadAllocations()
-  }, [reloadAllocations])
+    if (rawAllocations) {
+      setItems(mapAllocationRowsToItemLines(rawAllocations))
+    }
+  }, [rawAllocations])
 
   const pendingCount = items.filter(i => i.status === 'Pending').length
   const amendCount = items.filter(i => i.status === 'Amend Pending').length

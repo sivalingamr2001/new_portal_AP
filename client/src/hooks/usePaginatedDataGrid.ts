@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
 } from "react"
-import type { PagedResult } from "@/api/types/pagedResult"
+import type { PagedResult } from "@/api/allocationApi"
 
 export interface Result<T> {
   isSuccess: boolean
