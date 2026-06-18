@@ -94,4 +94,28 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             Queries.GetDemandMetrics,
             new { CustomerId = customerId, OrganizationId = organizationId, InventoryItemId = inventoryItemId },
             cancellationToken: cancellationToken);
+
+    public Task<OperatingUnitDto?> GetOperatingUnitByIdAsync(int organizationId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QuerySingleOrDefaultAsync<OperatingUnitDto>(
+            Queries.GetOperatingUnitById,
+            new { OrganizationId = organizationId },
+            cancellationToken: cancellationToken);
+
+    public Task<OrganizationDto?> GetInventoryOrganizationByIdAsync(int organizationId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QuerySingleOrDefaultAsync<OrganizationDto>(
+            Queries.GetInventoryOrganizationById,
+            new { OrganizationId = organizationId },
+            cancellationToken: cancellationToken);
+
+    public Task<InventoryItemDto?> GetInventoryItemByIdAsync(int inventoryItemId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QuerySingleOrDefaultAsync<InventoryItemDto>(
+            Queries.GetInventoryItemById,
+            new { InventoryItemId = inventoryItemId },
+            cancellationToken: cancellationToken);
+
+    public Task<CustomerDto?> GetCustomerNameByIdAsync(long customerId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QuerySingleOrDefaultAsync<CustomerDto>(
+            Queries.GetCustomerNameById,
+            new { CustomerId = customerId },
+            cancellationToken: cancellationToken);
 }

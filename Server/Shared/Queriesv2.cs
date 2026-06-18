@@ -28,7 +28,7 @@ namespace Backend.Shared
                 UPDATED_DATE,
                 REMARKS
             ) VALUES (
-                JAN_B3_HEADER_SEQ.NEXTVAL,  -- Oracle sequence for PK
+                JAN_B3_HEADER_SEQ.NEXTVAL,
                 :p_transaction_date,
                 :p_customer_or_item_specific,
                 :p_customer_id,

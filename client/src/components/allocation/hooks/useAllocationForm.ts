@@ -15,6 +15,7 @@ import type {
   FormLineItem,
   SubmitStatus,
 } from "../types"
+import { useAuth } from "@/context/AuthContext"
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ const INITIAL_STATE: AllocationFormState = {
 export function useAllocationForm() {
   const [form, setForm] = useState<AllocationFormState>(INITIAL_STATE)
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>({ type: "idle" })
+  const { currentUser } = useAuth()
 
   // ── Reference data ──────────────────────────────────────────
   const { data: regions, loading: regionsLoading } = useRegions()
@@ -209,7 +211,7 @@ export function useAllocationForm() {
 
     const payload: CreateAllocationRequest = {
       transactionDate: new Date().toISOString(),
-      createdBy: form.preparedBy || "SYSTEM",
+      createdBy: currentUser?.username ?? "unknown",
       remarks: form.remarks || null,
       ...(form.allocationType === "customer"
         ? {

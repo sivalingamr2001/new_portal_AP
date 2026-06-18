@@ -28,6 +28,10 @@ export const FulfillmentPage = lazy(() =>
   import("@/pages/Fulfillment").then((m) => ({ default: m.FulfillmentScreen }))
 )
 
+export const EditAllocationPage = lazy(() =>
+  import("@/pages/EditAllocationScreen").then((m) => ({ default: m.EditAllocationScreen }))
+)
+
 // Fallback Utilities
 export const UnauthorizedPage = lazy(() =>
   import("@/pages/UnauthorizedPage").then((m) => ({

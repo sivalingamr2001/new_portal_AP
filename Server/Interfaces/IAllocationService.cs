@@ -51,4 +51,25 @@ public interface IAllocationService
     Task<PagedResult<InventoryItemDto>> GetInventoryItemDetailsAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default);
     Task<string?> GetSalesRrsCategoryAsync(int organizationId, int inventoryItemId, CancellationToken cancellationToken = default);
     Task<DemandMetricsDto?> GetDemandMetricsAsync(int customerId, int organizationId, int inventoryItemId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a specific operating unit profile by its Organization ID.
+    /// </summary>
+    Task<OperatingUnitDto?> GetOperatingUnitByIdAsync(int organizationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a specific inventory organization definition by its Organization ID.
+    /// </summary>
+    Task<OrganizationDto?> GetInventoryOrganizationByIdAsync(int organizationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
+    /// </summary>
+    Task<InventoryItemDto?> GetInventoryItemByIdAsync(int inventoryItemId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a customer's name and Region details using their unique Customer ID.
+    /// </summary>
+    Task<CustomerDto?> GetCustomerNameByIdAsync(long customerId, CancellationToken cancellationToken = default);
+
 }

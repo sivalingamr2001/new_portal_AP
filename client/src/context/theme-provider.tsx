@@ -141,22 +141,21 @@ export function ThemeProvider({
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) {
-        return
-      }
+      if (event.repeat) return;
 
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return
-      }
+      // Modified modifier check to allow Alt, but block Meta and Ctrl
+      if (event.metaKey || event.ctrlKey) return;
+      if (!event.altKey) return;
 
-      if (isEditableTarget(event.target)) {
-        return
-      }
+      if (isEditableTarget(event.target)) return;
 
-      if (event.key.toLowerCase() !== "d") {
-        return
-      }
+      // Updated shortcut key to "t"
+      if (event.key.toLowerCase() !== "t") return;
 
+      // Prevent default browser behavior for Alt + T if necessary
+      event.preventDefault();
+
+      // 1. Calculate the next theme first
       setThemeState((currentTheme) => {
         const nextTheme =
           currentTheme === "dark"
@@ -165,19 +164,23 @@ export function ThemeProvider({
               ? "dark"
               : getSystemTheme() === "dark"
                 ? "light"
-                : "dark"
+                : "dark";
 
-        localStorage.setItem(storageKey, nextTheme)
-        return nextTheme
-      })
-    }
+        // 2. Schedule the side effect cleanly after the state calculation
+        setTimeout(() => {
+          localStorage.setItem(storageKey, nextTheme);
+        }, 0);
 
-    window.addEventListener("keydown", handleKeyDown)
+        return nextTheme;
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [storageKey])
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [storageKey]);
 
   React.useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {

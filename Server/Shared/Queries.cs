@@ -274,4 +274,45 @@ public static class Queries
         SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
         WHERE LINE_ID = :LINE_ID";
 
-}
+    /// <summary>
+    /// Retrieves a specific operating unit profile by its Organization ID.
+    /// </summary>
+    public const string GetOperatingUnitById = @"
+            SELECT ORGANIZATION_ID AS ""OrganizationId"", NAME AS ""Name"" 
+            FROM hr_operating_units 
+            WHERE ORGANIZATION_ID = :OrganizationId";
+
+    /// <summary>
+    /// Retrieves a specific inventory organization definition by its Organization ID.
+    /// </summary>
+    public const string GetInventoryOrganizationById = @"
+            SELECT ORGANIZATION_ID AS ""OrganizationId"", ORGANIZATION_CODE AS ""OrganizationCode"" 
+            FROM ORG_ORGANIZATION_DEFINITIONS 
+            WHERE ORGANIZATION_ID = :OrganizationId";
+
+    /// <summary>
+    /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
+    /// </summary>
+    public const string GetInventoryItemById = @"
+            SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
+                   SEGMENT1 AS ""ItemCode"", 
+                   TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
+            FROM MTL_SYSTEM_ITEMS
+            WHERE INVENTORY_ITEM_ID = :InventoryItemId";
+
+    /// <summary>
+    /// Retrieves a customer's name and region details using their unique Customer ID.
+    /// </summary>
+    public const string GetCustomerNameById = @"
+            SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
+            FROM (
+                SELECT ra.customer_id, ra.customer_name,
+                       (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
+                FROM ra_customers ra
+                JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
+                JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
+                WHERE ras.site_use_code = 'BILL_TO'
+            ) 
+            WHERE customer_id = :CustomerId";
+
+}   

@@ -53,6 +53,10 @@ export const routesConfig: RouteObject[] = [
             path: "/fulfillment",
             element: withSuspense(Pages.FulfillmentPage),
           },
+          {
+            path: "/fulfillment/edit/:headerId",
+            element: withSuspense(Pages.EditAllocationPage),
+          },
         ],
       },
     ],

@@ -20,53 +20,71 @@ namespace Backend.Services
 
         // ── CREATE ───────────────────────────────────────────────────────────
 
-        public async Task<decimal> CreateAllocationAsync(CreateAllocationRequestV2 req)
+        public async Task<string> CreateAllocationAsync(CreateAllocationRequestV2 req, CancellationToken cancellationToken = default)
         {
-            using var conn = CreateConnection();
-            conn.Open();
-            using var tx = conn.BeginTransaction();
+            if (req == null) throw new ArgumentNullException(nameof(req));
+            if (req.Lines == null || req.Lines.Count == 0) throw new ArgumentException("Allocation batch must contain at least one line item.");
+
+            using var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
             try
             {
-                // 1. Insert Header
+                // 1. Configure Master Header Parameters
                 var headerParams = new DynamicParameters();
-                headerParams.Add("p_transaction_date", req.TransactionDate);
-                headerParams.Add("p_customer_or_item_specific", req.CustomerOrItemSpecific);
-                headerParams.Add("p_customer_id", req.CustomerId);
-                headerParams.Add("p_territory_id", req.TerritoryId);
-                headerParams.Add("p_bill_to_customer", req.BillToCustomer);
-                headerParams.Add("p_ship_to_customer", req.ShipToCustomer);
-                headerParams.Add("p_created_by", req.CreatedBy);
-                headerParams.Add("p_remarks", req.Remarks);
-                headerParams.Add("p_header_id", dbType: DbType.Decimal,
-                                 direction: ParameterDirection.Output);
+                headerParams.Add("p_transaction_date", req.TransactionDate, DbType.Date);
+                headerParams.Add("p_customer_or_item_specific", req.CustomerOrItemSpecific, DbType.Decimal);
+                headerParams.Add("p_customer_id", req.CustomerId, DbType.Decimal);
+                headerParams.Add("p_territory_id", req.TerritoryId, DbType.Decimal);
+                headerParams.Add("p_bill_to_customer", req.BillToCustomer, DbType.Decimal);
+                headerParams.Add("p_ship_to_customer", req.ShipToCustomer, DbType.Decimal);
+                headerParams.Add("p_created_by", req.CreatedBy ?? "SYSTEM", DbType.String);
+                headerParams.Add("p_remarks", req.Remarks, DbType.String);
 
-                await conn.ExecuteAsync(QueriesV2.CreateBinAllocationHeader,
-                                        headerParams, transaction: tx);
-                decimal headerId = headerParams.Get<decimal>("p_header_id");
+                // Outbound binding to catch the generated numeric Header ID
+                headerParams.Add("p_header_id", dbType: DbType.Decimal, direction: ParameterDirection.Output);
 
-                // 2. Insert each Line
+                // 2. Execute Header write
+                await connection.ExecuteAsync(QueriesV2.CreateBinAllocationHeader, headerParams, transaction);
+
+                decimal numericHeaderId = headerParams.Get<decimal>("p_header_id");
+
+                // 3. Process Lines using the fresh numeric header ID reference
                 foreach (var line in req.Lines)
                 {
                     var lineParams = new DynamicParameters();
-                    lineParams.Add("p_header_id", headerId);
-                    lineParams.Add("p_organization_id", line.OrganizationId);
-                    lineParams.Add("p_inventory_item_id", line.InventoryItemId);
-                    lineParams.Add("p_b3_quantity", line.B3Quantity);
-                    lineParams.Add("p_target_date", line.TargetDate);
-                    lineParams.Add("p_line_id", dbType: DbType.Decimal,
-                                   direction: ParameterDirection.Output);
+                    lineParams.Add("p_header_id", numericHeaderId, DbType.Decimal);
+                    lineParams.Add("p_organization_id", line.OrganizationId, DbType.Decimal);
+                    lineParams.Add("p_inventory_item_id", line.InventoryItemId, DbType.Decimal);
+                    lineParams.Add("p_b3_quantity", line.B3Quantity, DbType.Decimal);
+                    lineParams.Add("p_target_date", line.TargetDate, DbType.Date);
+                    lineParams.Add("p_line_id", dbType: DbType.Decimal, direction: ParameterDirection.Output);
 
-                    await conn.ExecuteAsync(QueriesV2.CreateBinAllocationLine,
-                                            lineParams, transaction: tx);
+                    await connection.ExecuteAsync(QueriesV2.CreateBinAllocationLine, lineParams, transaction);
                 }
 
-                tx.Commit();
-                return headerId;
+
+                // 4. Persist transaction changes safely
+                await transaction.CommitAsync(cancellationToken);
+
+                // 5. Generate your custom 'B3-2627-001' token in C# using current Indian Fiscal Year logic
+                DateTime today = DateTime.Today;
+                int currentYear = today.Year;
+
+                // Indian FY shifts on April 1st
+                int startYear = (today.Month >= 4) ? currentYear : currentYear - 1;
+                int endYear = startYear + 1;
+
+                string fySegment = $"{startYear % 100}{(endYear % 100):D2}"; // e.g. "2627"
+                string suffixSegment = ((long)numericHeaderId % 1000).ToString("D3"); // Pads numeric ID out to 3 digits (e.g. "001")
+
+                return $"B3-{fySegment}-{suffixSegment}";
             }
-            catch
+            catch (Exception)
             {
-                tx.Rollback();
+                await transaction.RollbackAsync(cancellationToken);
                 throw;
             }
         }

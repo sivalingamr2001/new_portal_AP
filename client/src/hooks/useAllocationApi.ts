@@ -268,7 +268,11 @@ export function useAllAllocations() {
 }
 
 export function useAllocationByHeaderId(headerId?: number) {
-  return useApi(getAllocationByHeaderId, { immediate: !!headerId })
+  return useApi(getAllocationByHeaderId, {
+    immediate: !!headerId,
+    immediateParams: headerId ? [headerId] : undefined,
+    cacheKey: headerId ? getCacheKey("getAllocationByHeaderId", headerId) : undefined,
+  })
 }
 
 export function useAllocationSummary() {

@@ -136,4 +136,44 @@ public sealed class AllocationController(IAllocationService allocationService) :
         var result = await _allocationService.GetSalesRrsCategoryAsync(organizationId, inventoryItemId, cancellationToken);
         return Ok(new { rrsCategory = result });
     }
+
+    [HttpGet("operating-units/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OperatingUnitDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OperatingUnitDto>> GetOperatingUnitById(
+        int id, CancellationToken cancellationToken)
+    {
+        var unit = await _allocationService.GetOperatingUnitByIdAsync(id, cancellationToken);
+        return unit is not null ? Ok(unit) : NotFound();
+    }
+
+    [HttpGet("organizations/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(OrganizationDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OrganizationDto>> GetInventoryOrganizationById(
+        int id, CancellationToken cancellationToken)
+    {
+        var organization = await _allocationService.GetInventoryOrganizationByIdAsync(id, cancellationToken);
+        return organization is not null ? Ok(organization) : NotFound();
+    }
+
+    [HttpGet("items/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(InventoryItemDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<InventoryItemDto>> GetInventoryItemById(
+        int id, CancellationToken cancellationToken)
+    {
+        var item = await _allocationService.GetInventoryItemByIdAsync(id, cancellationToken);
+        return item is not null ? Ok(item) : NotFound();
+    }
+
+    [HttpGet("customers/{id:long}/name")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CustomerDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CustomerDto>> GetCustomerNameById(
+        long id, CancellationToken cancellationToken)
+    {
+        var customer = await _allocationService.GetCustomerNameByIdAsync(id, cancellationToken);
+        return customer is not null ? Ok(customer) : NotFound();
+    }
 }

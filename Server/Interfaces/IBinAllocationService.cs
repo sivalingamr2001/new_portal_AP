@@ -6,10 +6,10 @@ public interface IBinAllocationService
 {
     // ── CREATE ───────────────────────────────────────────────
     /// <summary>
-    /// Creates one header + N line items in a single transaction.
-    /// Returns the generated HEADER_ID.
+    /// Creates a transactional bin allocation header and associated lines.
     /// </summary>
-    Task<decimal> CreateAllocationAsync(CreateAllocationRequestV2 request);
+    /// <returns>The generated alphanumeric allocation tracking code (e.g., B3-2627-001).</returns>
+    Task<string> CreateAllocationAsync(CreateAllocationRequestV2 request, CancellationToken cancellationToken = default);
 
     // ── READ ─────────────────────────────────────────────────
     /// <summary>All allocations — header + lines joined.</summary>

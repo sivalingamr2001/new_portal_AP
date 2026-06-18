@@ -4,6 +4,7 @@ import { AppSidebar } from "./AppSidebar"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppHeader } from "./AppHeader"
 import { getAllAllocations } from "@/api/allocationApi"
+import { useAuth } from "@/context/AuthContext"
 
 export interface ItemLine {
   id: string
@@ -40,10 +41,11 @@ export default function AppLayout() {
   const currentScreen = screenFromPath(location.pathname)
   const setCurrentScreen = (screen: Screen) => navigate(SCREEN_PATHS[screen])
   const [items, setItems] = useState<ItemLine[]>([])
+  const { currentUserRole } = useAuth()
 
   const reloadAllocations = useCallback(async () => {
     try {
-      const data = await getAllAllocations()
+      const data: any = await getAllAllocations()
       setItems(data)
     } catch (error) {
       console.error("Failed to load allocations:", error)
@@ -66,6 +68,7 @@ export default function AppLayout() {
           setCurrentScreen={setCurrentScreen}
           pendingCount={pendingCount}
           amendCount={amendCount}
+          role={currentUserRole ?? 'user'}
         />
 
         <SidebarInset className="flex flex-col overflow-hidden">

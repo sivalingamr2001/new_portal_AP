@@ -25,9 +25,12 @@ import {
   useDemandMetrics,
   useRrsCategory,
   useCreateAllocation,
-  useItems
+  useItems,
+  useAllocationByHeaderId,
 } from "@/hooks/useAllocationApi"
+import { useParams } from "react-router-dom"
 import type {
+  AllocationRow,
   CreateAllocationRequest,
   CreateLineRequest,
   Customer,
@@ -87,7 +90,7 @@ function formatAddress(addr: CustomerAddress | null): string {
 
 /* ─────────────── COMPONENT ─────────────── */
 
-export function AllocationScreen() {
+export function EditAllocationScreen() {
   /* ── UI State ── */
   const [customerDetailsOpen, setCustomerDetailsOpen] = useState(true)
   const [regionSearch, setRegionSearch] = useState("")
@@ -128,6 +131,39 @@ export function AllocationScreen() {
       loadingItem: false,
     },
   ])
+
+  const { headerId: headerIdParam } = useParams<{ headerId: string }>()
+  const headerId = headerIdParam ? Number(headerIdParam) : undefined
+  const allocationByHeaderIdHook = useAllocationByHeaderId(
+    headerId && !Number.isNaN(headerId) ? headerId : undefined
+  )
+
+  useEffect(() => {
+    if (!allocationByHeaderIdHook.data || allocationByHeaderIdHook.data.length === 0) return
+
+    const rows = allocationByHeaderIdHook.data
+    const firstRow = rows[0]
+
+    setRemarks(firstRow.remarks ?? "")
+    setAllocationBasis(firstRow.customerId ? "customer" : "open")
+    setLines(
+      rows.map((row: AllocationRow) => ({
+        id: row.lineId.toString(),
+        organizationId: row.organizationId,
+        organizationCode: "",
+        inventoryItemId: row.inventoryItemId,
+        itemCode: row.inventoryItemId ? String(row.inventoryItemId) : "",
+        description: "",
+        week: "",
+        quantity: row.b3Quantity,
+        targetDate: row.targetDate ?? "",
+        metrics: null,
+        isRunnerItem: false,
+        itemError: null,
+        loadingItem: false,
+      }))
+    )
+  }, [allocationByHeaderIdHook.data])
 
   /* ── API Hooks ── */
   const regionsHook = useRegions()
@@ -510,11 +546,36 @@ export function AllocationScreen() {
 
   /* ── Loading State ── */
   const loadingInitial = regionsHook.loading || operatingUnitsHook.loading || weeksHook.loading || organizationsHook.loading
+  const headerIdValid = headerId !== undefined && !Number.isNaN(headerId)
 
-  if (loadingInitial) {
+  if (!headerIdValid) {
+    return (
+      <div className="p-8 text-sm text-red-600">
+        Invalid allocation header ID.
+      </div>
+    )
+  }
+
+  if (loadingInitial || allocationByHeaderIdHook.loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader />
+      </div>
+    )
+  }
+
+  if (allocationByHeaderIdHook.error) {
+    return (
+      <div className="p-8 text-sm text-red-600">
+        Error loading allocation: {allocationByHeaderIdHook.error.message}
+      </div>
+    )
+  }
+
+  if (!allocationByHeaderIdHook.data || allocationByHeaderIdHook.data.length === 0) {
+    return (
+      <div className="p-8 text-sm text-slate-600">
+        No allocation data found for header {headerId}.
       </div>
     )
   }
