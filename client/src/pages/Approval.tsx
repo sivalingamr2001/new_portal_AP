@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
-import { Search, Check, ChevronRight, ChevronDown } from 'lucide-react'
-import { useOutletContext } from 'react-router-dom'
-import { useAuth } from '@/context/AuthContext'
-import { useApproveLine } from '@/hooks/useAllocationApi'
+import React, { useEffect, useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
+import { Search, Check, ChevronRight, ChevronDown, Eye } from "lucide-react"
+import { useOutletContext } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
+import ReviewAllocationModal from "@/components/fulfillment/ReviewAllocationModal"
+import { useApproveLine } from "@/hooks/useAllocationApi"
 
 interface ItemLine {
   lineId: number
   headerId: number
   organizationId: number
+  organizationCode?: string
   inventoryItemId: number
+  itemCode?: string
+  itemDescription?: string
   b3Quantity: number
   targetDate: string
   b3ApprovedQuantity: number | null
@@ -21,7 +25,8 @@ interface ItemLine {
   transactionDate: string
   customerOrItemSpecific: number
   customerId: number
-  territoryId: number | null
+  customerName?: string
+  customerRegion?: string
   billToCustomer: number
   shipToCustomer: number
   createdBy: string
@@ -29,7 +34,7 @@ interface ItemLine {
   updatedBy: string
   updatedDate: string
   remarks: string
-  status?: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
+  status?: "Pending" | "Approved" | "Amend Pending" | "Partial" | "Fulfilled"
 }
 
 interface DashboardContext {
@@ -41,15 +46,20 @@ interface DashboardContext {
 export function ApprovalScreen() {
   const { items, reloadAllocations } = useOutletContext<DashboardContext>()
   const { currentUserRole, currentUser } = useAuth()
-  const isHodRole = currentUserRole === 'hod'
+  const isHodRole = currentUserRole === "hod"
 
-  const [filter, setFilter] = useState<'All' | 'Pending' | 'Amendment' | 'Approved'>('All')
-  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<
+    "All" | "Pending" | "Amendment" | "Approved"
+  >("All")
+  const [search, setSearch] = useState("")
   const [quantities, setQuantities] = useState<{ [key: number]: number }>({})
-  const [expandedHeaders, setExpandedHeaders] = useState<{ [key: number]: boolean }>({})
+  const [expandedHeaders, setExpandedHeaders] = useState<{
+    [key: number]: boolean
+  }>({})
 
-  // Track selected line IDs for explicit batch routing execution workflows
   const [selectedLineIds, setSelectedLineIds] = useState<number[]>([])
+  const [reviewHeaderId, setReviewHeaderId] = useState<number | null>(null)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
 
   const isBusinessHour = () => {
     const now = new Date()
@@ -60,10 +70,13 @@ export function ApprovalScreen() {
 
   useEffect(() => {
     setQuantities(
-      items.reduce((acc, curr) => ({
-        ...acc,
-        [curr.lineId]: curr.b3ApprovedQuantity ?? curr.b3Quantity,
-      }), {})
+      items.reduce(
+        (acc, curr) => ({
+          ...acc,
+          [curr.lineId]: curr.b3ApprovedQuantity ?? curr.b3Quantity,
+        }),
+        {}
+      )
     )
   }, [items])
 
@@ -72,35 +85,38 @@ export function ApprovalScreen() {
   }
 
   const toggleHeader = (headerId: number) => {
-    setExpandedHeaders(prev => ({ ...prev, [headerId]: !prev[headerId] }))
+    setExpandedHeaders((prev) => ({ ...prev, [headerId]: !prev[headerId] }))
   }
 
   const approveLineHook = useApproveLine()
 
   const getItemStatus = (item: ItemLine): string => {
+    if (item.closureFlag === "Y") return "Cancelled"
     if (item.status) return item.status
-    if (item.approvalFlag === 'Y') return 'Approved'
-    if (item.approvalFlag === 'A') return 'Amend Pending'
-    return 'Pending'
+    if (item.approvalFlag === "Y") return "Approved"
+    if (item.approvalFlag === "A") return "Amend Pending"
+    return "Pending"
   }
 
   const approveItem = async (lineId: number) => {
     if (!isHodRole) {
-      alert('Access Denied: Only HOD can authorize line allocations.')
+      alert("Access Denied: Only HOD can authorize line allocations.")
       return
     }
     try {
-      const targetItem = items.find(i => i.lineId === lineId)
-      const approvedQty = quantities[lineId] !== undefined ? quantities[lineId] : targetItem?.b3Quantity || 0
+      const targetItem = items.find((i) => i.lineId === lineId)
+      const approvedQty =
+        quantities[lineId] !== undefined
+          ? quantities[lineId]
+          : targetItem?.b3Quantity || 0
 
       await approveLineHook.execute({
         lineId,
         approvedQuantity: approvedQty,
-        approvedBy: currentUser?.username ?? 'system',
+        approvedBy: currentUser?.username ?? "system",
       })
 
-      // Clean selection tracking list state reference cleanly
-      setSelectedLineIds(prev => prev.filter(id => id !== lineId))
+      setSelectedLineIds((prev) => prev.filter((id) => id !== lineId))
       await reloadAllocations()
     } catch (error) {
       console.error("Failed to authorize item:", error)
@@ -110,37 +126,47 @@ export function ApprovalScreen() {
   const handleBatchExecutionAction = async () => {
     if (!isHodRole) return
 
-    // Choose lines based on user checkboxes or fall back to all pending items if none are selected
-    const targetedLineIds = selectedLineIds.length > 0
-      ? selectedLineIds
-      : items.filter(item => getItemStatus(item) === 'Pending').map(i => i.lineId)
+    const targetedLineIds =
+      selectedLineIds.length > 0
+        ? selectedLineIds
+        : items
+          .filter((item) => getItemStatus(item) === "Pending")
+          .map((i) => i.lineId)
 
     if (targetedLineIds.length === 0) return
 
     try {
-      await Promise.all(targetedLineIds.map(lineId => {
-        const itemRef = items.find(i => i.lineId === lineId)
-        const approvedQty = quantities[lineId] !== undefined ? quantities[lineId] : itemRef?.b3Quantity || 0
-        return approveLineHook.execute({
-          lineId,
-          approvedQuantity: approvedQty,
-          approvedBy: currentUser?.username ?? 'system',
+      await Promise.all(
+        targetedLineIds.map((lineId) => {
+          const itemRef = items.find((i) => i.lineId === lineId)
+          const approvedQty =
+            quantities[lineId] !== undefined
+              ? quantities[lineId]
+              : itemRef?.b3Quantity || 0
+          return approveLineHook.execute({
+            lineId,
+            approvedQuantity: approvedQty,
+            approvedBy: currentUser?.username ?? "system",
+          })
         })
-      }))
+      )
 
       setSelectedLineIds([])
       await reloadAllocations()
-      alert('All requested records authorized successfully inside allocation logs.')
+      alert(
+        "All requested records authorized successfully inside allocation logs."
+      )
     } catch (error) {
       console.error("Batch processing operation failure:", error)
     }
   }
 
-  const filteredItems = items.filter(item => {
+  const filteredItems = items.filter((item) => {
     const currentStatus = getItemStatus(item)
-    if (filter === 'Pending' && currentStatus !== 'Pending') return false
-    if (filter === 'Amendment' && currentStatus !== 'Amend Pending') return false
-    if (filter === 'Approved' && item.approvalFlag !== 'Y') return false
+    if (filter === "Pending" && currentStatus !== "Pending") return false
+    if (filter === "Amendment" && currentStatus !== "Amend Pending")
+      return false
+    if (filter === "Approved" && item.approvalFlag !== "Y") return false
 
     if (search) {
       const term = search.toLowerCase()
@@ -153,33 +179,54 @@ export function ApprovalScreen() {
     return true
   })
 
-  const groupedByHeader = filteredItems.reduce<{ [key: number]: ItemLine[] }>((groups, item) => {
-    if (!groups[item.headerId]) {
-      groups[item.headerId] = []
-    }
-    groups[item.headerId].push(item)
-    return groups
-  }, {})
+  const groupedByHeader = filteredItems.reduce<{ [key: number]: ItemLine[] }>(
+    (groups, item) => {
+      if (!groups[item.headerId]) {
+        groups[item.headerId] = []
+      }
+      groups[item.headerId].push(item)
+      return groups
+    },
+    {}
+  )
 
   const uniqueHeaderIds = Object.keys(groupedByHeader).map(Number)
-  const totalGlobalPendingItems = items.filter(i => getItemStatus(i) === 'Pending').length
+  const totalGlobalPendingItems = items.filter(
+    (i) => getItemStatus(i) === "Pending"
+  ).length
+
+  const openHeaderReview = (headerId: number) => {
+    const headerLines = groupedByHeader[headerId] || []
+    if (headerLines.length === 0) return
+    setReviewHeaderId(headerId)
+    setIsReviewModalOpen(true)
+  }
+
+  const closeHeaderReview = () => {
+    setIsReviewModalOpen(false)
+    setReviewHeaderId(null)
+  }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
       {/* Search and Filters Header Toolbar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-md font-bold text-foreground">BIN Approval Panel (HOD)</h2>
-          <p className="text-xs text-muted-foreground">Authorize item counts completely inside operational windows.</p>
+          <h2 className="text-md font-bold text-foreground">
+            BIN Approval Panel (HOD)
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Authorize item counts completely inside operational windows.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-muted border border-border rounded-lg p-0.5 text-xs">
-            {(['All', 'Pending', 'Amendment', 'Approved'] as const).map((t) => (
+          <div className="flex rounded-lg border border-border bg-muted p-0.5 text-xs">
+            {(["All", "Pending", "Amendment", "Approved"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setFilter(t)}
-                className={`px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${filter === t ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`cursor-pointer rounded-md px-3 py-1 font-medium transition-all ${filter === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {t}
               </button>
@@ -187,13 +234,16 @@ export function ApprovalScreen() {
           </div>
 
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 text-muted-foreground" size={14} />
+            <Search
+              className="absolute top-2.5 left-2.5 text-muted-foreground"
+              size={14}
+            />
             <input
               type="text"
               placeholder="Search ID numbers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-background border border-border pl-8 pr-3 py-1.5 rounded-lg text-xs text-foreground placeholder-muted-foreground/60 focus:outline-none focus:border-primary w-44"
+              className="w-44 rounded-lg border border-border bg-background py-1.5 pr-3 pl-8 text-xs text-foreground placeholder-muted-foreground/60 focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -201,62 +251,92 @@ export function ApprovalScreen() {
             <button
               onClick={handleBatchExecutionAction}
               disabled={totalGlobalPendingItems === 0}
-              className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed dark:bg-emerald-600/90 dark:hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 cursor-pointer transition-all"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-emerald-600/90 dark:hover:bg-emerald-600"
             >
               <Check size={14} />
               {selectedLineIds.length > 0
                 ? `Approve Selected (${selectedLineIds.length})`
-                : `Approve All Pending (${totalGlobalPendingItems})`
-              }
+                : `Approve All Pending (${totalGlobalPendingItems})`}
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Structured Multi-Level Grid */}
+      {/* ===== MAIN TABLE: Fixed Layout with Proper Column Widths ===== */}
       <div className="overflow-x-auto rounded-lg border border-border bg-muted/20">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full border-collapse text-left" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '52px' }} />
+            <col style={{ width: '110px' }} />
+            <col style={{ width: '80px' }} />
+            <col style={{ width: '200px' }} />
+            <col style={{ width: '100px' }} />
+            <col style={{ width: '120px' }} />
+            <col style={{ width: '130px' }} />
+          </colgroup>
           <thead>
-            <tr className="bg-muted/50 border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              <th className="p-3 pl-4 w-10"></th>
-              <th className="p-3 w-12 text-center">Select</th>
+            <tr className="border-b border-border bg-muted/50 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
+              <th className="p-3 pl-4 text-center"></th>
+              <th className="p-3 text-center">Select</th>
               <th className="p-3 font-mono">Header</th>
               <th className="p-3">ORG</th>
               <th className="p-3">Customer</th>
               <th className="p-3 text-right">Total Items</th>
-              <th className="p-3 text-right">Total Quantity</th>
+              <th className="p-3 text-right">Total Qty</th>
+              <th className="p-3 text-right">Requested On</th>
             </tr>
           </thead>
           <tbody className="text-xs">
             {uniqueHeaderIds.map((headerId) => {
               const headerLines = groupedByHeader[headerId] || []
               const isExpanded = !!expandedHeaders[headerId]
-              const pendingLines = headerLines.filter(item => getItemStatus(item) === 'Pending')
-              const totalRequestedQty = headerLines.reduce((sum, item) => sum + item.b3Quantity, 0)
-              const firstItem = headerLines[0]
+              const pendingLines = headerLines.filter(
+                (item) => getItemStatus(item) === "Pending"
+              )
+              const totalRequestedQty = headerLines.reduce(
+                (sum, item) => sum + item.b3Quantity,
+                0
+              )
+              const firstItem: any = headerLines[0]
 
-              const isAllLinesSelected = pendingLines.length > 0 && pendingLines.every(item => selectedLineIds.includes(item.lineId))
-              const isSomeLinesSelected = pendingLines.some(item => selectedLineIds.includes(item.lineId)) && !isAllLinesSelected
+              const isAllLinesSelected =
+                pendingLines.length > 0 &&
+                pendingLines.every((item) =>
+                  selectedLineIds.includes(item.lineId)
+                )
+              const isSomeLinesSelected =
+                pendingLines.some((item) =>
+                  selectedLineIds.includes(item.lineId)
+                ) && !isAllLinesSelected
 
               const handleHeaderCheckboxChange = () => {
                 if (isAllLinesSelected) {
-                  const pendingIds = pendingLines.map(i => i.lineId)
-                  setSelectedLineIds(prev => prev.filter(id => !pendingIds.includes(id)))
+                  const pendingIds = pendingLines.map((i) => i.lineId)
+                  setSelectedLineIds((prev) =>
+                    prev.filter((id) => !pendingIds.includes(id))
+                  )
                 } else {
-                  const pendingIds = pendingLines.map(i => i.lineId)
-                  setSelectedLineIds(prev => [...new Set([...prev, ...pendingIds])])
+                  const pendingIds = pendingLines.map((i) => i.lineId)
+                  setSelectedLineIds((prev) => [
+                    ...new Set([...prev, ...pendingIds]),
+                  ])
                 }
               }
 
               return (
                 <React.Fragment key={headerId}>
-                  {/* Accordion Toggle Row Target */}
-                  <tr className="bg-background hover:bg-muted/40 transition-colors border-b border-border/20 font-semibold select-none">
+                  {/* ===== HEADER ROW ===== */}
+                  <tr className="border-b border-border/20 bg-background font-semibold transition-colors select-none hover:bg-muted/40">
                     <td
                       onClick={() => toggleHeader(headerId)}
-                      className="p-3 pl-4 text-muted-foreground text-center cursor-pointer"
+                      className="cursor-pointer p-3 pl-4 text-center text-muted-foreground"
                     >
-                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      {isExpanded ? (
+                        <ChevronDown size={14} />
+                      ) : (
+                        <ChevronRight size={14} />
+                      )}
                     </td>
 
                     <td className="p-3 text-center">
@@ -268,81 +348,155 @@ export function ApprovalScreen() {
                             if (el) el.indeterminate = isSomeLinesSelected
                           }}
                           onChange={handleHeaderCheckboxChange}
-                          className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-primary"
+                          className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-primary accent-primary focus:ring-primary"
                         />
                       ) : (
-                        <input type="checkbox" disabled className="opacity-30 h-3.5 w-3.5 cursor-not-allowed" />
+                        <input
+                          type="checkbox"
+                          disabled
+                          className="h-3.5 w-3.5 cursor-not-allowed opacity-30"
+                        />
                       )}
                     </td>
 
-                    <td onClick={() => toggleHeader(headerId)} className="p-3 font-bold text-primary font-mono text-xs cursor-pointer">
-                      Header #{headerId}
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 font-mono text-xs font-bold text-primary"
+                    >
+                      <span className="truncate block">Header #{headerId}</span>
                     </td>
-                    <td onClick={() => toggleHeader(headerId)} className="p-3 text-foreground font-mono font-medium cursor-pointer">
-                      {firstItem?.organizationId ?? '-'}
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 font-mono font-medium text-foreground"
+                    >
+                      <span className="truncate block">{firstItem?.organizationCode ?? "-"}</span>
                     </td>
-                    <td onClick={() => toggleHeader(headerId)} className="p-3 text-muted-foreground font-mono font-medium cursor-pointer">
-                      {firstItem?.customerId ?? '-'}
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3"
+                    >
+                      <div className="space-y-0.5 text-xs overflow-hidden">
+                        <div className="font-medium text-slate-900 truncate">
+                          {firstItem?.customerName || `Customer #${firstItem?.customerId ?? "-"}`}
+                        </div>
+                        <div className="text-slate-500 truncate">
+                          {firstItem?.customerRegion ? `${firstItem.customerRegion}` : "-"}
+                        </div>
+                      </div>
                     </td>
-                    <td onClick={() => toggleHeader(headerId)} className="p-3 text-right font-mono text-muted-foreground font-normal cursor-pointer">
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 text-right font-mono font-normal text-muted-foreground"
+                    >
                       {headerLines.length} lines
                     </td>
-                    <td onClick={() => toggleHeader(headerId)} className="p-3 text-right font-mono font-bold text-foreground cursor-pointer">
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 text-right font-mono font-bold text-foreground"
+                    >
                       {totalRequestedQty.toLocaleString()}
+                    </td>
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 text-right font-mono font-normal text-muted-foreground"
+                    >
+                      {firstItem.transactionDate
+                        ? new Date(firstItem.transactionDate).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                        })
+                        : "-"}
                     </td>
                   </tr>
 
-                  {/* Sub-item Details Section */}
+                  {/* ===== EXPANDED SUB-TABLE ===== */}
                   {isExpanded && (
-                    <tr className="border-b border-border/40 last:border-0 bg-muted/20">
-                      <td colSpan={7} className="p-0">
+                    <tr className="border-b border-border/40 bg-muted/20 last:border-0">
+                      <td colSpan={8} className="p-0">
                         <div className="border-b border-border/40">
-                          <table className="w-full text-left border-collapse">
+                          <table className="w-full min-w-full border-collapse text-left" style={{ tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: '52px' }} />
+                              <col style={{ width: '90px' }} />
+                              <col style={{ width: '120px' }} />
+                              <col style={{ width: 'auto' }} />
+                              <col style={{ width: '110px' }} />
+                              <col style={{ width: '110px' }} />
+                              <col style={{ width: '110px' }} />
+                              <col style={{ width: '150px' }} />
+                            </colgroup>
                             <thead>
-                              <tr className="bg-muted/40 border-b border-border/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                <th className="p-2.5 pl-6 w-12 text-center">Select</th>
-                                <th className="p-2.5 font-mono w-24">Line ID</th>
-                                <th className="p-2.5 font-mono">Inventory Item ID</th>
-                                <th className="p-2.5">Ship To Customer</th>
-                                <th className="p-2.5 text-right w-32">Requested Qty</th>
-                                <th className="p-2.5 text-right w-32">Approved Qty</th>
-                                <th className="p-2.5 w-32">Target Date</th>
-                                <th className="p-2.5 text-right pr-6 w-44">Action</th>
+                              <tr className="border-b border-border/40 bg-muted/40 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                <th className="p-2.5 pl-6 text-center">Select</th>
+                                <th className="p-2.5 font-mono">Line ID</th>
+                                <th className="p-2.5 font-mono">Item Code</th>
+                                <th className="p-2.5">Description</th>
+                                <th className="p-2.5 text-right">Requested Qty</th>
+                                <th className="p-2.5 text-right">Approved Qty</th>
+                                <th className="p-2.5">Target Date</th>
+                                <th className="p-2.5 pr-6 text-right">Action</th>
                               </tr>
                             </thead>
                             <tbody className="text-xs">
                               {headerLines.map((item) => {
                                 const currentStatus = getItemStatus(item)
-                                const isFinalized = ['Approved', 'Fulfilled', 'Partial'].includes(currentStatus)
-                                const isLineChecked = selectedLineIds.includes(item.lineId)
+                                const isFinalized = [
+                                  "Approved",
+                                  "Fulfilled",
+                                  "Partial",
+                                  "Cancelled",
+                                ].includes(currentStatus)
+                                const isLineChecked = selectedLineIds.includes(
+                                  item.lineId
+                                )
 
                                 const handleLineCheckboxChange = () => {
                                   if (isLineChecked) {
-                                    setSelectedLineIds(prev => prev.filter(id => id !== item.lineId))
+                                    setSelectedLineIds((prev) =>
+                                      prev.filter((id) => id !== item.lineId)
+                                    )
                                   } else {
-                                    setSelectedLineIds(prev => [...prev, item.lineId])
+                                    setSelectedLineIds((prev) => [
+                                      ...prev,
+                                      item.lineId,
+                                    ])
                                   }
                                 }
 
                                 return (
-                                  <tr key={item.lineId} className="bg-white hover:bg-slate-100 transition-colors">
+                                  <tr
+                                    key={item.lineId}
+                                    className={`transition-colors ${currentStatus === "Cancelled" ? "bg-rose-50/80 text-rose-900 hover:bg-rose-100" : "bg-white hover:bg-slate-100"}`}
+                                  >
                                     <td className="p-2.5 text-center">
                                       {!isFinalized ? (
                                         <input
                                           type="checkbox"
                                           checked={isLineChecked}
                                           onChange={handleLineCheckboxChange}
-                                          className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5 cursor-pointer accent-primary"
+                                          className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-primary accent-primary focus:ring-primary"
                                         />
                                       ) : (
-                                        <input type="checkbox" disabled className="opacity-20 h-3.5 w-3.5 cursor-not-allowed" />
+                                        <input
+                                          type="checkbox"
+                                          disabled
+                                          className="h-3.5 w-3.5 cursor-not-allowed opacity-20"
+                                        />
                                       )}
                                     </td>
 
-                                    <td className="p-2.5 font-mono text-slate-700 pl-3">{item.lineId}</td>
-                                    <td className="p-2.5 font-mono font-bold text-slate-900">{item.inventoryItemId}</td>
-                                    <td className="p-2.5 text-slate-600">{item.shipToCustomer}</td>
-
+                                    <td className="p-2.5 pl-3 font-mono text-blue-700">
+                                      <span className="truncate block">Line #{item.lineId}</span>
+                                    </td>
+                                    <td className="p-2.5 font-mono text-slate-900">
+                                      <span className="truncate block">{item.itemCode || "-"}</span>
+                                    </td>
+                                    <td className="p-2.5 text-slate-900">
+                                      <div className="text-sm font-semibold truncate">
+                                        {item.itemDescription || "-"}
+                                      </div>
+                                    </td>
                                     <td className="p-2.5 text-right font-mono font-semibold text-slate-900">
                                       {item.b3Quantity.toLocaleString()}
                                     </td>
@@ -351,38 +505,72 @@ export function ApprovalScreen() {
                                       {isBusinessHour() && !isFinalized ? (
                                         <input
                                           type="number"
-                                          value={quantities[item.lineId] !== undefined ? quantities[item.lineId] : item.b3ApprovedQuantity ?? item.b3Quantity}
-                                          onChange={(e) => handleQtyChange(item.lineId, Number(e.target.value))}
-                                          className="bg-white border border-slate-300 w-24 text-center font-mono py-0.5 rounded text-xs text-slate-900 focus:border-primary focus:outline-none"
+                                          value={
+                                            quantities[item.lineId] !==
+                                              undefined
+                                              ? quantities[item.lineId]
+                                              : (item.b3ApprovedQuantity ??
+                                                item.b3Quantity)
+                                          }
+                                          onChange={(e) =>
+                                            handleQtyChange(
+                                              item.lineId,
+                                              Number(e.target.value)
+                                            )
+                                          }
+                                          className="w-20 rounded border border-slate-300 bg-white py-0.5 text-center font-mono text-xs text-slate-900 focus:border-primary focus:outline-none"
                                         />
                                       ) : isFinalized ? (
-                                        <span className="font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                                          {item.b3ApprovedQuantity?.toLocaleString() ?? '-'}
+                                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono font-bold text-emerald-600">
+                                          {item.b3ApprovedQuantity?.toLocaleString() ??
+                                            "-"}
                                         </span>
                                       ) : (
                                         <span className="font-mono text-slate-600">
-                                          {item.b3ApprovedQuantity != null ? item.b3ApprovedQuantity.toLocaleString() : '-'}
+                                          {item.b3ApprovedQuantity != null
+                                            ? item.b3ApprovedQuantity.toLocaleString()
+                                            : "-"}
                                         </span>
                                       )}
                                     </td>
 
                                     <td className="p-2.5 font-mono text-slate-600">
-                                      {new Date(item.targetDate).toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                      <span className="truncate block">
+                                        {new Date(item.targetDate).toLocaleDateString(undefined, {
+                                          year: "numeric",
+                                          month: "2-digit",
+                                          day: "2-digit",
+                                        })}
+                                      </span>
                                     </td>
 
-                                    <td className="p-2.5 text-right pr-6">
-                                      {isFinalized ? (
-                                        <span className="text-[10px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-2 py-0.5 rounded font-semibold inline-block">
-                                          ✓ Approved
-                                        </span>
-                                      ) : (
+                                    <td className="p-2.5 pr-6 text-right">
+                                      <div className="flex flex-wrap items-center justify-end gap-2">
                                         <button
-                                          onClick={() => approveItem(item.lineId)}
-                                          className="bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] font-medium px-2.5 py-0.5 rounded transition-all shadow-sm cursor-pointer"
+                                          onClick={() => openHeaderReview(item.headerId)}
+                                          className="cursor-pointer rounded bg-slate-100 px-2.5 py-0.5 text-[11px] font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-200 flex items-center gap-1"
                                         >
-                                          Approve
+                                          <Eye size={12} />
+                                          View
                                         </button>
-                                      )}
+
+                                        {currentStatus === "Cancelled" ? (
+                                          <span className="inline-block rounded border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                                            Cancelled
+                                          </span>
+                                        ) : isFinalized ? (
+                                          <span className="inline-block rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                                            ✓ Approved
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={() => approveItem(item.lineId)}
+                                            className="cursor-pointer rounded bg-primary px-2.5 py-0.5 text-[11px] font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
+                                          >
+                                            Approve
+                                          </button>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 )
@@ -399,6 +587,18 @@ export function ApprovalScreen() {
           </tbody>
         </table>
       </div>
+
+      {reviewHeaderId !== null && (
+        <ReviewAllocationModal
+          isOpen={isReviewModalOpen}
+          onClose={closeHeaderReview}
+          headerId={reviewHeaderId}
+          onSave={async () => {
+            closeHeaderReview()
+            await reloadAllocations()
+          }}
+        />
+      )}
     </div>
   )
 }

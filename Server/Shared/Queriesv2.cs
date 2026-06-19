@@ -114,6 +114,47 @@ namespace Backend.Shared
                 h.HEADER_ID, l.LINE_ID";
 
         /// <summary>
+        /// Retrieves a specific operating unit profile by its Organization ID.
+        /// </summary>
+        public const string GetOperatingUnitById = @"
+            SELECT NAME AS ""Name"" 
+            FROM hr_operating_units 
+            WHERE ORGANIZATION_ID = :OrganizationId";
+
+        /// <summary>
+        /// Retrieves a specific inventory organization definition by its Organization ID.
+        /// </summary>
+        public const string GetInventoryOrganizationById = @"
+            SELECT ORGANIZATION_CODE AS ""OrganizationCode"" 
+            FROM ORG_ORGANIZATION_DEFINITIONS 
+            WHERE ORGANIZATION_ID = :OrganizationId";
+
+        /// <summary>
+        /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
+        /// </summary>
+        public const string GetInventoryItemById = @"
+            SELECT DISTINCT
+                   TRIM(REPLACE(SEGMENT1, '""', ''))  AS ""ItemCode"", 
+                   TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
+            FROM MTL_SYSTEM_ITEMS
+            WHERE INVENTORY_ITEM_ID = :InventoryItemId";
+
+        /// <summary>
+        /// Retrieves a customer's name and region details using their unique Customer ID.
+        /// </summary>
+        public const string GetCustomerNameById = @"
+            SELECT DISTINCT customer_name AS CustomerName, REGION AS Region 
+            FROM (
+                SELECT ra.customer_id, ra.customer_name,
+                       (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
+                FROM ra_customers ra
+                JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
+                JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
+                WHERE ras.site_use_code = 'BILL_TO'
+            ) 
+            WHERE customer_id = :CustomerId";
+
+        /// <summary>
         /// Fetch a single allocation by Header ID.
         /// </summary>
         public const string GetAllocationByHeaderId = @"
@@ -286,6 +327,36 @@ namespace Backend.Shared
                 AND APPROVAL_FLAG = 'Y'   -- Only approved lines can be amended
                 AND CLOSURE_FLAG  = 'N'   -- Only open lines";
 
+        public const string InsertAmendedLineItem = @"
+            INSERT INTO JAN_B3_LINES (
+                LINE_ID,
+                ORGANIZATION_ID,
+                INVENTORY_ITEM_ID,
+                B3_QUANTITY,
+                TARGET_DATE,
+                B3_APPROVED_QUANTITY,
+                APPROVAL_FLAG,
+                CLOSURE_FLAG,
+                REVISION,
+                PARENT_LINE_ID,
+                HEADER_ID,
+                AMENDMENT_REASON
+            )
+            SELECT 
+                JAN_B3_LINES_SEQ.NEXTVAL, -- Assumes a standard database sequence exists
+                ORGANIZATION_ID,
+                INVENTORY_ITEM_ID,
+                :p_b3_quantity,           -- Passed from request payload
+                TARGET_DATE,
+                :p_b3_approved_quantity,  -- Passed from request payload
+                'A',                      -- Auto-approved flag state
+                'N',                      -- Default open closure state
+                :p_revision,              -- Passed from request payload
+                :p_parent_line_id,        -- The original line ID becomes parent
+                HEADER_ID,
+                :p_reason
+            FROM JAN_B3_LINES
+            WHERE LINE_ID = :p_parent_line_id";
 
         // ============================================================
         // 6. CANCEL ALLOCATION LINE

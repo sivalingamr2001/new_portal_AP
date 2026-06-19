@@ -1,17 +1,11 @@
-import { Sun, Moon, LogOut } from 'lucide-react'
-import { useTheme } from '../context/theme-provider'
-import { useAuth } from '@/context/AuthContext'
+import { LogOut } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
 
 interface AppHeaderProps {
-  currentScreen: 'allocation' | 'approval' | 'amendment' | 'fulfillment'
-  totalItemsCount: number
-  pendingCount: number
-  amendCount: number
-  approvedCount: number
+  currentScreen: "allocation" | "approval" | "amendment" | "fulfillment"
 }
 
-export function AppHeader({ currentScreen, totalItemsCount, pendingCount, amendCount, approvedCount }: AppHeaderProps) {
-  const { theme, setTheme } = useTheme()
+export function AppHeader({ currentScreen }: AppHeaderProps) {
   const { logout } = useAuth()
 
   const handleLogout = () => {
@@ -23,36 +17,26 @@ export function AppHeader({ currentScreen, totalItemsCount, pendingCount, amendC
   }
 
   return (
-    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-6 z-10">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="capitalize font-semibold text-foreground">{currentScreen === 'allocation' ? 'BIN Allocation' : currentScreen}</span>
-        <span>/</span>
-        <span className="text-xs">
-          {currentScreen === 'allocation' && 'Create forecast entries'}
-          {currentScreen === 'approval' && 'Approve item quantities'}
-          {currentScreen === 'amendment' && 'Amend or cancel items'}
-          {currentScreen === 'fulfillment' && 'Track OA allocation'}
+    <header className="z-10 flex h-14 items-center justify-between border-b border-border bg-card/80 px-4 sm:px-6 backdrop-blur-sm">
+      {/* Left side: Responsive Breadcrumbs */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted-foreground min-w-0 pr-4">
+        <span className="font-semibold text-foreground capitalize truncate">
+          {currentScreen === "allocation" ? "BIN Allocation" : currentScreen}
+        </span>
+        <span className="hidden sm:inline">/</span>
+        <span className="text-xs truncate hidden sm:inline">
+          {currentScreen === "allocation" && "Create forecast entries"}
+          {currentScreen === "approval" && "Approve item quantities"}
+          {currentScreen === "amendment" && "Amend or cancel items"}
+          {currentScreen === "fulfillment" && "Track OA allocation"}
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex bg-muted border border-border rounded-md p-1 gap-1 text-xs">
-          <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-semibold">{totalItemsCount} Items</span>
-          <span className="px-2 py-0.5 text-amber-600 dark:text-amber-400 font-medium">{pendingCount} Pending</span>
-          <span className="px-2 py-0.5 text-orange-600 dark:text-orange-400 font-medium">{amendCount} Amend</span>
-          <span className="px-2 py-0.5 text-emerald-600 dark:text-emerald-400 font-medium">{approvedCount} Approved</span>
-        </div>
-
+      {/* Right side: Actions */}
+      <div className="flex items-center shrink-0">
         <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="p-1.5 rounded-md hover:bg-muted border border-border text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          title="Toggle Theme (Press 'd')"
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-        <button
-          onClick={() => handleLogout()}
-          className="p-1.5 rounded-md hover:bg-muted border border-destructive text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          onClick={handleLogout}
+          className="cursor-pointer rounded-md border border-destructive/20 p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           title="Logout"
         >
           <LogOut className="h-4 w-4 text-destructive" />
@@ -61,4 +45,3 @@ export function AppHeader({ currentScreen, totalItemsCount, pendingCount, amendC
     </header>
   )
 }
-

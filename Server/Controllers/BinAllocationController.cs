@@ -42,16 +42,21 @@ public class BinAllocationController : ControllerBase
         var data = await _service.GetAllAllocationsAsync();
         return Ok(data);
     }
-
     // ── GET /api/binallocation/{headerId} ─────────────────────
     /// <summary>Get a single allocation by header ID.</summary>
     [HttpGet("{headerId:decimal}")]
     public async Task<IActionResult> GetAllocationByHeaderId(decimal headerId)
     {
         var data = await _service.GetAllocationByHeaderIdAsync(headerId);
-        if (!data.Any()) return NotFound();
+
+        if (data == null)
+        {
+            return NotFound(new { message = $"Allocation Header #{headerId} not found." });
+        }
+
         return Ok(data);
     }
+
 
     // ── GET /api/binallocation/summary ────────────────────────
     /// <summary>Dashboard summary per header.</summary>

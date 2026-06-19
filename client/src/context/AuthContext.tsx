@@ -27,7 +27,12 @@ type AuthContextType = {
   currentRegion: RegionType | null
   currentUserRole: "hod" | "user" | null
   isAuthenticated: boolean
-  login: (username: string, region: string, subRegion: string, expireInMinutes?: number) => void
+  login: (
+    username: string,
+    region: string,
+    subRegion: string,
+    expireInMinutes?: number
+  ) => void
   logout: () => void
 }
 
@@ -36,7 +41,9 @@ const AuthContext = createContext<AuthContextType | null>(null)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { get, set, remove } = useSessionStorage()
 
-  const [currentUser, setCurrentUser] = useState<UserType | null | undefined>(undefined)
+  const [currentUser, setCurrentUser] = useState<UserType | null | undefined>(
+    undefined
+  )
   const [currentRegion, setCurrentRegion] = useState<RegionType | null>(null)
 
   useEffect(() => {
@@ -53,7 +60,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentRegion(region)
   }, [get, set])
 
-  const login = (username: string, region: string, subRegion: string, expireInMinutes = 30) => {
+  const login = (
+    username: string,
+    region: string,
+    subRegion: string,
+    expireInMinutes = 30
+  ) => {
     const role = username === "JANHPL" ? "hod" : "user"
 
     const userPayload: UserType = { username, role }

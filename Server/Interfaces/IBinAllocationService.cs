@@ -6,17 +6,17 @@ public interface IBinAllocationService
 {
     // ── CREATE ───────────────────────────────────────────────
     /// <summary>
-    /// Creates a transactional bin allocation header and associated lines.
+    /// Creates one header + N line items in a single transaction.
+    /// Returns the generated HEADER_ID.
     /// </summary>
-    /// <returns>The generated alphanumeric allocation tracking code (e.g., B3-2627-001).</returns>
-    Task<string> CreateAllocationAsync(CreateAllocationRequestV2 request, CancellationToken cancellationToken = default);
+    Task<decimal> CreateAllocationAsync(CreateAllocationRequestV2 request);
 
     // ── READ ─────────────────────────────────────────────────
     /// <summary>All allocations — header + lines joined.</summary>
     Task<IEnumerable<AllocationRow>> GetAllAllocationsAsync();
 
     /// <summary>Single allocation by header ID.</summary>
-    Task<IEnumerable<AllocationRow>> GetAllocationByHeaderIdAsync(decimal headerId);
+    Task<AllocationHeaderDetailsDto> GetAllocationByHeaderIdAsync(decimal headerId);
 
     /// <summary>All lines currently pending HOD approval.</summary>
     Task<IEnumerable<B3Line>> GetPendingApprovalLinesAsync();

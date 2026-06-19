@@ -19,12 +19,12 @@ function MetricRow({
   Icon: React.ElementType
 }) {
   return (
-    <div className="flex justify-between items-center text-xs bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+    <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-xs">
       <span className={`flex items-center gap-1.5 ${colorClass}`}>
         <Icon size={12} />
         {label}
       </span>
-      <span className={`font-bold font-mono ${colorClass}`}>{value}</span>
+      <span className={`font-mono font-bold ${colorClass}`}>{value}</span>
     </div>
   )
 }
@@ -38,20 +38,24 @@ export function AllocationSidebar({ summary, loading }: Props) {
 
   // Last 5 headers for recents
   const recents = [...summary]
-    .sort((a, b) =>
-      new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
+    .sort(
+      (a, b) =>
+        new Date(b.transactionDate).getTime() -
+        new Date(a.transactionDate).getTime()
     )
     .slice(0, 6)
 
   return (
     <div className="space-y-4">
       {/* KPI card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+      <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-xl">
+        <h3 className="mb-3 text-xs font-bold tracking-wider text-slate-400 uppercase">
           Portfolio Summary
         </h3>
         {loading ? (
-          <div className="text-xs text-slate-500 text-center py-4">Loading…</div>
+          <div className="py-4 text-center text-xs text-slate-500">
+            Loading…
+          </div>
         ) : (
           <div className="space-y-2">
             <MetricRow
@@ -83,16 +87,18 @@ export function AllocationSidebar({ summary, loading }: Props) {
       </div>
 
       {/* Recent headers */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl max-h-[360px] flex flex-col">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex-shrink-0">
+      <div className="flex max-h-[360px] flex-col rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-xl">
+        <h3 className="mb-2 flex-shrink-0 text-xs font-bold tracking-wider text-slate-400 uppercase">
           Recent Allocations
         </h3>
-        <div className="space-y-1.5 overflow-y-auto pr-0.5 flex-1">
+        <div className="flex-1 space-y-1.5 overflow-y-auto pr-0.5">
           {loading && (
-            <div className="text-xs text-slate-500 text-center py-4">Loading…</div>
+            <div className="py-4 text-center text-xs text-slate-500">
+              Loading…
+            </div>
           )}
           {!loading && recents.length === 0 && (
-            <div className="text-xs text-slate-600 italic py-3 text-center">
+            <div className="py-3 text-center text-xs text-slate-600 italic">
               No allocations yet.
             </div>
           )}
@@ -100,31 +106,31 @@ export function AllocationSidebar({ summary, loading }: Props) {
             recents.map((h) => (
               <div
                 key={h.headerId}
-                className="bg-slate-950 border border-slate-800 p-2.5 rounded-md text-[11px] flex justify-between items-start gap-2"
+                className="flex items-start justify-between gap-2 rounded-md border border-slate-800 bg-slate-950 p-2.5 text-[11px]"
               >
                 <div className="min-w-0">
-                  <div className="font-bold text-blue-400 font-mono truncate">
+                  <div className="truncate font-mono font-bold text-blue-400">
                     #{h.headerId}
                   </div>
-                  <div className="text-slate-400 text-[10px]">
+                  <div className="text-[10px] text-slate-400">
                     {new Date(h.transactionDate).toLocaleDateString()}
                   </div>
-                  <div className="text-slate-500 text-[10px]">
+                  <div className="text-[10px] text-slate-500">
                     {h.totalLines} line{h.totalLines !== 1 ? "s" : ""}
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="font-mono text-slate-300 text-[11px]">
+                <div className="flex-shrink-0 text-right">
+                  <div className="font-mono text-[11px] text-slate-300">
                     {h.totalRequestedQty.toLocaleString()}
                   </div>
                   <div className="text-[9px] text-slate-500">units</div>
                   {h.pendingLines > 0 && (
-                    <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-900/30 px-1.5 py-0.5 rounded font-bold mt-0.5 inline-block">
+                    <span className="mt-0.5 inline-block rounded border border-amber-900/30 bg-amber-950 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
                       {h.pendingLines} pending
                     </span>
                   )}
                   {h.pendingLines === 0 && h.approvedLines > 0 && (
-                    <span className="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-900/30 px-1.5 py-0.5 rounded font-bold mt-0.5 inline-block">
+                    <span className="mt-0.5 inline-block rounded border border-emerald-900/30 bg-emerald-950 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
                       ✓ Approved
                     </span>
                   )}

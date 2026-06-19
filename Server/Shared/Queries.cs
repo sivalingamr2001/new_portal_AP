@@ -245,74 +245,137 @@ public static class Queries
         WHERE (:SEARCH IS NULL OR UPPER(SEGMENT1) LIKE UPPER(:SEARCH))";
 
     public const string GetAllAllocationsGrouped = @"
-    SELECT 
-        h.BILL_TO_CUSTOMER AS BillToCustomer,
-        h.CREATED_BY AS CreatedBy,
-        TO_CHAR(h.CREATED_DATE, 'YYYY-MM-DD') AS CreatedDate,
-        h.CUSTOMER_ID AS CustomerId,
-        h.CUSTOMER_OR_ITEM_SPECIFIC AS AllocationBasis,
-        h.HEADER_ID AS HeaderId,
-        h.REMARKS AS Remarks,
-        h.SHIP_TO_CUSTOMER AS ShipToCustomer,
-        h.TERRITORY_ID AS TerritoryId,
-        TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
-        
-        l.LINE_ID AS Id,
-        l.APPROVAL_FLAG AS IsApproved,
-        l.B3_APPROVED_QUANTITY AS ApprovedQty,
-        l.B3_QUANTITY AS BinQty,
-        l.HEADER_ID AS ParentHeaderId,
-        l.INVENTORY_ITEM_ID AS ItemCode,
-        l.ORGANIZATION_ID AS OrganizationId,
-        TO_CHAR(l.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate
-    FROM JAN_B3_HEADER h
-    LEFT JOIN JAN_B3_LINES l ON h.HEADER_ID = l.HEADER_ID
-    ORDER BY h.HEADER_ID DESC, l.LINE_ID ASC";
+        SELECT 
+            h.BILL_TO_CUSTOMER AS BillToCustomerId,
+            TRIM(cust_bill.customer_name) AS BillToCustomerName,
+            h.SHIP_TO_CUSTOMER AS ShipToCustomerId,
+            TRIM(cust_ship.customer_name) AS ShipToCustomerName,
+            h.CUSTOMER_ID AS CustomerId,
+            TRIM(cust_pri.customer_name) AS CustomerName,
+            h.HEADER_ID AS HeaderId,
+            TRIM(h.CUSTOMER_OR_ITEM_SPECIFIC) AS CustomerOrItemSpecific,
+            h.TERRITORY_ID AS TerritoryId,
+            TRIM(h.REMARKS) AS Remarks,
+            TO_CHAR(h.TRANSACTION_DATE, 'YYYY-MM-DD') AS TransactionDate,
+            TRIM(h.CREATED_BY) AS CreatedBy,
+            TO_CHAR(h.CREATED_DATE, 'YYYY-MM-DD') AS CreatedDate,
+            TRIM(h.UPDATED_BY) AS UpdatedBy,
+            TO_CHAR(h.UPDATED_DATE, 'YYYY-MM-DD') AS UpdatedDate,
+    
+            l.LineId,
+            l.ApprovalFlag,
+            l.B3ApprovedQuantity,
+            l.B3Quantity,
+            l.OldRequestedQty, -- 💡 Newly added field: holds Line 1's quantity when viewing Line 2
+            l.InventoryItemId,
+            l.OrganizationId,
+            l.OrganizationCode,
+            l.ItemCode,
+            l.ItemDescription,
+            l.TargetDate,
+            l.ClosureFlag,
+            l.Revision,
+            l.ParentLineId
+        FROM JAN_B3_HEADER h
+        LEFT JOIN (
+            SELECT 
+                LineId,
+                HEADER_ID,
+                ApprovalFlag,
+                B3ApprovedQuantity,
+                B3Quantity,
+                OldRequestedQty,
+                InventoryItemId,
+                OrganizationId,
+                OrganizationCode,
+                ItemCode,
+                ItemDescription,
+                TargetDate,
+                ClosureFlag,
+                Revision,
+                ParentLineId,
+                ROW_NUMBER() OVER (
+                    PARTITION BY HEADER_ID, RootLineId 
+                    ORDER BY Revision DESC, LineId DESC
+                ) AS rn
+            FROM (
+                SELECT 
+                    lines.LINE_ID AS LineId,
+                    lines.HEADER_ID,
+                    TRIM(lines.APPROVAL_FLAG) AS ApprovalFlag,
+                    lines.B3_APPROVED_QUANTITY AS B3ApprovedQuantity,
+                    lines.B3_QUANTITY AS B3Quantity,
+                    -- 💡 Looks back at the immediate parent revision record to fetch its quantity
+                    LAG(lines.B3_QUANTITY, 1) OVER (
+                        PARTITION BY lines.HEADER_ID, CONNECT_BY_ROOT lines.LINE_ID 
+                        ORDER BY lines.REVISION ASC, lines.LINE_ID ASC
+                    ) AS OldRequestedQty,
+                    lines.INVENTORY_ITEM_ID AS InventoryItemId,
+                    lines.ORGANIZATION_ID AS OrganizationId,
+                    TRIM(org.ORGANIZATION_CODE) AS OrganizationCode,
+                    TRIM(itm.SEGMENT1) AS ItemCode,
+                    TRIM(itm.DESCRIPTION) AS ItemDescription,
+                    TO_CHAR(lines.TARGET_DATE, 'YYYY-MM-DD') AS TargetDate,
+                    TRIM(lines.CLOSURE_FLAG) AS ClosureFlag,
+                    lines.REVISION AS Revision,
+                    lines.PARENT_LINE_ID AS ParentLineId,
+                    CONNECT_BY_ROOT lines.LINE_ID AS RootLineId
+                FROM JAN_B3_LINES lines
+                LEFT JOIN ORG_ORGANIZATION_DEFINITIONS org ON lines.ORGANIZATION_ID = org.ORGANIZATION_ID
+                LEFT JOIN MTL_SYSTEM_ITEMS itm ON lines.INVENTORY_ITEM_ID = itm.INVENTORY_ITEM_ID 
+                                              AND lines.ORGANIZATION_ID = itm.ORGANIZATION_ID
+                START WITH lines.PARENT_LINE_ID IS NULL
+                CONNECT BY PRIOR lines.LINE_ID = lines.PARENT_LINE_ID
+            )
+        ) l ON h.HEADER_ID = l.HEADER_ID AND l.rn = 1
+        LEFT JOIN ra_customers cust_pri ON h.CUSTOMER_ID = cust_pri.customer_id
+        LEFT JOIN ra_customers cust_bill ON h.BILL_TO_CUSTOMER = cust_bill.customer_id
+        LEFT JOIN ra_customers cust_ship ON h.SHIP_TO_CUSTOMER = cust_ship.customer_id";
 
     public const string AmendAllocationLine = @"
-        UPDATE JAN_B3_LINES 
-        SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
-        WHERE LINE_ID = :LINE_ID";
+            UPDATE JAN_B3_LINES 
+            SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
+            WHERE LINE_ID = :LINE_ID";
 
-    /// <summary>
-    /// Retrieves a specific operating unit profile by its Organization ID.
-    /// </summary>
-    public const string GetOperatingUnitById = @"
-            SELECT ORGANIZATION_ID AS ""OrganizationId"", NAME AS ""Name"" 
-            FROM hr_operating_units 
-            WHERE ORGANIZATION_ID = :OrganizationId";
+        /// <summary>
+        /// Retrieves a specific operating unit profile by its Organization ID.
+        /// </summary>
+        public const string GetOperatingUnitById = @"
+                SELECT ORGANIZATION_ID AS ""OrganizationId"", NAME AS ""Name"" 
+                FROM hr_operating_units 
+                WHERE ORGANIZATION_ID = :OrganizationId";
 
-    /// <summary>
-    /// Retrieves a specific inventory organization definition by its Organization ID.
-    /// </summary>
-    public const string GetInventoryOrganizationById = @"
-            SELECT ORGANIZATION_ID AS ""OrganizationId"", ORGANIZATION_CODE AS ""OrganizationCode"" 
-            FROM ORG_ORGANIZATION_DEFINITIONS 
-            WHERE ORGANIZATION_ID = :OrganizationId";
+        /// <summary>
+        /// Retrieves a specific inventory organization definition by its Organization ID.
+        /// </summary>
+        public const string GetInventoryOrganizationById = @"
+                SELECT ORGANIZATION_ID AS ""OrganizationId"", ORGANIZATION_CODE AS ""OrganizationCode"" 
+                FROM ORG_ORGANIZATION_DEFINITIONS 
+                WHERE ORGANIZATION_ID = :OrganizationId";
 
-    /// <summary>
-    /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
-    /// </summary>
-    public const string GetInventoryItemById = @"
-            SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
-                   SEGMENT1 AS ""ItemCode"", 
-                   TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
-            FROM MTL_SYSTEM_ITEMS
-            WHERE INVENTORY_ITEM_ID = :InventoryItemId";
+        /// <summary>
+        /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
+        /// </summary>
+        public const string GetInventoryItemById = @"
+                SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
+                       TRIM(REPLACE(SEGMENT1 AS ""ItemCode"")), 
+                       TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
+                FROM MTL_SYSTEM_ITEMS
+                WHERE INVENTORY_ITEM_ID = :InventoryItemId";
 
-    /// <summary>
-    /// Retrieves a customer's name and region details using their unique Customer ID.
-    /// </summary>
-    public const string GetCustomerNameById = @"
-            SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
-            FROM (
-                SELECT ra.customer_id, ra.customer_name,
-                       (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
-                FROM ra_customers ra
-                JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
-                JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
-                WHERE ras.site_use_code = 'BILL_TO'
-            ) 
-            WHERE customer_id = :CustomerId";
+        /// <summary>
+        /// Retrieves a customer's name and region details using their unique Customer ID.
+        /// </summary>
+        public const string GetCustomerNameById = @"
+                SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
+                FROM (
+                    SELECT ra.customer_id, ra.customer_name,
+                           (SELECT segment14 FROM ra_territories WHERE territory_id = ras.territory_id) AS REGION 
+                    FROM ra_customers ra
+                    JOIN ra_addresses_all ad ON ra.customer_id = ad.customer_id
+                    JOIN ra_site_uses_all ras ON ad.address_id = ras.address_id
+                    WHERE ras.site_use_code = 'BILL_TO'
+                ) 
+                WHERE customer_id = :CustomerId";
 
-}   
+    }   

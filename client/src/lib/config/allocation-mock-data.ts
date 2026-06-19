@@ -36,8 +36,16 @@ export const MOCK_BILL_TO_CUSTOMERS: CustomerDto[] = [
 ]
 
 export const MOCK_SHIP_TO_CUSTOMERS: CustomerDto[] = [
-  { customerId: 2001, customerName: "Tata Motors - Pune Plant", region: "Maharashtra" },
-  { customerId: 2002, customerName: "Maruti Suzuki - Gurgaon", region: "Maharashtra" },
+  {
+    customerId: 2001,
+    customerName: "Tata Motors - Pune Plant",
+    region: "Maharashtra",
+  },
+  {
+    customerId: 2002,
+    customerName: "Maruti Suzuki - Gurgaon",
+    region: "Maharashtra",
+  },
 ]
 
 export const MOCK_BILL_TO_ADDRESSES: AddressDto[] = [

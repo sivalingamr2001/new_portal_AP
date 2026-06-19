@@ -54,7 +54,9 @@ const INITIAL_STATE: AllocationFormState = {
 
 export function useAllocationForm() {
   const [form, setForm] = useState<AllocationFormState>(INITIAL_STATE)
-  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>({ type: "idle" })
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>({
+    type: "idle",
+  })
   const { currentUser } = useAuth()
 
   // ── Reference data ──────────────────────────────────────────
@@ -62,14 +64,19 @@ export function useAllocationForm() {
 
   //Add operation unit get api here to load OperatingUnit[]
 
-  const { data: billToCustomers, loading: billToLoading } =
-    useBillToCustomers(form.region, form.subRegion)
+  const { data: billToCustomers, loading: billToLoading } = useBillToCustomers(
+    form.region,
+    form.subRegion
+  )
 
-  const { data: shipToCustomers, loading: shipToLoading } =
-    useShipToCustomers(form.region, form.subRegion)
+  const { data: shipToCustomers, loading: shipToLoading } = useShipToCustomers(
+    form.region,
+    form.subRegion
+  )
 
-  const { data: employees, loading: employeesLoading } =
-    usePreparedByEmployees(form.region)
+  const { data: employees, loading: employeesLoading } = usePreparedByEmployees(
+    form.region
+  )
 
   // getCustomerAddresses() call address api to load location first after selected location address both bill to and ship to
 
@@ -81,10 +88,14 @@ export function useAllocationForm() {
   //call rrs-categroy pass respective params and it retrun Rn shoe error
   //call weeks api to load weeks
 
-  const { data: summary, loading: summaryLoading, execute: refreshSummary } =
-    useAllocationSummary()
+  const {
+    data: summary,
+    loading: summaryLoading,
+    execute: refreshSummary,
+  } = useAllocationSummary()
 
-  const { execute: createAllocation, loading: submitting } = useCreateAllocation()
+  const { execute: createAllocation, loading: submitting } =
+    useCreateAllocation()
 
   // ── Unique region names for the first dropdown ──────────────
   const regionOptions = Array.from(
@@ -104,7 +115,13 @@ export function useAllocationForm() {
       allocationType: type,
       // reset customer-specific fields when switching to open
       ...(type === "open"
-        ? { region: "", subRegion: "", billToCustomerId: null, shipToCustomerId: null, preparedBy: "" }
+        ? {
+            region: "",
+            subRegion: "",
+            billToCustomerId: null,
+            shipToCustomerId: null,
+            preparedBy: "",
+          }
         : {}),
     }))
   }, [])
@@ -132,7 +149,10 @@ export function useAllocationForm() {
   }, [])
 
   const setField = useCallback(
-    <K extends keyof AllocationFormState>(key: K, value: AllocationFormState[K]) => {
+    <K extends keyof AllocationFormState>(
+      key: K,
+      value: AllocationFormState[K]
+    ) => {
       setForm((prev) => ({ ...prev, [key]: value }))
     },
     []
@@ -147,7 +167,10 @@ export function useAllocationForm() {
   const removeLine = useCallback((key: string) => {
     setForm((prev) => ({
       ...prev,
-      lines: prev.lines.length > 1 ? prev.lines.filter((l) => l._key !== key) : prev.lines,
+      lines:
+        prev.lines.length > 1
+          ? prev.lines.filter((l) => l._key !== key)
+          : prev.lines,
     }))
   }, [])
 
@@ -230,7 +253,10 @@ export function useAllocationForm() {
 
     try {
       await createAllocation(payload)
-      setSubmitStatus({ type: "success", message: "Allocation submitted for approval." })
+      setSubmitStatus({
+        type: "success",
+        message: "Allocation submitted for approval.",
+      })
       setForm({ ...INITIAL_STATE, lines: [emptyLine()] })
       refreshSummary()
     } catch (e: unknown) {

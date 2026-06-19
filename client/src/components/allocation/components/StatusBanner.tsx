@@ -32,7 +32,7 @@ export function StatusBanner({ status, onDismiss }: Props) {
 
   return (
     <div
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm ${cfg.bg} ${cfg.text}`}
+      className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${cfg.bg} ${cfg.text}`}
       role="alert"
     >
       <IconComp
@@ -47,7 +47,7 @@ export function StatusBanner({ status, onDismiss }: Props) {
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="opacity-60 hover:opacity-100 transition-opacity"
+          className="opacity-60 transition-opacity hover:opacity-100"
         >
           <X size={14} />
         </button>

@@ -1,4 +1,10 @@
-import { AlertTriangle, ChevronRight, Loader2, Plus, Trash2 } from "lucide-react"
+import {
+  AlertTriangle,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 
 import { Loader } from "@/components/Loader"
@@ -25,7 +31,7 @@ import {
   useDemandMetrics,
   useRrsCategory,
   useCreateAllocation,
-  useItems
+  useItems,
 } from "@/hooks/useAllocationApi"
 import type {
   CreateAllocationRequest,
@@ -35,6 +41,8 @@ import type {
   OperatingUnit,
   InventoryItem,
 } from "@/api/allocationApi"
+import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
 
 /* ─────────────── TYPES ─────────────── */
 
@@ -73,7 +81,7 @@ function generateId() {
 
 function MetricsCell({ value }: { value: number | undefined }) {
   return (
-    <span className="font-mono text-[11px] text-muted-foreground font-medium">
+    <span className="font-mono text-[11px] font-medium text-muted-foreground">
       {value?.toLocaleString() ?? "—"}
     </span>
   )
@@ -81,7 +89,13 @@ function MetricsCell({ value }: { value: number | undefined }) {
 
 function formatAddress(addr: CustomerAddress | null): string {
   if (!addr) return ""
-  const parts = [addr.address1, addr.address2, addr.address3, addr.city, addr.postalCode].filter(Boolean)
+  const parts = [
+    addr.address1,
+    addr.address2,
+    addr.address3,
+    addr.city,
+    addr.postalCode,
+  ].filter(Boolean)
   return parts.join("\n")
 }
 
@@ -97,19 +111,29 @@ export function AllocationScreen() {
   const [shipToCustomerSearch, setShipToCustomerSearch] = useState("")
   const [billToLocationSearch, setBillToLocationSearch] = useState("")
   const [shipToLocationSearch, setShipToLocationSearch] = useState("")
-  const [orgSearchByLine, setOrgSearchByLine] = useState<Record<string, string>>({})
-  const [itemSearchByLine, setItemSearchByLine] = useState<Record<string, string>>({})
+  const [orgSearchByLine, setOrgSearchByLine] = useState<
+    Record<string, string>
+  >({})
+  const [itemSearchByLine, setItemSearchByLine] = useState<
+    Record<string, string>
+  >({})
   const [weekSearch, setWeekSearch] = useState("")
 
   /* ── Form State ── */
-  const [allocationBasis, setAllocationBasis] = useState<"customer" | "open">("customer")
+  const [allocationBasis, setAllocationBasis] = useState<"customer" | "open">(
+    "customer"
+  )
   const [selectedRegion, setSelectedRegion] = useState("")
   const [selectedSubRegion, setSelectedSubRegion] = useState("")
   const [operatingUnit, setOperatingUnit] = useState<OperatingUnit | null>(null)
   const [billToCustomer, setBillToCustomer] = useState<Customer | null>(null)
   const [shipToCustomer, setShipToCustomer] = useState<Customer | null>(null)
-  const [billToLocation, setBillToLocation] = useState<CustomerAddress | null>(null)
-  const [shipToLocation, setShipToLocation] = useState<CustomerAddress | null>(null)
+  const [billToLocation, setBillToLocation] = useState<CustomerAddress | null>(
+    null
+  )
+  const [shipToLocation, setShipToLocation] = useState<CustomerAddress | null>(
+    null
+  )
   const [remarks, setRemarks] = useState("")
   const [lines, setLines] = useState<LineItem[]>([
     {
@@ -135,8 +159,16 @@ export function AllocationScreen() {
   const weeksHook = useWeeksDropdown()
   const organizationsHook = useOrganizations()
 
-  const billToCustomersHook = useBillToCustomers(selectedRegion, selectedSubRegion)
-  const shipToCustomersHook = useShipToCustomers(selectedRegion, selectedSubRegion)
+  const navigate = useNavigate()
+
+  const billToCustomersHook = useBillToCustomers(
+    selectedRegion,
+    selectedSubRegion
+  )
+  const shipToCustomersHook = useShipToCustomers(
+    selectedRegion,
+    selectedSubRegion
+  )
 
   const billToAddressesHook = useCustomerAddresses(
     billToCustomer?.customerId ?? 0,
@@ -153,9 +185,16 @@ export function AllocationScreen() {
   const demandMetricsHook = useDemandMetrics(0, 0, 0)
   const rrsCategoryHook = useRrsCategory(0, 0)
   const createAllocationHook = useCreateAllocation()
+  const { currentRegion } = useAuth()
 
   useEffect(() => {
-    itemsHook.execute(1, 10).catch(() => {})
+    if (currentRegion?.region) {
+      setSelectedRegion(currentRegion.region);
+    }
+  }, [currentRegion]);
+
+  useEffect(() => {
+    itemsHook.execute(1, 10).catch(() => { })
   }, [itemsHook])
 
   /* ── Derived Data ── */
@@ -167,17 +206,22 @@ export function AllocationScreen() {
   const subRegionsForSelected = useMemo(
     () =>
       selectedRegion
-        ? [...new Set(
-          (regionsHook.data ?? [])
-            .filter((r) => r.region === selectedRegion)
-            .map((r) => r.subRegion)
-        )]
+        ? [
+          ...new Set(
+            (regionsHook.data ?? [])
+              .filter((r) => r.region === selectedRegion)
+              .map((r) => r.subRegion)
+          ),
+        ]
         : [],
     [regionsHook.data, selectedRegion]
   )
 
   const filteredRegionNames = useMemo(
-    () => regionNames.filter((r) => r.toLowerCase().includes(regionSearch.trim().toLowerCase())),
+    () =>
+      regionNames.filter((r) =>
+        r.toLowerCase().includes(regionSearch.trim().toLowerCase())
+      ),
     [regionNames, regionSearch]
   )
 
@@ -190,14 +234,14 @@ export function AllocationScreen() {
           .map((item) => item.trim())
           .filter(Boolean)
       )
-    );
+    )
 
     // 2. Filter the clean list based on your search input
-    const searchNormalized = subRegionSearch.trim().toLowerCase();
+    const searchNormalized = subRegionSearch.trim().toLowerCase()
     return individualSubRegions.filter((r) =>
       r.toLowerCase().includes(searchNormalized)
-    );
-  }, [subRegionsForSelected, subRegionSearch]);
+    )
+  }, [subRegionsForSelected, subRegionSearch])
 
   const filteredOperatingUnits = useMemo(
     () =>
@@ -210,7 +254,9 @@ export function AllocationScreen() {
   const filteredBillToCustomers = useMemo(
     () =>
       (billToCustomersHook.data ?? []).filter((c) =>
-        c.customerName.toLowerCase().includes(billToCustomerSearch.trim().toLowerCase())
+        c.customerName
+          .toLowerCase()
+          .includes(billToCustomerSearch.trim().toLowerCase())
       ),
     [billToCustomersHook.data, billToCustomerSearch]
   )
@@ -218,7 +264,9 @@ export function AllocationScreen() {
   const filteredShipToCustomers = useMemo(
     () =>
       (shipToCustomersHook.data ?? []).filter((c) =>
-        c.customerName.toLowerCase().includes(shipToCustomerSearch.trim().toLowerCase())
+        c.customerName
+          .toLowerCase()
+          .includes(shipToCustomerSearch.trim().toLowerCase())
       ),
     [shipToCustomersHook.data, shipToCustomerSearch]
   )
@@ -226,7 +274,9 @@ export function AllocationScreen() {
   const filteredBillToAddresses = useMemo(
     () =>
       (billToAddressesHook.data ?? []).filter((a) =>
-        `${a.location} ${a.address1}`.toLowerCase().includes(billToLocationSearch.trim().toLowerCase())
+        `${a.location} ${a.address1}`
+          .toLowerCase()
+          .includes(billToLocationSearch.trim().toLowerCase())
       ),
     [billToAddressesHook.data, billToLocationSearch]
   )
@@ -234,13 +284,18 @@ export function AllocationScreen() {
   const filteredShipToAddresses = useMemo(
     () =>
       (shipToAddressesHook.data ?? []).filter((a) =>
-        `${a.location} ${a.address1}`.toLowerCase().includes(shipToLocationSearch.trim().toLowerCase())
+        `${a.location} ${a.address1}`
+          .toLowerCase()
+          .includes(shipToLocationSearch.trim().toLowerCase())
       ),
     [shipToAddressesHook.data, shipToLocationSearch]
   )
 
   const filteredWeeks = useMemo(
-    () => (weeksHook.data ?? []).filter((w) => w.toLowerCase().includes(weekSearch.trim().toLowerCase())),
+    () =>
+      (weeksHook.data ?? []).filter((w) =>
+        w.toLowerCase().includes(weekSearch.trim().toLowerCase())
+      ),
     [weeksHook.data, weekSearch]
   )
 
@@ -249,27 +304,49 @@ export function AllocationScreen() {
   const prevSubRegionRef = useRef("")
   useEffect(() => {
     if (selectedRegion && selectedSubRegion) {
-      if (selectedRegion !== prevRegionRef.current || selectedSubRegion !== prevSubRegionRef.current) {
+      if (
+        selectedRegion !== prevRegionRef.current ||
+        selectedSubRegion !== prevSubRegionRef.current
+      ) {
         billToCustomersHook.execute(selectedRegion, selectedSubRegion)
         shipToCustomersHook.execute(selectedRegion, selectedSubRegion)
         prevRegionRef.current = selectedRegion
         prevSubRegionRef.current = selectedSubRegion
       }
     }
-  }, [selectedRegion, selectedSubRegion, billToCustomersHook, shipToCustomersHook])
+  }, [
+    selectedRegion,
+    selectedSubRegion,
+    billToCustomersHook,
+    shipToCustomersHook,
+  ])
 
   const prevBillToIdRef = useRef<number | null>(null)
   const prevShipToIdRef = useRef<number | null>(null)
   useEffect(() => {
-    if (billToCustomer?.customerId && billToCustomer.customerId !== prevBillToIdRef.current) {
-      billToAddressesHook.execute(billToCustomer.customerId, "BILL_TO", operatingUnit?.organizationId)
+    if (
+      billToCustomer?.customerId &&
+      billToCustomer.customerId !== prevBillToIdRef.current
+    ) {
+      billToAddressesHook.execute(
+        billToCustomer.customerId,
+        "BILL_TO",
+        operatingUnit?.organizationId
+      )
       prevBillToIdRef.current = billToCustomer.customerId
     }
   }, [billToCustomer, operatingUnit, billToAddressesHook])
 
   useEffect(() => {
-    if (shipToCustomer?.customerId && shipToCustomer.customerId !== prevShipToIdRef.current) {
-      shipToAddressesHook.execute(shipToCustomer.customerId, "SHIP_TO", operatingUnit?.organizationId)
+    if (
+      shipToCustomer?.customerId &&
+      shipToCustomer.customerId !== prevShipToIdRef.current
+    ) {
+      shipToAddressesHook.execute(
+        shipToCustomer.customerId,
+        "SHIP_TO",
+        operatingUnit?.organizationId
+      )
       prevShipToIdRef.current = shipToCustomer.customerId
     }
   }, [shipToCustomer, operatingUnit, shipToAddressesHook])
@@ -310,13 +387,20 @@ export function AllocationScreen() {
     })
   }, [])
 
-  const updateLine = useCallback((lineId: string, updates: Partial<LineItem>) => {
-    setLines((prev) => prev.map((l) => (l.id === lineId ? { ...l, ...updates } : l)))
-  }, [])
+  const updateLine = useCallback(
+    (lineId: string, updates: Partial<LineItem>) => {
+      setLines((prev) =>
+        prev.map((l) => (l.id === lineId ? { ...l, ...updates } : l))
+      )
+    },
+    []
+  )
 
   const setLineOrganization = useCallback(
     (lineId: string, orgCode: string) => {
-      const org = organizationsHook.data?.find((o) => o.organizationCode === orgCode)
+      const org = organizationsHook.data?.find(
+        (o) => o.organizationCode === orgCode
+      )
       updateLine(lineId, {
         organizationCode: orgCode,
         organizationId: org?.organizationId ?? null,
@@ -346,9 +430,9 @@ export function AllocationScreen() {
       setItemSearchByLine((prev) => ({ ...prev, [lineId]: normalized }))
 
       if (normalized.length > 3) {
-        itemsHook.execute(1, 10, normalized).catch(() => {})
+        itemsHook.execute(1, 10, normalized).catch(() => { })
       } else if (normalized.length === 0) {
-        itemsHook.execute(1, 10).catch(() => {})
+        itemsHook.execute(1, 10).catch(() => { })
       }
     },
     [itemsHook, setLineItemCode]
@@ -364,7 +448,11 @@ export function AllocationScreen() {
       updateLine(lineId, { loadingItem: true, itemError: null })
 
       try {
-        const matchedItem = selectedItem ?? (await itemsHook.execute(1, 10, itemCode)).data.find((i) => i.itemCode === itemCode)
+        const matchedItem =
+          selectedItem ??
+          (await itemsHook.execute(1, 10, itemCode)).data.find(
+            (i) => i.itemCode === itemCode
+          )
 
         if (!matchedItem) {
           updateLine(lineId, {
@@ -380,7 +468,10 @@ export function AllocationScreen() {
 
         let isRunner = false
         try {
-          const rrsResult = await rrsCategoryHook.execute(orgId, matchedItem.inventoryItemId)
+          const rrsResult = await rrsCategoryHook.execute(
+            orgId,
+            matchedItem.inventoryItemId
+          )
           isRunner = rrsResult.rrsCategory === "RUNNER"
         } catch {
           isRunner = false
@@ -406,12 +497,15 @@ export function AllocationScreen() {
           isRunnerItem: isRunner,
           metrics,
           loadingItem: false,
-          itemError: isRunner ? "Selected item is a RUNNER and cannot be allocated" : null,
+          itemError: isRunner
+            ? "Selected item is a RUNNER and cannot be allocated"
+            : null,
         })
       } catch (err) {
         updateLine(lineId, {
           loadingItem: false,
-          itemError: err instanceof Error ? err.message : "Failed to resolve item",
+          itemError:
+            err instanceof Error ? err.message : "Failed to resolve item",
         })
       }
     },
@@ -439,7 +533,16 @@ export function AllocationScreen() {
       billToLocation &&
       shipToLocation
     )
-  }, [allocationBasis, selectedRegion, selectedSubRegion, operatingUnit, billToCustomer, shipToCustomer, billToLocation, shipToLocation])
+  }, [
+    allocationBasis,
+    selectedRegion,
+    selectedSubRegion,
+    operatingUnit,
+    billToCustomer,
+    shipToCustomer,
+    billToLocation,
+    shipToLocation,
+  ])
 
   const validLines = useMemo(
     () =>
@@ -457,7 +560,8 @@ export function AllocationScreen() {
   )
 
   const canSubmit = useMemo(
-    () => headerComplete && validLines.length > 0 && !createAllocationHook.loading,
+    () =>
+      headerComplete && validLines.length > 0 && !createAllocationHook.loading,
     [headerComplete, validLines.length, createAllocationHook.loading]
   )
 
@@ -468,18 +572,29 @@ export function AllocationScreen() {
     const payload: CreateAllocationRequest = {
       transactionDate: new Date().toISOString(),
       customerOrItemSpecific: allocationBasis === "customer" ? 1 : 0,
-      customerId: allocationBasis === "customer" ? billToCustomer?.customerId ?? null : null,
+      customerId:
+        allocationBasis === "customer"
+          ? (billToCustomer?.customerId ?? null)
+          : null,
       territoryId: null,
-      billToCustomer: allocationBasis === "customer" ? billToCustomer?.customerId ?? null : null,
-      shipToCustomer: allocationBasis === "customer" ? shipToCustomer?.customerId ?? null : null,
+      billToCustomer:
+        allocationBasis === "customer"
+          ? (billToCustomer?.customerId ?? null)
+          : null,
+      shipToCustomer:
+        allocationBasis === "customer"
+          ? (shipToCustomer?.customerId ?? null)
+          : null,
       createdBy: "current-user",
       remarks: remarks || null,
-      lines: validLines.map((l): CreateLineRequest => ({
-        organizationId: l.organizationId,
-        inventoryItemId: l.inventoryItemId!,
-        b3Quantity: Number(l.quantity),
-        targetDate: l.targetDate || null,
-      })),
+      lines: validLines.map(
+        (l): CreateLineRequest => ({
+          organizationId: l.organizationId,
+          inventoryItemId: l.inventoryItemId!,
+          b3Quantity: Number(l.quantity),
+          targetDate: l.targetDate || null,
+        })
+      ),
     }
 
     try {
@@ -502,14 +617,27 @@ export function AllocationScreen() {
         },
       ])
       setRemarks("")
+      navigate(`/fulfillment`)
       return result
     } catch (err) {
       throw err
     }
-  }, [canSubmit, allocationBasis, billToCustomer, shipToCustomer, remarks, validLines, createAllocationHook])
+  }, [
+    canSubmit,
+    allocationBasis,
+    billToCustomer,
+    shipToCustomer,
+    remarks,
+    validLines,
+    createAllocationHook,
+  ])
 
   /* ── Loading State ── */
-  const loadingInitial = regionsHook.loading || operatingUnitsHook.loading || weeksHook.loading || organizationsHook.loading
+  const loadingInitial =
+    regionsHook.loading ||
+    operatingUnitsHook.loading ||
+    weeksHook.loading ||
+    organizationsHook.loading
 
   if (loadingInitial) {
     return (
@@ -525,9 +653,12 @@ export function AllocationScreen() {
       {/* Header Bar */}
       <div className="flex items-center justify-between rounded-xl border border-border bg-card px-6 py-2 shadow-sm">
         <div>
-          <h2 className="text-md font-bold text-foreground">New BIN Allocation</h2>
+          <h2 className="text-md font-bold text-foreground">
+            New BIN Allocation
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Customer header details and item lines — only B3 header/line fields are saved on submit.
+            Customer header details and item lines — only B3 header/line fields
+            are saved on submit.
           </p>
         </div>
         <Button
@@ -565,33 +696,35 @@ export function AllocationScreen() {
           className="flex cursor-pointer items-center justify-between border-b border-border px-6 py-4 transition-colors hover:bg-muted/40"
         >
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Customer Details
             </h3>
             {!customerDetailsOpen && (
               <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                 {selectedRegion && (
-                  <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground border border-border">
+                  <span className="rounded-md border border-border bg-muted px-2 py-1 text-muted-foreground">
                     Region: {selectedRegion}
                   </span>
                 )}
                 {operatingUnit && (
-                  <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground border border-border">
+                  <span className="rounded-md border border-border bg-muted px-2 py-1 text-muted-foreground">
                     OU: {operatingUnit.name}
                   </span>
                 )}
                 {billToCustomer && (
-                  <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground border border-border">
+                  <span className="rounded-md border border-border bg-muted px-2 py-1 text-muted-foreground">
                     Bill To: {billToCustomer.customerName}
                   </span>
                 )}
                 {shipToCustomer && (
-                  <span className="rounded-md bg-muted px-2 py-1 text-muted-foreground border border-border">
+                  <span className="rounded-md border border-border bg-muted px-2 py-1 text-muted-foreground">
                     Ship To: {shipToCustomer.customerName}
                   </span>
                 )}
-                <span className="rounded-md bg-blue-500/10 px-2 py-1 text-blue-600 dark:text-blue-400 border border-blue-500/20 font-medium">
-                  {allocationBasis === "customer" ? "Customer Specific" : "Open Pool"}
+                <span className="rounded-md border border-blue-500/20 bg-blue-500/10 px-2 py-1 font-medium text-blue-600 dark:text-blue-400">
+                  {allocationBasis === "customer"
+                    ? "Customer Specific"
+                    : "Open Pool"}
                 </span>
               </div>
             )}
@@ -611,7 +744,7 @@ export function AllocationScreen() {
                 <button
                   type="button"
                   onClick={() => setAllocationBasis("customer")}
-                  className={`rounded-md px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${allocationBasis === "customer"
+                  className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${allocationBasis === "customer"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                     }`}
@@ -621,7 +754,7 @@ export function AllocationScreen() {
                 <button
                   type="button"
                   onClick={() => setAllocationBasis("open")}
-                  className={`rounded-md px-4 py-1.5 text-xs font-medium transition-all cursor-pointer ${allocationBasis === "open"
+                  className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${allocationBasis === "open"
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                     }`}
@@ -646,21 +779,26 @@ export function AllocationScreen() {
                       setBillToLocation(null)
                       setShipToLocation(null)
                     }}
-                    disabled={regionNames.length === 0}
+                    disabled
                   >
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select region..."
                       onChange={(e) => setRegionSearch(e.currentTarget.value)}
+                      disabled
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {filteredRegionNames.length === 0 ? (
-                          <ComboboxItem value="" disabled>No regions found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No regions found
+                          </ComboboxItem>
                         ) : (
                           filteredRegionNames.map((region) => (
                             <ComboboxItem key={region} value={region}>
-                              <span className="whitespace-nowrap">{region}</span>
+                              <span className="whitespace-nowrap">
+                                {region}
+                              </span>
                             </ComboboxItem>
                           ))
                         )}
@@ -681,17 +819,27 @@ export function AllocationScreen() {
                       setBillToLocation(null)
                       setShipToLocation(null)
                     }}
-                    disabled={!selectedRegion || subRegionsForSelected.length === 0}
+                    disabled={
+                      !selectedRegion || subRegionsForSelected.length === 0
+                    }
                   >
                     <ComboboxInput
                       className={fieldClass}
-                      placeholder={!selectedRegion ? "Select region first..." : "Select sub-region..."}
-                      onChange={(e) => setSubRegionSearch(e.currentTarget.value)}
+                      placeholder={
+                        !selectedRegion
+                          ? "Select region first..."
+                          : "Select sub-region..."
+                      }
+                      onChange={(e) =>
+                        setSubRegionSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {filteredSubRegions.length === 0 ? (
-                          <ComboboxItem value="" disabled>No sub-regions found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No sub-regions found
+                          </ComboboxItem>
                         ) : (
                           filteredSubRegions.map((sub) => (
                             <ComboboxItem key={sub} value={sub}>
@@ -710,7 +858,9 @@ export function AllocationScreen() {
                   <Combobox
                     value={operatingUnit?.name ?? ""}
                     onValueChange={(value) => {
-                      const unit = (operatingUnitsHook.data ?? []).find((u) => u.name === value)
+                      const unit = (operatingUnitsHook.data ?? []).find(
+                        (u) => u.name === value
+                      )
                       setOperatingUnit(unit ?? null)
                       setBillToCustomer(null)
                       setShipToCustomer(null)
@@ -722,16 +872,25 @@ export function AllocationScreen() {
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select operating unit..."
-                      onChange={(e) => setOperatingUnitSearch(e.currentTarget.value)}
+                      onChange={(e) =>
+                        setOperatingUnitSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {filteredOperatingUnits.length === 0 ? (
-                          <ComboboxItem value="" disabled>No operating units found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No operating units found
+                          </ComboboxItem>
                         ) : (
                           filteredOperatingUnits.map((unit) => (
-                            <ComboboxItem key={unit.organizationId} value={unit.name}>
-                              <span className="whitespace-nowrap">{unit.name}</span>
+                            <ComboboxItem
+                              key={unit.organizationId}
+                              value={unit.name}
+                            >
+                              <span className="whitespace-nowrap">
+                                {unit.name}
+                              </span>
                             </ComboboxItem>
                           ))
                         )}
@@ -746,7 +905,9 @@ export function AllocationScreen() {
                   <Combobox
                     value={billToCustomer?.customerName ?? ""}
                     onValueChange={(value) => {
-                      const customer = (billToCustomersHook.data ?? []).find((c) => c.customerName === value)
+                      const customer = (billToCustomersHook.data ?? []).find(
+                        (c) => c.customerName === value
+                      )
                       setBillToCustomer(customer ?? null)
                       setBillToLocation(null)
                     }}
@@ -755,18 +916,29 @@ export function AllocationScreen() {
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select bill-to customer..."
-                      onChange={(e) => setBillToCustomerSearch(e.currentTarget.value)}
+                      onChange={(e) =>
+                        setBillToCustomerSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {billToCustomersHook.loading ? (
-                          <ComboboxItem value="" disabled>Loading...</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            Loading...
+                          </ComboboxItem>
                         ) : filteredBillToCustomers.length === 0 ? (
-                          <ComboboxItem value="" disabled>No customers found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No customers found
+                          </ComboboxItem>
                         ) : (
                           filteredBillToCustomers.map((customer) => (
-                            <ComboboxItem key={customer.customerId} value={customer.customerName}>
-                              <span className="whitespace-nowrap">{customer.customerName}</span>
+                            <ComboboxItem
+                              key={customer.customerId}
+                              value={customer.customerName}
+                            >
+                              <span className="whitespace-nowrap">
+                                {customer.customerName}
+                              </span>
                             </ComboboxItem>
                           ))
                         )}
@@ -781,7 +953,9 @@ export function AllocationScreen() {
                   <Combobox
                     value={shipToCustomer?.customerName ?? ""}
                     onValueChange={(value) => {
-                      const customer = (shipToCustomersHook.data ?? []).find((c) => c.customerName === value)
+                      const customer = (shipToCustomersHook.data ?? []).find(
+                        (c) => c.customerName === value
+                      )
                       setShipToCustomer(customer ?? null)
                       setShipToLocation(null)
                     }}
@@ -790,18 +964,29 @@ export function AllocationScreen() {
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select ship-to customer..."
-                      onChange={(e) => setShipToCustomerSearch(e.currentTarget.value)}
+                      onChange={(e) =>
+                        setShipToCustomerSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {shipToCustomersHook.loading ? (
-                          <ComboboxItem value="" disabled>Loading...</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            Loading...
+                          </ComboboxItem>
                         ) : filteredShipToCustomers.length === 0 ? (
-                          <ComboboxItem value="" disabled>No customers found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No customers found
+                          </ComboboxItem>
                         ) : (
                           filteredShipToCustomers.map((customer) => (
-                            <ComboboxItem key={customer.customerId} value={customer.customerName}>
-                              <span className="whitespace-nowrap">{customer.customerName}</span>
+                            <ComboboxItem
+                              key={customer.customerId}
+                              value={customer.customerName}
+                            >
+                              <span className="whitespace-nowrap">
+                                {customer.customerName}
+                              </span>
                             </ComboboxItem>
                           ))
                         )}
@@ -814,7 +999,11 @@ export function AllocationScreen() {
                 <div className="md:col-span-3">
                   <Label className={labelClass}>Bill To Location *</Label>
                   <Combobox
-                    value={billToLocation ? `${billToLocation.location}-${billToLocation.address1}` : ""}
+                    value={
+                      billToLocation
+                        ? `${billToLocation.location}-${billToLocation.address1}`
+                        : ""
+                    }
                     onValueChange={(value) => {
                       const address = (billToAddressesHook.data ?? []).find(
                         (a) => `${a.location}-${a.address1}` === value
@@ -826,14 +1015,20 @@ export function AllocationScreen() {
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select location..."
-                      onChange={(e) => setBillToLocationSearch(e.currentTarget.value)}
+                      onChange={(e) =>
+                        setBillToLocationSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {billToAddressesHook.loading ? (
-                          <ComboboxItem value="" disabled>Loading...</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            Loading...
+                          </ComboboxItem>
                         ) : filteredBillToAddresses.length === 0 ? (
-                          <ComboboxItem value="" disabled>No locations found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No locations found
+                          </ComboboxItem>
                         ) : (
                           filteredBillToAddresses.map((address) => (
                             <ComboboxItem
@@ -842,7 +1037,9 @@ export function AllocationScreen() {
                             >
                               <div className="flex flex-col text-left">
                                 <span>{address.location}</span>
-                                <span className="text-[11px] text-muted-foreground">{address.address1}</span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {address.address1}
+                                </span>
                               </div>
                             </ComboboxItem>
                           ))
@@ -856,7 +1053,11 @@ export function AllocationScreen() {
                 <div className="md:col-span-3">
                   <Label className={labelClass}>Ship To Location *</Label>
                   <Combobox
-                    value={shipToLocation ? `${shipToLocation.location}-${shipToLocation.address1}` : ""}
+                    value={
+                      shipToLocation
+                        ? `${shipToLocation.location}-${shipToLocation.address1}`
+                        : ""
+                    }
                     onValueChange={(value) => {
                       const address = (shipToAddressesHook.data ?? []).find(
                         (a) => `${a.location}-${a.address1}` === value
@@ -868,14 +1069,20 @@ export function AllocationScreen() {
                     <ComboboxInput
                       className={fieldClass}
                       placeholder="Select location..."
-                      onChange={(e) => setShipToLocationSearch(e.currentTarget.value)}
+                      onChange={(e) =>
+                        setShipToLocationSearch(e.currentTarget.value)
+                      }
                     />
                     <ComboboxContent>
                       <ComboboxList>
                         {shipToAddressesHook.loading ? (
-                          <ComboboxItem value="" disabled>Loading...</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            Loading...
+                          </ComboboxItem>
                         ) : filteredShipToAddresses.length === 0 ? (
-                          <ComboboxItem value="" disabled>No locations found</ComboboxItem>
+                          <ComboboxItem value="" disabled>
+                            No locations found
+                          </ComboboxItem>
                         ) : (
                           filteredShipToAddresses.map((address) => (
                             <ComboboxItem
@@ -884,7 +1091,9 @@ export function AllocationScreen() {
                             >
                               <div className="flex flex-col text-left">
                                 <span>{address.location}</span>
-                                <span className="text-[11px] text-muted-foreground">{address.address1}</span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {address.address1}
+                                </span>
                               </div>
                             </ComboboxItem>
                           ))
@@ -897,15 +1106,19 @@ export function AllocationScreen() {
                 {/* Address Displays */}
                 <div className="md:col-span-3">
                   <Label className={labelClass}>Bill To Address</Label>
-                  <div className="min-h-[72px] rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words">
-                    {billToLocation ? formatAddress(billToLocation) : "Select a Bill To location"}
+                  <div className="min-h-[72px] rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
+                    {billToLocation
+                      ? formatAddress(billToLocation)
+                      : "Select a Bill To location"}
                   </div>
                 </div>
 
                 <div className="md:col-span-3">
                   <Label className={labelClass}>Ship To Address</Label>
-                  <div className="min-h-[72px] rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed text-muted-foreground whitespace-pre-wrap break-words">
-                    {shipToLocation ? formatAddress(shipToLocation) : "Select a Ship To location"}
+                  <div className="min-h-[72px] rounded-lg border border-border bg-background px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap text-muted-foreground">
+                    {shipToLocation
+                      ? formatAddress(shipToLocation)
+                      : "Select a Ship To location"}
                   </div>
                 </div>
 
@@ -943,17 +1156,18 @@ export function AllocationScreen() {
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
               Item Lines
             </h3>
             <p className="mt-1 text-[11px] text-muted-foreground/80">
-              Metrics and week are UI-only. Saved: organization, item, quantity, target date.
+              Metrics and week are UI-only. Saved: organization, item, quantity,
+              target date.
             </p>
           </div>
           <button
             type="button"
             onClick={addLine}
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 cursor-pointer"
+            className="flex cursor-pointer items-center gap-1 text-xs font-medium text-primary hover:text-primary/80"
           >
             <Plus size={14} /> Add Row
           </button>
@@ -962,20 +1176,20 @@ export function AllocationScreen() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-xs">
             <thead>
-              <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="p-2 w-8">#</th>
-                <th className="p-2 w-28">ORG *</th>
+              <tr className="border-b border-border text-[10px] tracking-wider text-muted-foreground uppercase">
+                <th className="w-8 p-2">#</th>
+                <th className="w-28 p-2">ORG *</th>
                 <th className="p-2">Item Code *</th>
-                <th className="p-2 min-w-36">Description</th>
-                <th className="p-2 w-32">Week *</th>
+                <th className="min-w-36 p-2">Description</th>
+                <th className="w-32 p-2">Week *</th>
                 <th className="p-2">OA Pend</th>
                 <th className="p-2">OA Rsv</th>
                 <th className="p-2">OA Picked</th>
                 <th className="p-2">BIN Qty</th>
                 <th className="p-2">BIN Rsv</th>
-                <th className="p-2 w-20">Qty *</th>
+                <th className="w-20 p-2">Qty *</th>
                 <th className="p-2">Target Date *</th>
-                <th className="p-2 w-10"></th>
+                <th className="w-10 p-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -984,7 +1198,9 @@ export function AllocationScreen() {
                   key={line.id}
                   className={`border-b border-border/60 ${line.isRunnerItem ? "bg-destructive/10" : ""}`}
                 >
-                  <td className="p-2 text-center font-mono text-muted-foreground">{idx + 1}</td>
+                  <td className="p-2 text-center font-mono text-muted-foreground">
+                    {idx + 1}
+                  </td>
 
                   {/* Org */}
                   <td className="p-2">
@@ -996,10 +1212,13 @@ export function AllocationScreen() {
                       }}
                     >
                       <ComboboxInput
-                        className="h-8 bg-background border-border text-xs w-full"
+                        className="h-8 w-full border-border bg-background text-xs"
                         placeholder="Org..."
                         onChange={(e) =>
-                          setOrgSearchByLine((prev) => ({ ...prev, [line.id]: e.currentTarget.value }))
+                          setOrgSearchByLine((prev) => ({
+                            ...prev,
+                            [line.id]: e.currentTarget.value,
+                          }))
                         }
                       />
                       <ComboboxContent>
@@ -1008,19 +1227,32 @@ export function AllocationScreen() {
                             .filter((org) =>
                               org.organizationCode
                                 .toLowerCase()
-                                .includes((orgSearchByLine[line.id] ?? "").trim().toLowerCase())
+                                .includes(
+                                  (orgSearchByLine[line.id] ?? "")
+                                    .trim()
+                                    .toLowerCase()
+                                )
                             )
                             .map((org) => (
-                              <ComboboxItem key={org.organizationId} value={org.organizationCode}>
+                              <ComboboxItem
+                                key={org.organizationId}
+                                value={org.organizationCode}
+                              >
                                 {org.organizationCode}
                               </ComboboxItem>
                             ))}
                           {(organizationsHook.data ?? []).filter((org) =>
                             org.organizationCode
                               .toLowerCase()
-                              .includes((orgSearchByLine[line.id] ?? "").trim().toLowerCase())
+                              .includes(
+                                (orgSearchByLine[line.id] ?? "")
+                                  .trim()
+                                  .toLowerCase()
+                              )
                           ).length === 0 && (
-                              <ComboboxItem value="" disabled>No organizations found</ComboboxItem>
+                              <ComboboxItem value="" disabled>
+                                No organizations found
+                              </ComboboxItem>
                             )}
                         </ComboboxList>
                       </ComboboxContent>
@@ -1038,13 +1270,20 @@ export function AllocationScreen() {
                         }
                         setLineItemCode(line.id, value)
                         if (line.organizationId) {
-                          const selectedItem = (itemsHook.data?.data ?? []).find((i) => i.itemCode === value)
-                          resolveItemForLine(line.id, line.organizationId, value, selectedItem)
+                          const selectedItem = (
+                            itemsHook.data?.data ?? []
+                          ).find((i) => i.itemCode === value)
+                          resolveItemForLine(
+                            line.id,
+                            line.organizationId,
+                            value,
+                            selectedItem
+                          )
                         }
                       }}
                     >
                       <ComboboxInput
-                        className="h-8 bg-background border-border font-mono text-xs uppercase w-40"
+                        className="h-8 w-40 border-border bg-background font-mono text-xs uppercase"
                         placeholder="Item code"
                         onChange={(e) => {
                           const value = e.currentTarget.value.toUpperCase()
@@ -1054,21 +1293,31 @@ export function AllocationScreen() {
                         disabled={
                           !line.organizationId ||
                           line.loadingItem ||
-                          ((itemSearchByLine[line.id] ?? "").length > 3 && itemsHook.loading)
+                          ((itemSearchByLine[line.id] ?? "").length > 3 &&
+                            itemsHook.loading)
                         }
                       />
                       <ComboboxContent>
                         <ComboboxList>
                           {itemsHook.loading ? (
-                            <ComboboxItem value="" disabled>Loading...</ComboboxItem>
+                            <ComboboxItem value="" disabled>
+                              Loading...
+                            </ComboboxItem>
                           ) : (itemsHook.data?.data ?? []).length === 0 ? (
                             <ComboboxEmpty>No items found</ComboboxEmpty>
                           ) : (
                             (itemsHook.data?.data ?? []).map((item) => (
-                              <ComboboxItem key={item.inventoryItemId} value={item.itemCode}>
+                              <ComboboxItem
+                                key={item.inventoryItemId}
+                                value={item.itemCode}
+                              >
                                 <div className="flex flex-col text-left">
-                                  <span className="font-medium">{item.itemCode.trim()}</span>
-                                  <span className="text-[11px] text-muted-foreground">{item.description}</span>
+                                  <span className="font-medium">
+                                    {item.itemCode.trim()}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {item.description}
+                                  </span>
                                 </div>
                               </ComboboxItem>
                             ))
@@ -1082,7 +1331,7 @@ export function AllocationScreen() {
                   </td>
 
                   {/* Description */}
-                  <td className="p-2 text-muted-foreground max-w-[16rem] break-words whitespace-normal">
+                  <td className="max-w-[16rem] p-2 break-words whitespace-normal text-muted-foreground">
                     {line.description || "—"}
                   </td>
 
@@ -1096,17 +1345,21 @@ export function AllocationScreen() {
                       }}
                     >
                       <ComboboxInput
-                        className="h-8 bg-background border-border text-xs w-full"
+                        className="h-8 w-full border-border bg-background text-xs"
                         placeholder="Week"
                         onChange={(e) => setWeekSearch(e.currentTarget.value)}
                       />
                       <ComboboxContent>
                         <ComboboxList>
                           {filteredWeeks.length === 0 ? (
-                            <ComboboxItem value="" disabled>No weeks found</ComboboxItem>
+                            <ComboboxItem value="" disabled>
+                              No weeks found
+                            </ComboboxItem>
                           ) : (
                             filteredWeeks.map((week) => (
-                              <ComboboxItem key={week} value={week}>{week}</ComboboxItem>
+                              <ComboboxItem key={week} value={week}>
+                                {week}
+                              </ComboboxItem>
                             ))
                           )}
                         </ComboboxList>
@@ -1115,11 +1368,21 @@ export function AllocationScreen() {
                   </td>
 
                   {/* Metrics */}
-                  <td className="p-2"><MetricsCell value={line.metrics?.oaPendingQuantity} /></td>
-                  <td className="p-2"><MetricsCell value={line.metrics?.oaRsvQty} /></td>
-                  <td className="p-2"><MetricsCell value={line.metrics?.oaPickedQty} /></td>
-                  <td className="p-2"><MetricsCell value={line.metrics?.binQty} /></td>
-                  <td className="p-2"><MetricsCell value={line.metrics?.binRsvQty} /></td>
+                  <td className="p-2">
+                    <MetricsCell value={line.metrics?.oaPendingQuantity} />
+                  </td>
+                  <td className="p-2">
+                    <MetricsCell value={line.metrics?.oaRsvQty} />
+                  </td>
+                  <td className="p-2">
+                    <MetricsCell value={line.metrics?.oaPickedQty} />
+                  </td>
+                  <td className="p-2">
+                    <MetricsCell value={line.metrics?.binQty} />
+                  </td>
+                  <td className="p-2">
+                    <MetricsCell value={line.metrics?.binRsvQty} />
+                  </td>
 
                   {/* Qty */}
                   <td className="p-2">
@@ -1129,11 +1392,12 @@ export function AllocationScreen() {
                       value={line.quantity}
                       onChange={(e) =>
                         updateLine(line.id, {
-                          quantity: e.target.value === "" ? "" : Number(e.target.value),
+                          quantity:
+                            e.target.value === "" ? "" : Number(e.target.value),
                         })
                       }
                       disabled={line.isRunnerItem}
-                      className="h-8 bg-background border-border font-mono text-xs"
+                      className="h-8 border-border bg-background font-mono text-xs"
                       placeholder="Qty"
                     />
                   </td>
@@ -1143,9 +1407,11 @@ export function AllocationScreen() {
                     <Input
                       type="date"
                       value={line.targetDate}
-                      onChange={(e) => updateLine(line.id, { targetDate: e.target.value })}
+                      onChange={(e) =>
+                        updateLine(line.id, { targetDate: e.target.value })
+                      }
                       disabled={line.isRunnerItem}
-                      className="h-8 bg-background border-border text-xs"
+                      className="h-8 border-border bg-background text-xs"
                     />
                   </td>
 
@@ -1154,7 +1420,7 @@ export function AllocationScreen() {
                     <button
                       type="button"
                       onClick={() => removeLine(line.id)}
-                      className="p-1.5 text-muted-foreground/60 transition-colors hover:text-destructive cursor-pointer"
+                      className="cursor-pointer p-1.5 text-muted-foreground/60 transition-colors hover:text-destructive"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1171,7 +1437,10 @@ export function AllocationScreen() {
             {lines
               .filter((l) => l.itemError)
               .map((l) => (
-                <p key={l.id} className="flex items-center gap-1.5 text-[11px] text-destructive">
+                <p
+                  key={l.id}
+                  className="flex items-center gap-1.5 text-[11px] text-destructive"
+                >
                   <AlertTriangle size={12} />
                   Row {lines.indexOf(l) + 1}: {l.itemError}
                 </p>
@@ -1181,13 +1450,14 @@ export function AllocationScreen() {
 
         {/* Validation Messages */}
         {!headerComplete && allocationBasis === "customer" && (
-          <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+          <p className="mt-3 text-[11px] font-medium text-amber-600 dark:text-amber-400">
             Complete all required customer header fields before submitting.
           </p>
         )}
         {headerComplete && validLines.length === 0 && (
-          <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-            Add at least one valid item line (non-runner, with org, item, week, qty, and target date).
+          <p className="mt-3 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+            Add at least one valid item line (non-runner, with org, item, week,
+            qty, and target date).
           </p>
         )}
       </div>

@@ -1,120 +1,227 @@
-import React, { useState } from 'react';
-import type { GroupedAllocationHeader } from '@/components/fulfillment/hooks/useFullfilement';
+import React, { useState } from "react"
+import type { GroupedAllocationHeader } from "@/components/fulfillment/hooks/useFullfilement"
 
 interface TableProps {
-    headers: GroupedAllocationHeader[];
-    onEditClick: (headerId: number) => void;
+    headers: GroupedAllocationHeader[]
+    onEditClick: (headerId: number) => void
 }
 
-export const FulfillmentTrackerTable: React.FC<TableProps> = ({ headers, onEditClick }) => {
-    const [openHeaderId, setOpenHeaderId] = useState<number | null>(null);
+export const FulfillmentTrackerTable: React.FC<TableProps> = ({
+    headers,
+    onEditClick,
+}) => {
+    const [openHeaderId, setOpenHeaderId] = useState<number | null>(null)
 
     const toggleRow = (id: number) => {
-        setOpenHeaderId(openHeaderId === id ? null : id);
-    };
-
-    // Check if any header in the dataset contains unapproved items to toggle the parent grid layout column
-    const hasUnapprovedItemsInDataset = headers.some(h => 
-        h.lines.some(line => line.approvalFlag === 'N')
-    );
+        setOpenHeaderId(openHeaderId === id ? null : id)
+    }
 
     return (
-        <div className="w-full">
-            {/* Header Labels Layout Panel */}
-            <div className={`grid ${hasUnapprovedItemsInDataset ? 'grid-cols-13' : 'grid-cols-12'} bg-slate-50 px-4 py-2.5 border-b border-slate-200 font-bold text-slate-400 text-[10px] uppercase tracking-wider`}>
-                <div className="col-span-2">Allocation Matrix ID</div>
-                <div className="col-span-3">Bill-To Target Client</div>
-                <div className="col-span-2">Ship-To Node Location</div>
-                <div className="col-span-1 text-right">Gross Demands</div>
-                <div className="col-span-1 text-right">Allocated Qty</div>
+        <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            {/* Table Header Layout */}
+            <div className="grid grid-cols-12 border-b border-slate-200 bg-slate-50/70 px-6 py-3.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <div className="col-span-2">Allocation ID</div>
+                <div className="col-span-3">Bill-To Customer</div>
+                <div className="col-span-1">Region</div>
                 <div className="col-span-2 text-center">Fill Rate Metric</div>
+                <div className="col-span-1 text-right">Requested</div>
+                <div className="col-span-1 text-right">Approved</div>
                 <div className="col-span-1 text-center">Status</div>
-                {hasUnapprovedItemsInDataset && <div className="col-span-1 text-center">Actions</div>}
+                <div className="col-span-1 text-right">Actions</div>
             </div>
 
-            {/* Structured Rows mapping data keys elements */}
+            {/* Structured Rows mapping data elements */}
             <div className="divide-y divide-slate-100">
                 {headers.map((h) => {
                     const isExpanded = openHeaderId === h.headerId;
                     const fillRate = h.totalRequested > 0 ? Math.round((h.totalApproved / h.totalRequested) * 100) : 0;
-                    
-                    // Header contains items waiting for approval auth signatures
-                    const hasUnapprovedLines = h.lines.some(line => line.approvalFlag === 'N');
+
+                    const samplingLine = h.lines[0];
+                    const customerDisplay = samplingLine?.customerName || `Open Pool`;
+                    const locationDisplay = samplingLine?.customerRegion || `--`;
+                    const hasUnapprovedLines = h.lines.some((line) => line.approvalFlag === "N");
+
+                    // Color calculation helper for the fill rate indicators
+                    const fillRateColor = fillRate >= 90 ? 'bg-emerald-500' : fillRate >= 50 ? 'bg-amber-500' : 'bg-rose-500';
 
                     return (
-                        <div key={h.headerId} className="w-full">
+                        <div key={h.headerId} className="w-full bg-white">
+                            {/* Row Trigger Frame */}
                             <div
                                 onClick={() => toggleRow(h.headerId)}
-                                className={`grid ${hasUnapprovedItemsInDataset ? 'grid-cols-13' : 'grid-cols-12'} px-4 py-3 items-center hover:bg-slate-50/60 transition-colors cursor-pointer text-slate-700 font-medium`}
+                                className={`grid cursor-pointer grid-cols-12 items-center px-6 py-4 transition-all hover:bg-slate-50/50 ${isExpanded ? 'bg-blue-50/30' : ''
+                                    }`}
                             >
-                                <div className="col-span-2 text-blue-600 font-bold flex items-center gap-2">
-                                    <span>{isExpanded ? '▼' : '▶'}</span>
-                                    <span>Header #{h.headerId}</span>
+                                {/* Allocation ID */}
+                                <div className="col-span-2 flex items-center gap-3">
+                                    <span className={`text-[10px] text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
+                                        ▶
+                                    </span>
+                                    <span className="font-mono text-sm font-bold text-slate-900">
+                                        #{h.headerId}
+                                    </span>
                                 </div>
-                                <div className="col-span-3 font-mono text-slate-600">Customer ID: {h.billToCustomer}</div>
-                                <div className="col-span-2 font-mono text-slate-400">Node: {h.shipToCustomer}</div>
-                                <div className="col-span-1 text-right font-bold">{h.totalRequested}</div>
-                                <div className="col-span-1 text-right font-bold text-green-600">{h.totalApproved}</div>
-                                <div className="col-span-2 px-6">
-                                    <div className="flex justify-between items-center text-[9px] text-slate-400 font-mono mb-0.5">
-                                        <span>{fillRate}%</span>
+
+                                {/* Customer Info */}
+                                <div className="col-span-3 pr-4" title={customerDisplay}>
+                                    <div className="truncate text-sm font-semibold text-slate-800">{customerDisplay}</div>
+                                    <div className="text-xs text-slate-400 font-normal">Created: {h.createdOn ? new Date(h.createdOn).toLocaleDateString() : "—"}</div>
+                                </div>
+
+                                {/* Region */}
+                                <div className="col-span-1 text-sm font-medium text-slate-600">
+                                    {locationDisplay}
+                                </div>
+
+                                {/* Fill Rate Display */}
+                                <div className="col-span-2 px-4">
+                                    <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-slate-700">
+                                        <span>{fillRate}% Filled</span>
                                     </div>
-                                    <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, fillRate)}%` }}></div>
+                                    <div className="h-1.5 w-full rounded-full bg-slate-100">
+                                        <div
+                                            className={`h-full rounded-full transition-all duration-300 ${fillRateColor}`}
+                                            style={{ width: `${Math.min(100, fillRate)}%` }}
+                                        />
                                     </div>
                                 </div>
+
+                                {/* Requested Qty */}
+                                <div className="col-span-1 text-right text-sm font-semibold text-slate-900">
+                                    {h.totalRequested.toLocaleString()}
+                                </div>
+
+                                {/* Approved Qty */}
+                                <div className="col-span-1 text-right text-sm font-bold text-emerald-600">
+                                    {h.totalApproved.toLocaleString()}
+                                </div>
+
+                                {/* Main Status Tag */}
                                 <div className="col-span-1 text-center">
-                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${h.status === 'Fulfilled' ? 'bg-green-50 border-green-200 text-green-700' :
-                                        h.status === 'Partial' ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-orange-50 border-orange-200 text-orange-600'
-                                        }`}>{h.status}</span>
+                                    <span
+                                        className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide ${h.status === "Fulfilled"
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : h.status === "Partial"
+                                                ? "bg-amber-50 text-amber-700"
+                                                : "bg-rose-50 text-rose-700"
+                                            }`}
+                                    >
+                                        {h.status}
+                                    </span>
                                 </div>
-                                
-                                {/* Structural Alignment Spaceholder matching your Grid layout settings */}
-                                {hasUnapprovedItemsInDataset && (
-                                    <div className="col-span-1 text-center">
-                                        {hasUnapprovedLines ? (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); onEditClick(h.headerId); }}
-                                                className="px-2 py-0.5 border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-[10px] font-bold shadow-xs transition-colors"
-                                            >
-                                                Edit
-                                            </button>
-                                        ) : (
-                                            <span className="text-[10px] text-slate-300 font-semibold italic">Approved</span>
-                                        )}
-                                    </div>
-                                )}
+
+                                {/* Action CTA Block */}
+                                <div className="col-span-1 text-right">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onEditClick(h.headerId);
+                                        }}
+                                        className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs transition-colors hover:bg-blue-700 active:bg-blue-800"
+                                    >
+                                        Review
+                                    </button>
+                                    {!hasUnapprovedLines && (
+                                        <span className="text-xs font-medium text-slate-400 inline-flex items-center gap-1">
+                                            <span className="text-emerald-500">✓</span> Approved
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Collapsible details layout view */}
+                            {/* Collapsible Child Line Item Cards View */}
                             {isExpanded && (
-                                <div className="bg-slate-50/50 border-t border-b border-slate-200/60 px-6 py-2">
-                                    <div className="grid grid-cols-12 text-[9px] font-bold uppercase text-slate-400 py-1 border-b border-slate-200">
-                                        <div className="col-span-2">Line Unique Identity</div>
-                                        <div className="col-span-2">Inventory Item Identifier</div>
-                                        <div className="col-span-2">Plant Node ID</div>
-                                        <div className="col-span-2">Target Date</div>
-                                        <div className="col-span-1 text-right">Requested</div>
-                                        <div className="col-span-2 text-right">Approved</div>
-                                        <div className="col-span-1 text-center">Line Status</div>
-                                    </div>
-                                    <div className="divide-y divide-slate-100">
-                                        {h.lines.map((line) => (
-                                            <div key={line.lineId} className="grid grid-cols-12 py-2 items-center text-[11px] font-medium text-slate-600">
-                                                <div className="col-span-2 font-mono text-purple-600 font-semibold">Line Row #{line.lineId}</div>
-                                                <div className="col-span-2 font-mono text-slate-500">Item: {line.inventoryItemId}</div>
-                                                <div className="col-span-2 text-slate-400 font-mono">Org Unit: {line.organizationId}</div>
-                                                <div className="col-span-2 font-mono text-slate-400">{new Date(line.targetDate).toLocaleDateString()}</div>
-                                                <div className="col-span-1 text-right font-bold">{line.b3Quantity}</div>
-                                                <div className="col-span-2 text-right font-bold text-green-600">{line.b3ApprovedQuantity ?? '0'}</div>
-                                                <div className="col-span-1 text-center">
-                                                    <span className={`text-[10px] font-bold ${line.approvalFlag === 'Y' ? 'text-green-600' : 'text-amber-600'}`}>
-                                                        {line.approvalFlag === 'Y' ? 'Authorized' : 'Pending'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                <div className="border-t border-b border-slate-200/60 bg-slate-50/40 px-8 py-4">
+                                    <div className="rounded-lg border border-slate-200 bg-white shadow-xs">
+                                        {/* Nested Subheader Row */}
+                                        <div className="grid grid-cols-12 border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                            <div className="col-span-2">Line ID</div>
+                                            <div className="col-span-4">Item Details</div>
+                                            <div className="col-span-1 text-center">Plant</div>
+                                            <div className="col-span-2 text-center">Target Date</div>
+                                            <div className="col-span-1 text-right">Requested</div>
+                                            <div className="col-span-1 text-right">Approved</div>
+                                            <div className="col-span-1 text-right">Line Status</div>
+                                        </div>
+
+                                        {/* Nested Sub-rows mappings */}
+                                        <div className="divide-y divide-slate-100">
+                                            {h.lines.map((line) => {
+                                                const isCancelledLine = line.closureFlag === "Y";
+                                                return (
+                                                    <div
+                                                        key={line.lineId}
+                                                        className={`grid grid-cols-12 items-center px-4 py-3 text-xs font-medium ${isCancelledLine ? "bg-rose-50/50 text-rose-900" : "text-slate-600 hover:bg-slate-50/30"}`}
+                                                    >
+                                                        <div className="col-span-2 font-mono font-bold text-indigo-600">
+                                                            Line #{line.lineId}
+                                                        </div>
+                                                        <div className="col-span-4 pr-4">
+                                                            <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-800">
+                                                                {line.itemCode?.trim()}
+                                                            </span>
+                                                            <span
+                                                                className="mt-0.5 block truncate text-[11px] text-slate-400 font-normal"
+                                                                title={line.itemDescription ?? undefined}
+                                                            >
+                                                                {line.itemDescription}
+                                                            </span>
+                                                        </div>
+                                                        <div className="col-span-1 text-center font-mono text-slate-500">
+                                                            {line.organizationCode || `ID: ${line.organizationId}`}
+                                                        </div>
+                                                        <div className="col-span-2 text-center text-slate-500 font-normal">
+                                                            {line.targetDate ? new Date(line.targetDate).toLocaleDateString() : "—"}
+                                                        </div>
+                                                        <div className="col-span-1 text-right font-semibold whitespace-nowrap">
+                                                            {line.oldRequestedQty !== null && line.oldRequestedQty !== undefined && line.oldRequestedQty !== line.b3Quantity ? (
+                                                                <div className="flex items-center justify-end gap-1.5">
+                                                                    {/* Old Quantity - Red Strikethrough */}
+                                                                    <span className="text-xs text-red-500 line-through">
+                                                                        {line.oldRequestedQty.toLocaleString()}
+                                                                    </span>
+                                                                    {/* Decorative separator arrow */}
+                                                                    <span className="text-[10px] text-slate-400 font-normal">→</span>
+                                                                    {/* New Quantity - Solid Emerald Green */}
+                                                                    <span className="text-emerald-600 dark:text-emerald-400">
+                                                                        {line.b3Quantity?.toLocaleString() || 0}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                /* Standard display fallback if there is no previous revision history amount */
+                                                                <span className="text-slate-900 dark:text-slate-100">
+                                                                    {line.b3Quantity?.toLocaleString() || 0}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className={`col-span-1 text-right font-bold ${isCancelledLine ? "text-rose-700" : "text-emerald-600"}`}>
+                                                            {line.b3ApprovedQuantity !== null && line.b3ApprovedQuantity !== undefined
+                                                                ? line.b3ApprovedQuantity.toLocaleString()
+                                                                : "0"}
+                                                        </div>
+                                                        <div className="col-span-1 text-right">
+                                                            <span
+                                                                className={`inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase ${line.closureFlag === "Y"
+                                                                    ? "bg-rose-50 text-rose-700"
+                                                                    : line.approvalFlag === "Y"
+                                                                        ? "bg-emerald-50 text-emerald-700"
+                                                                        : "bg-amber-50 text-amber-700"
+                                                                    }`}
+                                                            >
+                                                                {line.closureFlag === "Y"
+                                                                    ? "Canceled"
+                                                                    : line.approvalFlag === "Y"
+                                                                        ? "Approved"
+                                                                        : "Amended"
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -123,7 +230,5 @@ export const FulfillmentTrackerTable: React.FC<TableProps> = ({ headers, onEditC
                 })}
             </div>
         </div>
-    );
-};
-
-export default FulfillmentTrackerTable;
+    )
+}

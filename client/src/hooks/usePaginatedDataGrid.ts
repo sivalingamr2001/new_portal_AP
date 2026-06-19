@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { PagedResult } from "@/api/types/pagedResult"
 
 export interface Result<T> {
@@ -44,16 +39,12 @@ export function usePaginatedDataGrid<T extends object>(
 
   const loadData = useCallback(
     async (page?: number) => {
-      if (loadingRef.current)
-        return
+      if (loadingRef.current) return
 
       const targetPage = page ?? currentPageRef.current
       setLoading(true)
       try {
-        const result = await apiFn(
-          targetPage,
-          pageSize
-        )
+        const result = await apiFn(targetPage, pageSize)
 
         if (result.isSuccess && result.value) {
           const pagedResult = result.value
@@ -77,10 +68,7 @@ export function usePaginatedDataGrid<T extends object>(
 
   const loadMore = useCallback(
     async (page: number) => {
-      if (
-        loadingRef.current ||
-        page <= currentPageRef.current
-      ) {
+      if (loadingRef.current || page <= currentPageRef.current) {
         return
       }
 

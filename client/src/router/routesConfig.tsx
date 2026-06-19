@@ -10,13 +10,19 @@ import * as Pages from "./pages"
 import { withSuspense } from "./withSuspense"
 
 const HomeRedirect = () => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, currentUserRole } = useAuth()
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
-  return <Navigate to="/allocation" replace />
+  if (currentUserRole === "user") {
+    return <Navigate to="/fulfillment" replace />
+  }
+
+  if (currentUserRole === "hod") {
+    return <Navigate to="/approval" replace />
+  }
 }
 
 export const routesConfig: RouteObject[] = [

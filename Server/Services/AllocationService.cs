@@ -67,11 +67,13 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
         page = Math.Max(page, 1);
         pageSize = Math.Max(pageSize, 1);
 
+        var trimmedSearch = search?.Trim();
+
         var parameters = new
         {
             Offset = (page - 1) * pageSize,
             PageSize = pageSize,
-            Search = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%"
+            Search = string.IsNullOrEmpty(trimmedSearch) ? null : $"%{trimmedSearch}%"
         };
 
         var (data, totalCount) = await _queryExecutor.QueryPagedAsync<InventoryItemDto>(
@@ -80,7 +82,28 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             parameters,
             cancellationToken: cancellationToken);
 
-        return new PagedResult<InventoryItemDto>(data.ToList(), totalCount, page, pageSize);
+        // Materialize the list to modify its items
+        var itemList = data.ToList();
+
+        // Reflection cache for performance
+        var stringProperties = typeof(InventoryItemDto)
+            .GetProperties()
+            .Where(p => p.PropertyType == typeof(string) && p.CanWrite);
+
+        // Trim all string properties on every returned item
+        foreach (var item in itemList)
+        {
+            foreach (var prop in stringProperties)
+            {
+                var value = (string?)prop.GetValue(item);
+                if (value != null)
+                {
+                    prop.SetValue(item, value.Trim());
+                }
+            }
+        }
+
+        return new PagedResult<InventoryItemDto>(itemList, totalCount, page, pageSize);
     }
 
     public Task<string?> GetSalesRrsCategoryAsync(int organizationId, int inventoryItemId, CancellationToken cancellationToken = default)

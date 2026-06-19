@@ -36,20 +36,23 @@ export function AllocationForm({ hook }: Props) {
   } = hook
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl flex flex-col gap-6">
+    <div className="flex flex-col gap-6 rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
       {/* ── Form header ─────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-slate-100">New BIN Allocation</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Forecast stock commitment — allocate to a specific customer or open pool.
+          <h2 className="text-sm font-bold text-slate-100">
+            New BIN Allocation
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Forecast stock commitment — allocate to a specific customer or open
+            pool.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex shrink-0 gap-2">
           <button
             type="button"
             onClick={resetForm}
-            className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition-all"
+            className="rounded-lg border border-slate-800 px-3 py-1.5 text-xs text-slate-400 transition-all hover:bg-slate-800 hover:text-slate-200"
           >
             Reset
           </button>
@@ -57,7 +60,7 @@ export function AllocationForm({ hook }: Props) {
             type="button"
             onClick={handleSubmit}
             disabled={loading.submitting}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 disabled:text-blue-500 text-white text-xs font-semibold px-4 py-1.5 rounded-lg shadow-lg shadow-blue-600/10 transition-all"
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/10 transition-all hover:bg-blue-500 disabled:bg-blue-900 disabled:text-blue-500"
           >
             {loading.submitting ? (
               <Loader2 size={13} className="animate-spin" />
@@ -71,7 +74,10 @@ export function AllocationForm({ hook }: Props) {
       <StatusBanner status={submitStatus} onDismiss={dismissStatus} />
 
       {/* ── Allocation type toggle ───────────────────────────────── */}
-      <AllocationTypeToggle value={form.allocationType} onChange={setAllocationType} />
+      <AllocationTypeToggle
+        value={form.allocationType}
+        onChange={setAllocationType}
+      />
 
       {/* ── Customer fields (only for customer-specific) ─────────── */}
       {form.allocationType === "customer" && (
@@ -96,7 +102,7 @@ export function AllocationForm({ hook }: Props) {
 
       {/* ── Remarks ─────────────────────────────────────────────── */}
       <div>
-        <label className="text-xs font-medium text-slate-400 block mb-1.5">
+        <label className="mb-1.5 block text-xs font-medium text-slate-400">
           Remarks <span className="text-slate-600">(optional)</span>
         </label>
         <textarea
@@ -104,7 +110,7 @@ export function AllocationForm({ hook }: Props) {
           value={form.remarks}
           onChange={(e) => setField("remarks", e.target.value)}
           placeholder="Internal notes about this allocation…"
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+          className="w-full resize-none rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-blue-500 focus:outline-none"
         />
       </div>
 
@@ -113,12 +119,13 @@ export function AllocationForm({ hook }: Props) {
 
       {/* ── Item lines ───────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-xs font-semibold tracking-wider text-slate-300 uppercase">
             Item Lines
           </h3>
           <span className="text-[11px] text-slate-500">
-            {form.lines.filter((l) => l.inventoryItemId).length} of {form.lines.length} filled
+            {form.lines.filter((l) => l.inventoryItemId).length} of{" "}
+            {form.lines.length} filled
           </span>
         </div>
         <LinesTable

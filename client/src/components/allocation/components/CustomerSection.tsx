@@ -17,7 +17,10 @@ interface Props {
   }
   onRegionChange: (r: string) => void
   onSubRegionChange: (sr: string) => void
-  onField: <K extends keyof AllocationFormState>(key: K, val: AllocationFormState[K]) => void
+  onField: <K extends keyof AllocationFormState>(
+    key: K,
+    val: AllocationFormState[K]
+  ) => void
 }
 
 function SelectField({
@@ -41,22 +44,26 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="text-xs font-medium text-slate-400 block mb-1.5">
+      <label className="mb-1.5 block text-xs font-medium text-slate-400">
         {label}
-        {required && <span className="text-red-400 ml-0.5">*</span>}
+        {required && <span className="ml-0.5 text-red-400">*</span>}
       </label>
       <div className="relative">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled || isLoading}
-          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed appearance-none pr-8"
+          className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 pr-8 text-sm text-foreground focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="">{isLoading ? "Loading…" : placeholder}</option>
           {children}
         </select>
         <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center">
-          <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+          <svg
+            className="h-3.5 w-3.5 text-slate-500"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
             <path
               fillRule="evenodd"
               d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
@@ -82,7 +89,7 @@ export function CustomerSection({
 }: Props) {
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SelectField
           label="Region"
           required
@@ -114,12 +121,14 @@ export function CustomerSection({
         </SelectField>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SelectField
           label="Bill-To Customer"
           required
           value={form.billToCustomerId?.toString() ?? ""}
-          onChange={(value) => onField("billToCustomerId", value ? Number(value) : null)}
+          onChange={(value) =>
+            onField("billToCustomerId", value ? Number(value) : null)
+          }
           placeholder="Select bill-to customer…"
           disabled={!form.subRegion}
           loading={loading.billTo}
@@ -134,7 +143,9 @@ export function CustomerSection({
         <SelectField
           label="Ship-To Customer"
           value={form.shipToCustomerId?.toString() ?? ""}
-          onChange={(value) => onField("shipToCustomerId", value ? Number(value) : null)}
+          onChange={(value) =>
+            onField("shipToCustomerId", value ? Number(value) : null)
+          }
           placeholder="Same as bill-to (optional)"
           disabled={!form.subRegion}
           loading={loading.shipTo}
@@ -148,7 +159,7 @@ export function CustomerSection({
         </SelectField>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <SelectField
           label="Prepared By"
           required
@@ -159,7 +170,10 @@ export function CustomerSection({
           loading={loading.employees}
         >
           {employees.map((employee) => (
-            <option key={employee.employeeNumber} value={employee.employeeNumber}>
+            <option
+              key={employee.employeeNumber}
+              value={employee.employeeNumber}
+            >
               {employee.lastName} ({employee.employeeNumber})
             </option>
           ))}

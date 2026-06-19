@@ -16,15 +16,9 @@ export const useLoader = () => {
     []
   )
 
-  const showLoader = useCallback(
-    () => setIsLoading(true),
-    []
-  )
+  const showLoader = useCallback(() => setIsLoading(true), [])
 
-  const hideLoader = useCallback(
-    () => setIsLoading(false),
-    []
-  )
+  const hideLoader = useCallback(() => setIsLoading(false), [])
 
   return { loading, withLoader, showLoader, hideLoader }
 }

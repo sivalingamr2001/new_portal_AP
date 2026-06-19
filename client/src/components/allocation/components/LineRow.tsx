@@ -34,7 +34,10 @@ export function LineRow({
   // Close dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         onUpdate(line._key, { searchState: "idle" })
       }
     }
@@ -45,25 +48,25 @@ export function LineRow({
   }, [line.searchState, line._key, onUpdate])
 
   return (
-    <div className="grid grid-cols-12 gap-2 items-start bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/50 group">
+    <div className="group grid grid-cols-12 items-start gap-2 rounded-lg border border-slate-800/50 bg-slate-950/50 p-2.5">
       {/* Row index */}
       <div className="col-span-1 flex items-center justify-center pt-2">
-        <span className="text-xs text-slate-500 font-mono w-5 text-center select-none">
+        <span className="w-5 text-center font-mono text-xs text-slate-500 select-none">
           {index + 1}
         </span>
       </div>
 
       {/* Item Code — inline search */}
-      <div className="col-span-4 relative" ref={dropdownRef}>
+      <div className="relative col-span-4" ref={dropdownRef}>
         <div className="relative">
           <Search
             size={12}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none"
+            className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-slate-600"
           />
           {searching && (
             <Loader2
               size={12}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-400 animate-spin"
+              className="absolute top-1/2 right-2.5 -translate-y-1/2 animate-spin text-blue-400"
             />
           )}
           <input
@@ -83,13 +86,13 @@ export function LineRow({
             onChange={(e) => {
               onSearchQueryChange(line._key, e.target.value)
             }}
-            className="w-full bg-slate-950 border border-slate-800 rounded-md pl-7 pr-6 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500"
+            className="w-full rounded-md border border-slate-800 bg-slate-950 py-1.5 pr-6 pl-7 text-xs text-slate-200 placeholder-slate-600 focus:border-blue-500 focus:outline-none"
           />
         </div>
 
         {/* Search dropdown */}
         {line.searchState === "searching" && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl overflow-hidden">
+          <div className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border border-slate-700 bg-slate-900 shadow-2xl">
             {searching && (
               <div className="p-2 text-center text-xs text-slate-500">
                 Searching…
@@ -106,12 +109,12 @@ export function LineRow({
                   key={item.inventoryItemId}
                   type="button"
                   onClick={() => onSelect(line._key, item)}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-800 transition-colors"
+                  className="w-full px-3 py-2 text-left transition-colors hover:bg-slate-800"
                 >
-                  <div className="text-xs font-mono font-bold text-blue-400">
+                  <div className="font-mono text-xs font-bold text-blue-400">
                     {item.itemCode}
                   </div>
-                  <div className="text-[11px] text-slate-400 truncate">
+                  <div className="truncate text-[11px] text-slate-400">
                     {item.description}
                   </div>
                 </button>
@@ -128,7 +131,7 @@ export function LineRow({
           readOnly
           tabIndex={-1}
           placeholder="— select item first"
-          className="w-full bg-slate-900/30 border border-slate-800/40 rounded-md px-2.5 py-1.5 text-xs text-slate-500 placeholder-slate-700 cursor-not-allowed focus:outline-none"
+          className="w-full cursor-not-allowed rounded-md border border-slate-800/40 bg-slate-900/30 px-2.5 py-1.5 text-xs text-slate-500 placeholder-slate-700 focus:outline-none"
         />
       </div>
 
@@ -141,7 +144,7 @@ export function LineRow({
               organizationId: e.target.value ? Number(e.target.value) : null,
             })
           }
-          className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 appearance-none"
+          className="w-full appearance-none rounded-md border border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
         >
           <option value="">Org…</option>
           {organizations.map((o) => (
@@ -159,10 +162,8 @@ export function LineRow({
           min={1}
           placeholder="Qty"
           value={line.b3Quantity}
-          onChange={(e) =>
-            onUpdate(line._key, { b3Quantity: e.target.value })
-          }
-          className="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-slate-200 font-mono text-right focus:outline-none focus:border-blue-500"
+          onChange={(e) => onUpdate(line._key, { b3Quantity: e.target.value })}
+          className="w-full rounded-md border border-slate-800 bg-slate-950 px-2 py-1.5 text-right font-mono text-xs text-slate-200 focus:border-blue-500 focus:outline-none"
         />
       </div>
 
@@ -171,17 +172,15 @@ export function LineRow({
         <input
           type="date"
           value={line.targetDate}
-          onChange={(e) =>
-            onUpdate(line._key, { targetDate: e.target.value })
-          }
-          className="w-full bg-slate-950 border border-slate-800 rounded-md px-1.5 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-blue-500"
+          onChange={(e) => onUpdate(line._key, { targetDate: e.target.value })}
+          className="w-full rounded-md border border-slate-800 bg-slate-950 px-1.5 py-1.5 text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none"
         />
         <button
           type="button"
           onClick={() => onRemove(line._key)}
           disabled={!canRemove}
           aria-label="Remove line"
-          className="p-1.5 text-slate-700 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+          className="flex-shrink-0 p-1.5 text-slate-700 transition-colors hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-30"
         >
           <Trash2 size={13} />
         </button>

@@ -15,8 +15,14 @@ export interface ItemLine {
   binQty: number
   approvedQty?: number
   targetDate: string
-  status: 'Pending' | 'Approved' | 'Amend Pending' | 'Partial' | 'Fulfilled'
-  oaDetails?: Array<{ oaNumber: string; date: string; qty: number; allocated: number; status: string }>
+  status: "Pending" | "Approved" | "Amend Pending" | "Partial" | "Fulfilled"
+  oaDetails?: Array<{
+    oaNumber: string
+    date: string
+    qty: number
+    allocated: number
+    status: string
+  }>
 }
 
 type Screen = "allocation" | "approval" | "amendment" | "fulfillment"
@@ -56,9 +62,9 @@ export default function AppLayout() {
     reloadAllocations()
   }, [reloadAllocations])
 
-  const pendingCount = items.filter(i => i.status === 'Pending').length
-  const amendCount = items.filter(i => i.status === 'Amend Pending').length
-  const approvedCount = items.filter(i => i.status === 'Approved').length
+  const pendingCount = items.filter((i) => i.status === "Pending").length
+  const amendCount = items.filter((i) => i.status === "Amend Pending").length
+  const approvedCount = items.filter((i) => i.status === "Approved").length
 
   return (
     <SidebarProvider>
@@ -68,7 +74,7 @@ export default function AppLayout() {
           setCurrentScreen={setCurrentScreen}
           pendingCount={pendingCount}
           amendCount={amendCount}
-          role={currentUserRole ?? 'user'}
+          role={currentUserRole ?? "user"}
         />
 
         <SidebarInset className="flex flex-col overflow-hidden">
@@ -81,8 +87,10 @@ export default function AppLayout() {
           />
 
           <main className="flex-1 overflow-y-auto">
-            <div className="p-4 h-full">
-              <Outlet context={{ currentScreen, items, setItems, reloadAllocations }} />
+            <div className="h-full p-4">
+              <Outlet
+                context={{ currentScreen, items, setItems, reloadAllocations }}
+              />
             </div>
           </main>
         </SidebarInset>

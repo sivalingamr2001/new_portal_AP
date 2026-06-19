@@ -131,7 +131,10 @@ export interface B3Cancellation {
 export interface AllocationRow extends B3Header {
   lineId: number
   organizationId: number | null
+  organizationCode?: string | null
   inventoryItemId: number
+  itemCode?: string | null
+  itemDescription?: string | null
   b3Quantity: number
   targetDate: string | null
   b3ApprovedQuantity: number | null
@@ -140,6 +143,10 @@ export interface AllocationRow extends B3Header {
   approvedBy: string | null
   closureFlag: "Y" | "N"
   revision: number
+  parentLineId?: number | null
+  customerName?: string | null
+  billToCustomerName?: string | null
+  shipToCustomerName?: string | null
 }
 
 export interface AllocationSummary {
@@ -188,6 +195,8 @@ export interface AmendQuantityRequest {
   lineId: number
   amendedQuantity: number
   amendedBy: string
+  revision: number
+  reason: string
 }
 
 export interface CancelLineRequest {
@@ -256,7 +265,9 @@ export const getRegions = async (): Promise<Region[]> => {
   const { data } = await axiosClient.get<Region[]>(`${BASE}/regions`)
   return data.sort((a, b) => {
     const regionCompare = a.region.localeCompare(b.region)
-    return regionCompare !== 0 ? regionCompare : a.subRegion.localeCompare(b.subRegion)
+    return regionCompare !== 0
+      ? regionCompare
+      : a.subRegion.localeCompare(b.subRegion)
   })
 }
 
@@ -365,7 +376,9 @@ export const getOrganizations = async (): Promise<Organization[]> => {
   const { data } = await axiosClient.get<Organization[]>(
     `${BASE}/organizations`
   )
-  return data.sort((a, b) => a.organizationCode.localeCompare(b.organizationCode))
+  return data.sort((a, b) =>
+    a.organizationCode.localeCompare(b.organizationCode)
+  )
 }
 
 /**
@@ -429,13 +442,35 @@ export const getAllAllocations = async (): Promise<AllocationRow[]> => {
 /**
  * Get a single allocation by header ID — sorted by lineId asc
  */
+export interface AllocationHeaderDetails {
+  headerId: number
+  customerId: number | null
+  customerName: string | null
+  billToCustomerId: number | null
+  billToCustomerName: string | null
+  shipToCustomerId: number | null
+  shipToCustomerName: string | null
+  territoryId: number | null
+  customerOrItemSpecific: number | null
+  remarks: string | null
+  transactionDate: string
+  createdBy: string
+  createdDate: string
+  updatedBy: string | null
+  updatedDate: string | null
+  totalRequested: number
+  totalApproved: number
+  status: string
+  items: AllocationRow[]
+}
+
 export const getAllocationByHeaderId = async (
   headerId: number
-): Promise<AllocationRow[]> => {
-  const { data } = await axiosClient.get<AllocationRow[]>(
+): Promise<AllocationHeaderDetails> => {
+  const { data } = await axiosClient.get<AllocationHeaderDetails>(
     `${BIN_BASE}/${headerId}`
   )
-  return data.sort((a, b) => a.lineId - b.lineId)
+  return data
 }
 
 /**

@@ -41,45 +41,52 @@ function useRowSearch() {
   return { queries, results, pending, handleQueryChange }
 }
 
-export function LinesTable({ lines, organizations, onAdd, onRemove, onUpdate, onSelect }: Props) {
+export function LinesTable({
+  lines,
+  organizations,
+  onAdd,
+  onRemove,
+  onUpdate,
+  onSelect,
+}: Props) {
   const { results, pending, handleQueryChange } = useRowSearch()
 
   return (
     <div>
       {/* Column headers */}
-      <div className="grid grid-cols-12 gap-2 px-2.5 mb-1.5">
+      <div className="mb-1.5 grid grid-cols-12 gap-2 px-2.5">
         <div className="col-span-1" />
-        <div className="col-span-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="col-span-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Org
         </div>
-        <div className="col-span-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="col-span-4 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Item Code
         </div>
-        <div className="col-span-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="col-span-3 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Description
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Week
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           OA PEND
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           OA RSV
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           OA Picked
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           BIN Qty
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           BIN Rsv
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+        <div className="col-span-1 text-right text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Qty
         </div>
-        <div className="col-span-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <div className="col-span-1 text-[10px] font-bold tracking-wider text-slate-500 uppercase">
           Target Date
         </div>
       </div>
@@ -107,7 +114,7 @@ export function LinesTable({ lines, organizations, onAdd, onRemove, onUpdate, on
       <button
         type="button"
         onClick={onAdd}
-        className="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors px-1"
+        className="mt-3 flex items-center gap-1.5 px-1 text-xs font-medium text-blue-400 transition-colors hover:text-blue-300"
       >
         <Plus size={13} />
         Add Item Line

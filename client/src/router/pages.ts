@@ -29,7 +29,9 @@ export const FulfillmentPage = lazy(() =>
 )
 
 export const EditAllocationPage = lazy(() =>
-  import("@/pages/EditAllocationScreen").then((m) => ({ default: m.EditAllocationScreen }))
+  import("@/pages/EditAllocationScreen").then((m) => ({
+    default: m.EditAllocationScreen,
+  }))
 )
 
 // Fallback Utilities
