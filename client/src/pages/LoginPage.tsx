@@ -11,13 +11,13 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/context/AuthContext"
 import { useLoader } from "@/hooks/useLoader"
-import { useNavigate } from "react-router-dom"
+import { Navigate, useNavigate } from "react-router-dom"
 import Logo from "@/lib/constants"
 import { Loader } from "@/components/Loader"
 import { loginApi } from "@/api/allocationApi"
 
 export const LoginPage = () => {
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const { withLoader, loading } = useLoader()
 
@@ -39,6 +39,10 @@ export const LoginPage = () => {
     } catch (error) {
       console.error("Login failed:", error)
     }
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
   }
 
   if (loading) {

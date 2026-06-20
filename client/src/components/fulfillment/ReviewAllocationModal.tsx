@@ -485,11 +485,11 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-2xl font-bold">Allocation Review</h2>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getHeaderStatusColor()}`}>
+                {/* <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getHeaderStatusColor()}`}>
                   {currentFillRate === 100 ? "Fully Allocated" : currentFillRate > 0 ? "Partially Allocated" : "Pending Allocation"}
-                </span>
+                </span> */}
               </div>
-              <p className="text-slate-300 text-sm">Header ID: <span className="font-mono text-white">#{headerData?.headerId || headerId}</span></p>
+              <p className="text-foreground text-sm">Header ID: <span className="font-mono text-foreground">#{headerData?.headerId || headerId}</span></p>
             </div>
             <button
               onClick={onClose}
@@ -501,21 +501,33 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
 
           {/* Customer Info Cards */}
           <div className="grid grid-cols-3 gap-4 mt-6">
+            {/* Row 1: The 3 Information Cards */}
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Bill To Customer</p>
               <p className="font-semibold text-sm">{headerData?.billToCustomerName || "—"}</p>
               <p className="text-slate-400 text-xs mt-1">ID: {headerData?.billToCustomerId || "—"}</p>
             </div>
+
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Ship To Customer</p>
               <p className="font-semibold text-sm">{headerData?.shipToCustomerName || "—"}</p>
               <p className="text-slate-400 text-xs mt-1">ID: {headerData?.shipToCustomerId || "—"}</p>
             </div>
+
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs uppercase tracking-wider mb-1">Transaction Date</p>
               <p className="font-semibold text-sm">{headerData?.transactionDate ? formatDate(headerData.transactionDate) : "—"}</p>
               <p className="text-slate-400 text-xs mt-1">Created by: {headerData?.createdBy || "—"}</p>
             </div>
+
+            {/* Row 2: Full Width Remarks at the bottom */}
+            {headerData?.remarks && (
+              <div className="col-span-3 mt-2">
+                <div className="text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200w-full">
+                  <span className="font-semibold">Remarks:</span> {headerData.remarks}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -554,34 +566,6 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
               <p className="text-xs text-slate-500 uppercase tracking-wider">Cancelled</p>
               <p className="text-2xl font-bold text-gray-600">{cancelledCount}</p>
             </div>
-          </div>
-        </div>
-
-        {/* ===== TABS & REMARKS ===== */}
-        <div className="px-6 pt-4 pb-2 border-b border-slate-200">
-          <div className="flex justify-between items-center">
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
-              {(["all", "pending", "approved", "cancelled"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                    }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  <span className="ml-2 text-xs bg-slate-200 px-2 py-0.5 rounded-full">
-                    {tab === "all" ? items.length : tab === "pending" ? pendingCount : tab === "approved" ? approvedCount + partiallyApprovedCount : cancelledCount}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {headerData?.remarks && (
-              <div className="text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                <span className="font-semibold">Remarks:</span> {headerData.remarks}
-              </div>
-            )}
           </div>
         </div>
 
@@ -658,7 +642,7 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
 
                       {/* Requested Qty - Editable ONLY when Pending */}
                       <td className="p-3 text-right">
-                        {canEditRequestedQty ? (
+                        {canEditRequestedQty && currentUserRole === "user" ? (
                           <div className="flex flex-col items-end gap-1">
                             <input
                               type="number"
@@ -670,6 +654,7 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
                                 : "border-slate-300 bg-white text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 }`}
                               placeholder="0"
+                              disabled={isCancelled || isFullyApproved}
                             />
                             {hasBeenModified && (
                               <span className="text-[10px] text-amber-600 font-medium">Modified</span>
@@ -801,7 +786,7 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
                               className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-xs font-semibold hover:bg-emerald-100 transition-colors"
                               title="Approve full quantity"
                             >
-                              Approve All
+                              Approve
                             </button>
                             <button
                               onClick={() => handleCancelLine(item.lineId)}
@@ -816,7 +801,7 @@ export const ReviewAllocationModal: React.FC<ModalProps> = ({
                         {/* HOD: Show status for already processed lines */}
                         {isHod && !isPending && !isCancelled && (
                           <span className="text-xs text-slate-500 font-medium">
-                            {isFullyApproved ? "✓ Approved" : "✕ Rejected"}
+                            {isFullyApproved ? "✓ Approved" : "-"}
                           </span>
                         )}
 

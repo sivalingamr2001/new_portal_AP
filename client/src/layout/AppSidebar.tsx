@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext"
+import Logo from "@/lib/constants"
 import { Layers, CheckCircle, Edit3, Truck } from "lucide-react"
 
 // 1. Define strict types for the roles
@@ -26,12 +27,13 @@ export function AppSidebar({
       <div>
         {/* LOGO HEADER */}
         <div className="border-b border-border p-1.5">
-          <h1 className="text-lg font-black tracking-wider text-primary">
-            JANATICS
-          </h1>
-          <p className="text-[11px] font-medium text-muted-foreground">
-            BIN Portal · Allocation System
-          </p>
+          <div className="mt-1 flex rounded bg-primary/5 p-1 font-black tracking-wider text-primary">
+            <img
+              src={Logo}
+              alt="JANATICS"
+              className="h-8 w-auto animate-in object-contain object-left duration-300 fade-in"
+            />
+          </div>
         </div>
 
         {/* NAVIGATION MENUS */}
@@ -44,11 +46,10 @@ export function AppSidebar({
             {role === "user" && (
               <button
                 onClick={() => setCurrentScreen("fulfillment")}
-                className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                  currentScreen === "fulfillment"
-                    ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                }`}
+                className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${currentScreen === "fulfillment"
+                  ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  }`}
               >
                 <Truck size={16} />
                 <span>Fulfillment</span>
@@ -60,11 +61,10 @@ export function AppSidebar({
               <>
                 <button
                   onClick={() => setCurrentScreen("allocation")}
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                    currentScreen === "allocation"
-                      ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${currentScreen === "allocation"
+                    ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <Layers size={16} />
@@ -79,11 +79,10 @@ export function AppSidebar({
               <>
                 <button
                   onClick={() => setCurrentScreen("approval")}
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                    currentScreen === "approval"
-                      ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${currentScreen === "approval"
+                    ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <CheckCircle size={16} />
@@ -98,11 +97,10 @@ export function AppSidebar({
 
                 <button
                   onClick={() => setCurrentScreen("amendment")}
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                    currentScreen === "amendment"
-                      ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  }`}
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${currentScreen === "amendment"
+                    ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <Edit3 size={16} />

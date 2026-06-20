@@ -72,4 +72,7 @@ public interface IAllocationService
     /// </summary>
     Task<CustomerDto?> GetCustomerNameByIdAsync(long customerId, CancellationToken cancellationToken = default);
 
+    Task<IEnumerable<dynamic>> GetHeaderAsync(CancellationToken cancellationToken = default);
+    Task<IEnumerable<dynamic>> GetLinesByHeaderIdAsync(int headerId, CancellationToken cancellationToken = default);
+    Task<dynamic?> GetCurrentOrgAsync(CancellationToken cancellationToken = default);
 }

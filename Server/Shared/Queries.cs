@@ -337,36 +337,36 @@ public static class Queries
             SET APPROVAL_FLAG = 'A', B3_QUANTITY = :NEW_QTY, APPROVED_DATE = SYSDATE 
             WHERE LINE_ID = :LINE_ID";
 
-        /// <summary>
-        /// Retrieves a specific operating unit profile by its Organization ID.
-        /// </summary>
-        public const string GetOperatingUnitById = @"
+    /// <summary>
+    /// Retrieves a specific operating unit profile by its Organization ID.
+    /// </summary>
+    public const string GetOperatingUnitById = @"
                 SELECT ORGANIZATION_ID AS ""OrganizationId"", NAME AS ""Name"" 
                 FROM hr_operating_units 
                 WHERE ORGANIZATION_ID = :OrganizationId";
 
-        /// <summary>
-        /// Retrieves a specific inventory organization definition by its Organization ID.
-        /// </summary>
-        public const string GetInventoryOrganizationById = @"
+    /// <summary>
+    /// Retrieves a specific inventory organization definition by its Organization ID.
+    /// </summary>
+    public const string GetInventoryOrganizationById = @"
                 SELECT ORGANIZATION_ID AS ""OrganizationId"", ORGANIZATION_CODE AS ""OrganizationCode"" 
                 FROM ORG_ORGANIZATION_DEFINITIONS 
                 WHERE ORGANIZATION_ID = :OrganizationId";
 
-        /// <summary>
-        /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
-        /// </summary>
-        public const string GetInventoryItemById = @"
+    /// <summary>
+    /// Retrieves full details for a specific inventory item using its unique Inventory Item ID.
+    /// </summary>
+    public const string GetInventoryItemById = @"
                 SELECT DISTINCT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
                        TRIM(REPLACE(SEGMENT1 AS ""ItemCode"")), 
                        TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description""
                 FROM MTL_SYSTEM_ITEMS
                 WHERE INVENTORY_ITEM_ID = :InventoryItemId";
 
-        /// <summary>
-        /// Retrieves a customer's name and region details using their unique Customer ID.
-        /// </summary>
-        public const string GetCustomerNameById = @"
+    /// <summary>
+    /// Retrieves a customer's name and region details using their unique Customer ID.
+    /// </summary>
+    public const string GetCustomerNameById = @"
                 SELECT DISTINCT customer_id AS CustomerId, customer_name AS CustomerName, REGION AS Region 
                 FROM (
                     SELECT ra.customer_id, ra.customer_name,
@@ -378,4 +378,25 @@ public static class Queries
                 ) 
                 WHERE customer_id = :CustomerId";
 
-    }   
+    public const string GetHeaderDetails =
+    "SELECT * FROM jan_mrp_master_header";
+
+    public const string GetLinesByHeaderId =
+        "SELECT * FROM jan_mrp_master_lines WHERE MRP_HEADER_ID = :HeaderId";
+
+    public const string GetCurrentOrgDetails = @"
+        SELECT MRPL.CURRENT_ORG 
+        FROM JAN_IT.jan_mrp_master_HEADER MRPH, JAN_IT.jan_mrp_master_lines MRPL  
+        WHERE MRPH.MRP_HEADER_ID = MRPL.MRP_HEADER_ID 
+          AND MRPH.MRP_RUN_STATUS = 1     
+          AND MRPL.SEQUENCE_NO = (
+              SELECT MIN(SEQUENCE_NO) 
+              FROM JAN_IT.jan_mrp_master_LINES 
+              WHERE COMPLETION_FLAG = 0   
+                AND MRP_HEADER_ID = (
+                    SELECT MRP_HEADER_ID 
+                    FROM JAN_IT.jan_mrp_master_HEADER 
+                    WHERE MRP_RUN_STATUS = 1
+                )
+          )";
+}

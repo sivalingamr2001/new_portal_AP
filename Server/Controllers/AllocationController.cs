@@ -176,4 +176,26 @@ public sealed class AllocationController(IAllocationService allocationService) :
         var customer = await _allocationService.GetCustomerNameByIdAsync(id, cancellationToken);
         return customer is not null ? Ok(customer) : NotFound();
     }
+
+        [HttpGet("headers")]
+    public async Task<IActionResult> GetHeaders(CancellationToken cancellationToken)
+    {
+        var result = await _allocationService.GetHeaderAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("headers/{headerId}/lines")]
+    public async Task<IActionResult> GetLines(int headerId, CancellationToken cancellationToken)
+    {
+        var result = await _allocationService.GetLinesByHeaderIdAsync(headerId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("current-org")]
+    public async Task<IActionResult> GetCurrentOrg(CancellationToken cancellationToken)
+    {
+        var result = await _allocationService.GetCurrentOrgAsync(cancellationToken);
+        if (result == null) return NotFound("Organization details not found.");
+        return Ok(result);
+    }
 }

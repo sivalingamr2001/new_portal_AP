@@ -1128,7 +1128,6 @@ export function AllocationScreen() {
                   <Textarea
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Optional header remarks (saved to JAN_B3_HEADER.REMARKS)"
                     className={`${fieldClass} min-h-20 resize-none`}
                     maxLength={250}
                   />

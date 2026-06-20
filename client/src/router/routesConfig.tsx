@@ -1,3 +1,4 @@
+import { type ReactNode } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { Navigate, type RouteObject } from "react-router-dom"
 
@@ -23,6 +24,18 @@ const HomeRedirect = () => {
   if (currentUserRole === "hod") {
     return <Navigate to="/approval" replace />
   }
+
+  return null
+}
+
+const RedirectIfAuthenticated = ({ children }: { children: ReactNode }) => {
+  const { isAuthenticated } = useAuth()
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
 }
 
 export const routesConfig: RouteObject[] = [
@@ -71,7 +84,14 @@ export const routesConfig: RouteObject[] = [
     element: <AuthLayout />,
     children: [
       { index: true, element: <Navigate to="/login" replace /> },
-      { path: "/login", element: withSuspense(Pages.LoginPage) },
+      {
+        path: "/login",
+        element: (
+          <RedirectIfAuthenticated>
+            {withSuspense(Pages.LoginPage)}
+          </RedirectIfAuthenticated>
+        ),
+      },
     ],
   },
 ]

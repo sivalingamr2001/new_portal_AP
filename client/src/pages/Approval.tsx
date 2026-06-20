@@ -213,7 +213,7 @@ export function ApprovalScreen() {
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h2 className="text-md font-bold text-foreground">
-            BIN Approval Panel (HOD)
+            BIN Approval Panel
           </h2>
           <p className="text-xs text-muted-foreground">
             Authorize item counts completely inside operational windows.
@@ -274,6 +274,7 @@ export function ApprovalScreen() {
             <col style={{ width: '100px' }} />
             <col style={{ width: '120px' }} />
             <col style={{ width: '130px' }} />
+            <col style={{ width: '130px' }} />
           </colgroup>
           <thead>
             <tr className="border-b border-border bg-muted/50 text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
@@ -285,6 +286,7 @@ export function ApprovalScreen() {
               <th className="p-3 text-right">Total Items</th>
               <th className="p-3 text-right">Total Qty</th>
               <th className="p-3 text-right">Requested On</th>
+              <th className="p-3 text-right">Requested By</th>
             </tr>
           </thead>
           <tbody className="text-xs">
@@ -408,12 +410,18 @@ export function ApprovalScreen() {
                         })
                         : "-"}
                     </td>
+                    <td
+                      onClick={() => toggleHeader(headerId)}
+                      className="cursor-pointer p-3 text-right font-mono font-normal text-muted-foreground"
+                    >
+                      {firstItem.createdBy || "-"}
+                    </td>
                   </tr>
 
                   {/* ===== EXPANDED SUB-TABLE ===== */}
                   {isExpanded && (
                     <tr className="border-b border-border/40 bg-muted/20 last:border-0">
-                      <td colSpan={8} className="p-0">
+                      <td colSpan={9} className="p-0">
                         <div className="border-b border-border/40">
                           <table className="w-full min-w-full border-collapse text-left" style={{ tableLayout: 'fixed' }}>
                             <colgroup>
@@ -428,7 +436,7 @@ export function ApprovalScreen() {
                             </colgroup>
                             <thead>
                               <tr className="border-b border-border/40 bg-muted/40 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
-                                <th className="p-2.5 pl-6 text-center">Select</th>
+                                <th className="p-2.5 pl-6 text-center"></th>
                                 <th className="p-2.5 font-mono">Line ID</th>
                                 <th className="p-2.5 font-mono">Item Code</th>
                                 <th className="p-2.5">Description</th>

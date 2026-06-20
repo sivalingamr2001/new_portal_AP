@@ -141,4 +141,20 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             Queries.GetCustomerNameById,
             new { CustomerId = customerId },
             cancellationToken: cancellationToken);
+
+    public Task<IEnumerable<dynamic>> GetHeaderAsync(CancellationToken cancellationToken = default)
+        => _queryExecutor.QueryAsync<dynamic>(
+            Queries.GetHeaderDetails,
+            cancellationToken: cancellationToken);
+
+    public Task<IEnumerable<dynamic>> GetLinesByHeaderIdAsync(int headerId, CancellationToken cancellationToken = default)
+        => _queryExecutor.QueryAsync<dynamic>(
+            Queries.GetLinesByHeaderId,
+            new { HeaderId = headerId },
+            cancellationToken: cancellationToken);
+
+    public Task<dynamic?> GetCurrentOrgAsync(CancellationToken cancellationToken = default)
+        => _queryExecutor.QuerySingleOrDefaultAsync<dynamic>(
+            Queries.GetCurrentOrgDetails,
+            cancellationToken: cancellationToken);
 }
