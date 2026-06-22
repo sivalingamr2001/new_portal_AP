@@ -154,4 +154,19 @@ public class BinAllocationController : ControllerBase
         var data = await _service.GetAllCancellationsAsync();
         return Ok(data);
     }
+
+    [HttpGet("cancellations-by-id/{lineId}")]
+    public async Task<IActionResult> GetCancellationsById(int lineId)
+    {
+        // Call the specific single-record service method rather than GetAllCancellationsAsync
+        var data = await _service.GetCancellationByLineIdAsync(lineId);
+
+        if (data == null)
+        {
+            return NotFound(new { message = $"Cancellation records for Line ID {lineId} were not found." });
+        }
+
+        return Ok(data);
+    }
+
 }

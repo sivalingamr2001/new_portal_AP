@@ -116,16 +116,15 @@ public static class Queries
     /// Retrieves inventory item ID based on the Segment1 item code.
     /// </summary>
     public const string GetInventoryItemDetails = @"
-        SELECT ""InventoryItemId"", ""ItemCode"", ""Description"" FROM (
-            SELECT INVENTORY_ITEM_ID AS ""InventoryItemId"", 
-                   SEGMENT1 AS ""ItemCode"", 
-                   TRIM(REPLACE(DESCRIPTION, '""', '')) AS ""Description"",
-                   ROW_NUMBER() OVER (ORDER BY SEGMENT1) AS rn
-            FROM MTL_SYSTEM_ITEMS
-            WHERE (:Search IS NULL 
-                   OR UPPER(SEGMENT1) LIKE UPPER(:Search)
-                   OR UPPER(DESCRIPTION) LIKE UPPER(:Search))
-        ) WHERE rn > :Offset AND rn <= (:Offset + :PageSize)";
+        SELECT DISTINCT 
+            INVENTORY_ITEM_ID AS ""InventoryItemId"", 
+            SEGMENT1          AS ""ItemCode"", 
+            DESCRIPTION       AS ""Description"" 
+        FROM 
+            MTL_SYSTEM_ITEMS 
+        WHERE 
+            UPPER(SEGMENT1) LIKE UPPER(:Search) 
+            AND ORGANIZATION_ID = :OrgId";
 
     public const string GetDemandMetrics = @"
         SELECT 

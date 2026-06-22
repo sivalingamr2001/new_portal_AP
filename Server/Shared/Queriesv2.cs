@@ -85,31 +85,11 @@ namespace Backend.Shared
         /// </summary>
         public const string GetAllAllocations = @"
             SELECT
-                h.HEADER_ID,
-                h.TRANSACTION_DATE,
-                h.CUSTOMER_OR_ITEM_SPECIFIC,
-                h.CUSTOMER_ID,
-                h.TERRITORY_ID,
-                h.BILL_TO_CUSTOMER,
-                h.SHIP_TO_CUSTOMER,
-                h.REMARKS,
-                h.CREATED_BY,
-                h.CREATED_DATE,
-                h.UPDATED_BY,
-                h.UPDATED_DATE,
-                l.LINE_ID,
-                l.ORGANIZATION_ID,
-                l.INVENTORY_ITEM_ID,
-                l.B3_QUANTITY,
-                l.TARGET_DATE,
-                l.B3_APPROVED_QUANTITY,
-                l.APPROVAL_FLAG,
-                l.APPROVED_DATE,
-                l.APPROVED_BY,
-                l.CLOSURE_FLAG
+                *
             FROM
                 JAN_B3_HEADER  h
                 JOIN JAN_B3_LINES l ON l.HEADER_ID = h.HEADER_ID
+                JOIN JAN_B3_CANCELLATION
             ORDER BY
                 h.HEADER_ID, l.LINE_ID";
 
@@ -205,39 +185,52 @@ namespace Backend.Shared
         /// to JAN_B3_LINES to support this pattern.
         /// </summary>
         public const string CreateQuantityRevision = @"
-            INSERT INTO JAN_B3_LINES (
-                LINE_ID,
-                HEADER_ID,
-                ORGANIZATION_ID,
-                INVENTORY_ITEM_ID,
-                B3_QUANTITY,
-                TARGET_DATE,
-                B3_APPROVED_QUANTITY,
-                APPROVAL_FLAG,
-                APPROVED_DATE,
-                APPROVED_BY,
-                CLOSURE_FLAG,
-                REVISION,
-                PARENT_LINE_ID
-            )
-            SELECT
-                JAN_B3_LINES_SEQ.NEXTVAL,  -- New unique line
-                HEADER_ID,
-                ORGANIZATION_ID,
-                INVENTORY_ITEM_ID,
-                :p_new_b3_quantity,         -- User's updated quantity
-                TARGET_DATE,
-                NULL,                       -- Reset approval
-                'N',                        -- Re-pending approval
-                NULL,
-                NULL,
-                'N',
-                NVL(REVISION, 0) + 1,       -- Increment revision
-                LINE_ID                     -- Link back to original
-            FROM
-                JAN_B3_LINES
-            WHERE
-                LINE_ID = :p_original_line_id";
+            DECLARE
+                v_new_line_id NUMBER;
+            BEGIN
+                -- 1. Fetch sequence allocation value beforehand
+                SELECT JAN_B3_LINES_SEQ.NEXTVAL INTO v_new_line_id FROM DUAL;
+
+                -- 2. Execute target transaction block matching your exact column specifications
+                INSERT INTO JAN_B3_LINES (
+                    LINE_ID,
+                    HEADER_ID,
+                    ORGANIZATION_ID,
+                    INVENTORY_ITEM_ID,
+                    B3_QUANTITY,
+                    TARGET_DATE,
+                    B3_APPROVED_QUANTITY,
+                    APPROVAL_FLAG,
+                    APPROVED_DATE,
+                    APPROVED_BY,
+                    CLOSURE_FLAG,
+                    REVISION,
+                    PARENT_LINE_ID,
+                    AMENDMENT_REASON
+                )
+                SELECT
+                    v_new_line_id,             -- Generated ID
+                    HEADER_ID,
+                    ORGANIZATION_ID,
+                    INVENTORY_ITEM_ID,
+                    :p_new_b3_quantity,        -- User's new quantity request
+                    TARGET_DATE,
+                    NULL,                      -- Reset approval quantities
+                    'N',                       -- Re-pending status
+                    NULL,
+                    NULL,
+                    'N',
+                    NVL(REVISION, 0) + 1,      -- Track version revisions
+                    LINE_ID,                   -- Self-referencing link trace
+                    :p_amendment_reason        -- Target dropdown selection text
+                FROM
+                    JAN_B3_LINES
+                WHERE
+                    LINE_ID = :p_original_line_id;
+
+                -- 3. Return the runtime structural context out to Dapper safely
+                :p_line_id := v_new_line_id;
+            END;";
 
         /// <summary>
         /// Get the full revision history for a given original line.
@@ -463,6 +456,29 @@ namespace Backend.Shared
                 JOIN JAN_B3_HEADER  h ON h.HEADER_ID  = l.HEADER_ID
             ORDER BY
                 c.CANCELLED_DATE DESC";
+
+        public const string GetCancellationByLineId = @"
+            SELECT
+                c.CANCEL_ID            AS ""CancelId"",
+                c.LINE_ID              AS ""LineId"",
+                c.CANCELLED_QTY        AS ""CancelledQty"",
+                c.CANCELLED_DATE       AS ""CancelledDate"",
+                c.CANCEL_REASON        AS ""CancelReason"",
+                c.CREATED_BY           AS ""CreatedBy"",
+                c.CREATED_DATE         AS ""CreatedDate"",
+                l.HEADER_ID            AS ""HeaderId"",
+                l.INVENTORY_ITEM_ID    AS ""InventoryItemId"",
+                l.ORGANIZATION_ID      AS ""OrganizationId"",
+                l.B3_QUANTITY          AS ""OriginalQuantity"",
+                l.B3_APPROVED_QUANTITY AS ""ApprovedQuantity"",
+                h.CUSTOMER_ID          AS ""CustomerId"",
+                h.TRANSACTION_DATE     AS ""TransactionDate""
+            FROM
+                JAN_B3_CANCELLATION c
+                JOIN JAN_B3_LINES   l ON l.LINE_ID   = c.LINE_ID
+                JOIN JAN_B3_HEADER  h ON h.HEADER_ID = l.HEADER_ID
+            WHERE 
+                c.LINE_ID = :LineId";
 
 
         // ============================================================

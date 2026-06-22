@@ -1,6 +1,7 @@
 ﻿using Backend.Interfaces;
 using Backend.Models;
 using Backend.Shared;
+using System.Security.Cryptography;
 
 namespace Backend.Services;
 
@@ -62,7 +63,7 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
             cancellationToken: cancellationToken);
 
     public async Task<PagedResult<InventoryItemDto>> GetInventoryItemDetailsAsync(
-        int page, int pageSize, string? search, CancellationToken cancellationToken = default)
+        int page, int pageSize, string? search, int? orgId, CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
         pageSize = Math.Max(pageSize, 1);
@@ -71,39 +72,45 @@ public sealed class AllocationService(IDynamicQueryExecutor dynamicQuery) : IAll
 
         var parameters = new
         {
-            Offset = (page - 1) * pageSize,
-            PageSize = pageSize,
+            OrgId = orgId,
             Search = string.IsNullOrEmpty(trimmedSearch) ? null : $"%{trimmedSearch}%"
         };
 
-        var (data, totalCount) = await _queryExecutor.QueryPagedAsync<InventoryItemDto>(
+        // Fetch all matching records from the database first
+        var allData = await _queryExecutor.QueryAsync<InventoryItemDto>(
             Queries.GetInventoryItemDetails,
-            Queries.CountInventoryItems,
             parameters,
             cancellationToken: cancellationToken);
-
-        // Materialize the list to modify its items
-        var itemList = data.ToList();
 
         // Reflection cache for performance
         var stringProperties = typeof(InventoryItemDto)
             .GetProperties()
-            .Where(p => p.PropertyType == typeof(string) && p.CanWrite);
+            .Where(p => p.PropertyType == typeof(string) && p.CanWrite)
+            .ToList();
 
-        // Trim all string properties on every returned item
-        foreach (var item in itemList)
-        {
-            foreach (var prop in stringProperties)
+        // Process, trim, and page the dataset in C# memory
+        var processedList = allData
+            .Select(item =>
             {
-                var value = (string?)prop.GetValue(item);
-                if (value != null)
+                foreach (var prop in stringProperties)
                 {
-                    prop.SetValue(item, value.Trim());
+                    if (prop.GetValue(item) is string value)
+                    {
+                        prop.SetValue(item, value.Trim());
+                    }
                 }
-            }
-        }
+                return item;
+            })
+            .ToList();
 
-        return new PagedResult<InventoryItemDto>(itemList, totalCount, page, pageSize);
+        var totalCount = processedList.Count;
+
+        var pagedItems = processedList
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<InventoryItemDto>(pagedItems, totalCount, page, pageSize);
     }
 
     public Task<string?> GetSalesRrsCategoryAsync(int organizationId, int inventoryItemId, CancellationToken cancellationToken = default)

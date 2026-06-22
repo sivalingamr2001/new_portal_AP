@@ -23,6 +23,8 @@ public interface IBinAllocationService
 
     /// <summary>All cancellation records with context.</summary>
     Task<IEnumerable<B3Cancellation>> GetAllCancellationsAsync();
+    Task<IEnumerable<CancellationDto>> GetCancellationByLineIdAsync(int? lineId);
+
 
     /// <summary>Per-header summary (totals, approved, pending, cancelled).</summary>
     Task<IEnumerable<AllocationSummary>> GetAllocationSummaryAsync();

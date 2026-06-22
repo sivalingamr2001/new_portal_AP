@@ -120,9 +120,10 @@ public sealed class AllocationController(IAllocationService allocationService) :
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
+        [FromQuery] int? orgId = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _allocationService.GetInventoryItemDetailsAsync(page, pageSize, search, cancellationToken);
+        var result = await _allocationService.GetInventoryItemDetailsAsync(page, pageSize, search, orgId, cancellationToken);
         return Ok(result);
     }
 

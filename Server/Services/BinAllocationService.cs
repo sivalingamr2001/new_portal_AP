@@ -278,6 +278,12 @@ namespace Backend.Services
             return await conn.QueryAsync<B3Cancellation>(QueriesV2.GetAllCancellations);
         }
 
+        public async Task<IEnumerable<CancellationDto>> GetCancellationByLineIdAsync(int? lineId)
+        {
+            using var conn = CreateConnection();
+            return await conn.QueryAsync<CancellationDto>(QueriesV2.GetCancellationByLineId, new { LineId = lineId });
+        }
+
         public async Task<IEnumerable<AllocationSummary>> GetAllocationSummaryAsync()
         {
             using var conn = CreateConnection();
@@ -294,13 +300,23 @@ namespace Backend.Services
             var p = new DynamicParameters();
             p.Add("p_new_b3_quantity", req.NewB3Quantity);
             p.Add("p_original_line_id", req.OriginalLineId);
+            p.Add("p_amendment_reason", req.Reason); // Maps the string text from the UI dropdown
 
-            // The INSERT..SELECT returns the new LINE_ID via RETURNING
-            p.Add("p_line_id", dbType: DbType.Decimal,
-                  direction: ParameterDirection.Output);
+            // Out parameter to capture the generated sequence value
+            p.Add("p_line_id", dbType: DbType.Decimal, direction: ParameterDirection.Output);
 
+            // Execute the PL/SQL Block engine
             await conn.ExecuteAsync(QueriesV2.CreateQuantityRevision, p);
-            return p.Get<decimal>("p_line_id");
+
+            // Safe extraction fallback mechanism to eliminate DBNull parsing exceptions
+            var outputValue = p.Get<decimal?>("p_line_id");
+
+            if (!outputValue.HasValue || outputValue.Value == 0)
+            {
+                throw new ApplicationException("Database transaction failed to yield a valid sequence Line ID back to context.");
+            }
+
+            return outputValue.Value;
         }
 
         public async Task<IEnumerable<B3Line>> GetLineRevisionHistoryAsync(decimal originalLineId)
@@ -418,5 +434,6 @@ namespace Backend.Services
                 throw;
             }
         }
+
     }
 }

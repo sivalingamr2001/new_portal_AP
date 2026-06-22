@@ -56,6 +56,7 @@ public class InventoryItemDto
     public int InventoryItemId { get; set; }
     public string ItemCode { get; set; }
     public string Description { get; set; }
+    public int OrgId { get; set; }
 }
 
 public class AllocationHeaderDto

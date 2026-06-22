@@ -13,38 +13,39 @@ public class B3Header
     public decimal? TerritoryId { get; set; }
     public decimal? BillToCustomer { get; set; }
     public decimal? ShipToCustomer { get; set; }
-    public string CreatedBy { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
     public DateTime CreatedDate { get; set; }
-    public string UpdatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
     public DateTime? UpdatedDate { get; set; }
-    public string Remarks { get; set; }
+    public string? Remarks { get; set; }
+
+    // Lookups
+    public string? CustomerName { get; set; }
+    public string? CustomerRegion { get; set; }
 }
 
 public class AllocationRow : B3Header
 {
-    // Updated type to decimal to match your database keys
     public decimal LineId { get; set; }
+    public decimal HeaderId { get; set; }
     public decimal? OrganizationId { get; set; }
     public decimal InventoryItemId { get; set; }
     public decimal B3Quantity { get; set; }
     public DateTime? TargetDate { get; set; }
     public decimal? B3ApprovedQuantity { get; set; }
-    public string ApprovalFlag { get; set; }
+    public string ApprovalFlag { get; set; } = "N";
     public DateTime? ApprovedDate { get; set; }
-    public string ApprovedBy { get; set; }
-    public string ClosureFlag { get; set; }
-    public decimal Revision { get; set; }
+    public string? ApprovedBy { get; set; }
+    public string ClosureFlag { get; set; } = "N";
+    public decimal Revision { get; set; } = 0;
+    public decimal? ParentLineId { get; set; }
+    public string? AmendmentReason { get; set; }
 
-    // 💡 Newly Added Relationship Tracking Properties
-    public decimal? ParentLineId { get; set; }    // Holds the ID of the old line (Line 1)
-    public decimal? OldRequestedQty { get; set; }  // Holds the old quantity from the parent line
-
-    // Lookup Properties
-    public string OrganizationCode { get; set; }
-    public string ItemCode { get; set; }
-    public string ItemDescription { get; set; }
-    public string CustomerName { get; set; }
-    public string CustomerRegion { get; set; }
+    // Lookups
+    public string? OrganizationCode { get; set; }
+    public string? ItemCode { get; set; }
+    public string? ItemDescription { get; set; }
+    public decimal? OldRequestedQty { get; set; }
 }
 
 // ── Line ────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ public class ReviseQuantityRequest
 {
     public decimal OriginalLineId { get; set; }
     public decimal NewB3Quantity { get; set; }
+    public string Reason { get; set; } = string.Empty;
 }
 
 public class ApproveLineRequest
@@ -199,3 +201,22 @@ public class AllocationLineItemDto
     public int Revision { get; set; }
     public decimal? ParentLineId { get; set; }
 }
+
+public class CancellationDto
+{
+    public int CancelId { get; set; }
+    public int LineId { get; set; }
+    public decimal CancelledQty { get; set; }
+    public DateTime CancelledDate { get; set; }
+    public string CancelReason { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime CreatedDate { get; set; }
+    public int HeaderId { get; set; }
+    public int InventoryItemId { get; set; }
+    public int OrganizationId { get; set; }
+    public decimal OriginalQuantity { get; set; }
+    public decimal? ApprovedQuantity { get; set; } // Nullable because matching item might not be approved yet
+    public int CustomerId { get; set; }
+    public DateTime TransactionDate { get; set; }
+}
+

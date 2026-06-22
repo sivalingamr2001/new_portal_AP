@@ -57,24 +57,12 @@ export const routesConfig: RouteObject[] = [
             element: withSuspense(Pages.DashboardPage),
           },
           {
-            path: "/allocation",
-            element: withSuspense(Pages.AllocationPage),
-          },
-          {
             path: "/approval",
             element: withSuspense(Pages.ApprovalPage),
           },
           {
-            path: "/amendment",
-            element: withSuspense(Pages.AmendmentPage),
-          },
-          {
             path: "/fulfillment",
             element: withSuspense(Pages.FulfillmentPage),
-          },
-          {
-            path: "/fulfillment/edit/:headerId",
-            element: withSuspense(Pages.EditAllocationPage),
           },
         ],
       },
