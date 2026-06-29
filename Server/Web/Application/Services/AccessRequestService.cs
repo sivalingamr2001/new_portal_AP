@@ -58,7 +58,7 @@ public sealed class AccessRequestService(
         await db.SaveChangesAsync();
 
         // ─── Notifications ────────────────────────────────────────────────────
-        await SendSubmissionNotificationsAsync(request, items, user);
+        //await SendSubmissionNotificationsAsync(request, items, user);
 
         return Result.Success(request.AccessReqId);
     }
@@ -162,7 +162,7 @@ public sealed class AccessRequestService(
         {
             var normalizedIdentifier = identifier.Trim().ToLower();
 
-            hodRecord = await db.HodMasters
+            hodRecord = await hodDb.HodMasters
                 .FirstOrDefaultAsync(h => h.Deleted == 0
                     && ((h.EmployeeId != null && h.EmployeeId.ToLower() == normalizedIdentifier)
                         || (h.Email != null && h.Email.ToLower() == normalizedIdentifier)));
@@ -177,19 +177,37 @@ public sealed class AccessRequestService(
         // 3. Conditional Routing: HOD Query vs. User/Operator Query
         if (hodRecord is not null)
         {
-            // ========================================================
-            // HOD PATH: View managed departments and folder paths globally
-            // ========================================================
             var cleanEmpId = hodRecord.EmployeeId?.Trim().ToLower() ?? string.Empty;
+            var cmplContext = isTestEnv ? db.CmplUsers : cmplDb.CmplUsers;
 
-            // A. Fetch departments managed by this HOD's Employee ID string
-            var deptIds = await db.Departments
-                .Where(d => d.HodId != null && d.HodId.ToLower() == cleanEmpId && d.IsActive)
-                .Select(d => d.Id)
-                .ToListAsync();
+            var cmplUserId = await cmplDb.CmplUsers
+                .Where(c => c.EmployeeId == cleanEmpId)
+                .Select(c => c.Id)
+                .FirstOrDefaultAsync();
+
+            // 1. QUERY: Verify inside db.Users that this employee holds the "Hod" role
+            // Since Role is a JSON array string like '["Hod","Admin"]', we use .Contains()
+            var isVerifiedHod = await db.Users
+                .AnyAsync(u => u.Id == cmplUserId && u.Role.Contains("Hod"));
+
+            // Initialize an empty list for department IDs
+            var deptIds = new List<int>();
+
+            if (isVerifiedHod)
+            {
+                // 2. QUERY: Fetch the department ID from cmplDb using the cleanEmpId
+                var hodDepartmentId = await cmplContext
+                    .Where(u => u.EmployeeId != null && u.EmployeeId.ToLower() == cleanEmpId && u.DepartmentId.HasValue)
+                    .Select(u => u.DepartmentId)
+                    .FirstOrDefaultAsync();
+
+                if (hodDepartmentId.HasValue)
+                {
+                    deptIds.Add(hodDepartmentId.Value);
+                }
+            }
 
             // B. Fetch user IDs belonging to those departments
-            var cmplContext = isTestEnv ? db.CmplUsers : cmplDb.CmplUsers;
             var deptUserIds = await cmplContext
                 .Where(u => u.DepartmentId.HasValue && deptIds.Contains(u.DepartmentId!.Value))
                 .Select(u => u.Id)
@@ -203,11 +221,12 @@ public sealed class AccessRequestService(
                 .Select(f => f.FolderName)
                 .ToListAsync();
 
-            // Apply global manager filters (No "UserId == userId" constraint here)
+            // Apply global manager filters
             baseQuery = baseQuery.Where(i =>
                 deptUserIds.Contains(i.AccessRequest.UserId) ||
                 hodOwnedFolderPaths.Contains(i.FolderPath));
         }
+
         else
         {
             // ========================================================
@@ -228,7 +247,12 @@ public sealed class AccessRequestService(
             .ToListAsync();
 
         // 5. Apply safe local mapping conversion in-memory
-        var items = (await Task.WhenAll(rawItems.Select(MapToSummaryDtoAsync))).ToList();
+        var items = new List<AccessRequestSummaryDto>();
+        foreach (var rawItem in rawItems)
+        {
+            var summaryDto = await MapToSummaryDtoAsync(rawItem);
+            items.Add(summaryDto);
+        }
 
         return new PagedResult<AccessRequestSummaryDto>(
             items,
@@ -625,11 +649,11 @@ public sealed class AccessRequestService(
         if (approverIds.Count == 0)
             return new Dictionary<int, string?>();
 
-        var cmplUsers = await db.CmplUsers
+        var cmplUsers = await cmplDb.CmplUsers
             .Where(u => approverIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.Name);
 
-        var hodUsers = await db.HodMasters
+        var hodUsers = await hodDb.HodMasters
             .Where(h => h.Deleted == 0 && approverIds.Contains(h.UserId))
             .ToDictionaryAsync(h => h.UserId, h => h.Name);
 

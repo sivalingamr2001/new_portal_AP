@@ -23,7 +23,7 @@ public sealed class NotificationService(
 
         var dto = MapToDto(notification);
 
-        await QueueEmailNotificationAsync(userId, requestId, itemId, title, message, type);
+        //await QueueEmailNotificationAsync(userId, requestId, itemId, title, message, type);
 
         // Push to the user's personal SignalR group
         await hubContext.Clients
@@ -43,7 +43,7 @@ public sealed class NotificationService(
         foreach (var uid in usersInRole)
         {
             await PersistAsync(uid, role, title, message, type, requestId, itemId, ticketNumber);
-            await QueueEmailNotificationAsync(uid, requestId, itemId, title, message, type);
+            //await QueueEmailNotificationAsync(uid, requestId, itemId, title, message, type);
         }
 
         await hubContext.Clients

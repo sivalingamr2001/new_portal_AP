@@ -103,7 +103,7 @@ export interface PortalUserDetails {
 
 export interface UpsertPortalUserDto {
   cmplUserId: number
-  role: string
+  role: string[]
   location: string
 }
 
@@ -156,6 +156,7 @@ export interface ApiError {
 export interface PaginationParams {
   page?: number
   pageSize?: number
+  identifier?: string
 }
 
 export interface PagedResult<T> {

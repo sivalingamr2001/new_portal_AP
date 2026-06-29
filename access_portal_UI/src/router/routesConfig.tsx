@@ -1,6 +1,5 @@
 import RoleGuard from "@/components/RoleGuard"
 import { UserRole } from "@/lib/constants"
-import { roleStringToNumeric } from "@/lib/roleMapper"
 import { Navigate, type RouteObject } from "react-router-dom"
 import { useAuth } from "@/context/AuthContext"
 
@@ -19,20 +18,33 @@ const HomeRedirect = () => {
     return <Navigate to="/login" replace />
   }
 
-  const userRoleNumeric = roleStringToNumeric(currentUserRole)
+  const roleNameToIdMap = {
+    "Admin": UserRole.Admin,
+    "Operator": UserRole.Operator,
+    "Hod": UserRole.Hod,
+    "User": UserRole.User
+  };
 
-  switch (userRoleNumeric) {
-    case UserRole.Admin:
-      return <Navigate to="/dashboard" replace />
-    case UserRole.Operator:
-      return <Navigate to="/operator/dashboard" replace />
-    case UserRole.Hod:
-      return <Navigate to="/hod/pending-approvals" replace />
-    case UserRole.User:
-      return <Navigate to="/my-requests" replace />
-    default:
-      return <Navigate to="/unauthorized" replace />
+  const rawRoles = Array.isArray(currentUserRole) ? currentUserRole : [currentUserRole];
+
+  const userRolesList = rawRoles.map(
+    (roleName) => roleNameToIdMap[roleName as keyof typeof roleNameToIdMap]
+  );
+
+  if (userRolesList.includes(UserRole.Admin)) {
+    return <Navigate to="/dashboard" replace />
   }
+  if (userRolesList.includes(UserRole.Operator)) {
+    return <Navigate to="/operator/dashboard" replace />
+  }
+  if (userRolesList.includes(UserRole.Hod)) {
+    return <Navigate to="/hod/pending-approvals" replace />
+  }
+  if (userRolesList.includes(UserRole.User)) {
+    return <Navigate to="/my-requests" replace />
+  }
+
+  return <Navigate to="/unauthorized" replace />
 }
 
 export const routesConfig: RouteObject[] = [

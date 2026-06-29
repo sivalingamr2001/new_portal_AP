@@ -8,7 +8,7 @@ export const HodPendingRequestsPage = () => {
   return (
     <RequestsPageFactory<HodCartItemDto>
       fetchApiFn={async () => {
-        const result = await hodCartApi.getCart(currentUser?.headOfDepartment?.id)
+        const result = await hodCartApi.getCart(currentUser?.user?.employeeId || "")
         return result
       }}
       actionButtonLabel="Review"

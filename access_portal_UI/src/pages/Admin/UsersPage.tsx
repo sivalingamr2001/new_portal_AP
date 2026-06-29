@@ -31,7 +31,7 @@ export const UsersPage = () => {
       onUpdateRecord: async (id, updatedData) => {
         await usersApi.updatePortalUser(id as number, {
           cmplUserId: id as number,
-          role: updatedData.role,
+          role: [JSON.stringify(updatedData.roles)],
           location: updatedData.location,
         })
       },

@@ -5,19 +5,14 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
+  DialogHeader, 
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox" // Ensure you have this shadcn primitive
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { ChevronDown } from "lucide-react"
 
-// UserRole mapping definition matching string values
 export const UserRole = {
   Admin: "Admin",
   Operator: "Operator",
@@ -27,8 +22,9 @@ export const UserRole = {
 
 export type UserRoleType = (typeof UserRole)[keyof typeof UserRole]
 
+// 1. Updated form values to accept an array of strings for roles
 interface FormValues {
-  role: string
+  roles: string[] 
   location: string
 }
 
@@ -36,7 +32,7 @@ interface EditUsersModalProps {
   isOpen: boolean
   onClose: () => void
   userData: any | null
-  onSave: (updatedData: FormValues) => void
+  onSave: (updatedData: { roles: string[]; location: string }) => void 
 }
 
 export const EditUsersModal = ({
@@ -53,20 +49,33 @@ export const EditUsersModal = ({
     formState: { isSubmitting, errors },
   } = useForm<FormValues>({
     defaultValues: {
-      role: "",
+      roles: [],
       location: "",
     },
   })
 
-  // Automatically maps and resets values into form fields when userData shifts or loads
+  // 3. Parses existing roles from the DB into an array when modal opens
   useEffect(() => {
     if (isOpen && userData?.user) {
+      let initialRoles: string[] = []
+      const rawRoleData = userData.user.role
+
+      if (rawRoleData) {
+        try {
+          // If stored as JSON string '["Admin","Hod"]'
+          initialRoles = JSON.parse(rawRoleData)
+        } catch {
+          // Fallback if stored as comma-separated 'Admin,Hod'
+          initialRoles = rawRoleData.split(",").map((r: string) => r.trim())
+        }
+      }
+
       reset({
-        role: userData.user.role || "",
+        roles: Array.isArray(initialRoles) ? initialRoles : [],
         location: userData.user.location || "",
       })
     } else if (!isOpen) {
-      reset({ role: "", location: "" })
+      reset({ roles: [], location: "" })
     }
   }, [userData, isOpen, reset])
 
@@ -84,41 +93,66 @@ export const EditUsersModal = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSave)} className="space-y-5 py-2">
-          {/* Main Form Fields wrapper */}
-          <div className="grid grid-cols-1 gap-5 rounded-md border border-border bg-card p-4 md:grid-cols-1">
-            {/* Role Dropdown Selector */}
+          <div className="grid grid-cols-1 gap-5 rounded-md border border-border bg-card p-4">
+            
+            {/* 4. Multi-Select Role Field */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
-                Assigned Role
+                Assigned Roles
               </label>
               <Controller
                 control={control}
-                name="role"
-                rules={{ required: "Please select a role" }}
+                name="roles"
+                rules={{ required: "Please select at least one role" }}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select functional role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={UserRole.Admin}>Admin</SelectItem>
-                      <SelectItem value={UserRole.Operator}>
-                        Operator
-                      </SelectItem>
-                      <SelectItem value={UserRole.Hod}>Hod</SelectItem>
-                      <SelectItem value={UserRole.User}>User</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between font-normal">
+                        {field.value.length > 0
+                          ? field.value.join(", ")
+                          : "Select functional roles"}
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+                      <div className="space-y-2">
+                        {Object.values(UserRole).map((role) => {
+                          const checked = field.value.includes(role)
+                          return (
+                            <div key={role} className="flex items-center space-x-2 p-1 hover:bg-accent rounded-sm">
+                              <Checkbox
+                                id={`role-${role}`}
+                                checked={checked}
+                                onCheckedChange={(isSelected) => {
+                                  if (isSelected) {
+                                    field.onChange([...field.value, role])
+                                  } else {
+                                    field.onChange(field.value.filter((r) => r !== role))
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={`role-${role}`}
+                                className="text-sm font-medium leading-none cursor-pointer w-full py-1"
+                              >
+                                {role}
+                              </label>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
               />
-              {errors.role && (
+              {errors.roles && (
                 <p className="text-xs text-destructive">
-                  {errors.role.message}
+                  {errors.roles.message}
                 </p>
               )}
             </div>
 
-            {/* Location Form Input Field */}
+            {/* Location Input Field */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">
                 Work Location
@@ -138,7 +172,6 @@ export const EditUsersModal = ({
             </div>
           </div>
 
-          {/* Dialog Action Buttons */}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button
               type="button"

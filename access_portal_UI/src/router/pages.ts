@@ -38,8 +38,8 @@ export const PendingApprovalsPage = lazy(() =>
   }))
 )
 export const HodAllRequestsPage = lazy(() =>
-  import("@/pages/Hod/HodPendingRequestsPage").then((m) => ({
-    default: m.HodPendingRequestsPage,
+  import("@/pages/Hod/HodAllDepartmentRequestsPage").then((m) => ({
+    default: m.HodAllDepartmentRequestsPage,
   }))
 )
 

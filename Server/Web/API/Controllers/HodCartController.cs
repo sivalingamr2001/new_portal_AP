@@ -13,7 +13,7 @@ public sealed class HodCartController(IHodCartService service) : ControllerBase
 {
     // GET api/hod-cart?page=1&pageSize=20
     [HttpGet]
-    public async Task<IActionResult> GetCart(int hodDBUserId,
+    public async Task<IActionResult> GetCart(string hodDBUserId,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var result = await service.GetCartAsync(hodDBUserId, page, pageSize);

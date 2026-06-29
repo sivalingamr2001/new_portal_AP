@@ -13,6 +13,7 @@ namespace Web.Application.Services;
 public sealed class HodCartService(
     AppDbContext db,
     CmplDbContext cmplDb,
+    HodDbContext hodDb,
     IUserService userService,
     INotificationService notificationService) : IHodCartService
 {
@@ -84,7 +85,7 @@ public sealed class HodCartService(
         return Result.Success(responseList);
     }
 
-    public async Task<PagedResult<HodCartItemDto>> GetCartAsync(int hodUserId, int page, int pageSize)
+    public async Task<PagedResult<HodCartItemDto>> GetCartAsync(string hodUserId, int page, int pageSize)
     {
         Console.WriteLine($"[DEBUG] === Start GetCartAsync === Params -> hodUserId: {hodUserId}, page: {page}, pageSize: {pageSize}");
 
@@ -264,16 +265,6 @@ public sealed class HodCartService(
         // 7. Commit all pending database changes in a single transaction
         await db.SaveChangesAsync();
 
-        // 8. Trigger external notification service
-        await notificationService.NotifyRoleGroupAsync(
-            role: "Operator",
-            title: "HOD Approved — Action Required",
-            message: $"Ticket {item.TicketNumber} has been approved by HOD and is pending IT review.",
-            type: "HodApproved",
-            requestId: item.AccessReqId,
-            itemId: item.AccessItemId,
-            ticketNumber: item.TicketNumber);
-
         return Result.Success();
     }
 
@@ -281,7 +272,7 @@ public sealed class HodCartService(
     {
         // 1. Query the primary portal users table for security attributes
         var portalUser = await db.Users
-            .FirstOrDefaultAsync(u => u.Id == hodUserId && u.Role == "Hod");
+            .FirstOrDefaultAsync(u => u.Id == hodUserId && u.Role.Contains("Hod"));
 
         if (portalUser is null)
         {
@@ -493,9 +484,9 @@ public sealed class HodCartService(
 
     // ─── Private ─────────────────────────────────────────────────────────────────
 
-    private async Task<string?> GetHodUserIdAsync(int hodUserId)
-        => await db.HodMasters
-            .Where(h => h.UserId == hodUserId && h.Deleted == 0)
+    private async Task<string?> GetHodUserIdAsync(string hodUserId)
+        => await hodDb.HodMasters
+            .Where(h => h.EmployeeId == hodUserId && h.Deleted == 0)
             .Select(h => h.EmployeeId)
             .FirstOrDefaultAsync();
 

@@ -49,7 +49,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       currentUser,
 
-      currentUserRole: currentUser?.user?.role ?? null,
+      currentUserRole: (() => {
+        const rawRole = currentUser?.user?.role;
+        if (!rawRole) return [];
+        try {
+          return typeof rawRole === "string" ? JSON.parse(rawRole) : rawRole;
+        } catch (e) {
+          return [rawRole];
+        }
+      })(),
 
       isAuthenticated: !!currentUser,
 

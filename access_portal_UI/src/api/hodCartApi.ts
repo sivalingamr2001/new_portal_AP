@@ -8,7 +8,7 @@ import type {
 
 export const hodCartApi = {
   getCart: async (
-    userId?: number,
+    userId?: string,
     params?: PaginationParams
   ): Promise<PagedResult<HodCartItemDto>> => {
     try {

@@ -79,7 +79,6 @@ public sealed record OperatorCartItemDto(
     string Reason,
     int? HodApproverId,
     int RequesterUserId,
-    string DepartmentName,
     DateTime SubmittedAt
 );
 

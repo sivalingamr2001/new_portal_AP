@@ -47,12 +47,6 @@ public sealed class OperatorCartService(
         // 3. Query the user database to map UserIds to Department Names
         var userContext = isTestEnv ? db.CmplUsers.AsQueryable() : cmplDb.CmplUsers.AsQueryable();
 
-        var userDeptMap = await (from u in userContext
-                                 join d in db.Departments on u.DepartmentId equals d.Id
-                                 where uniqueUserIds.Contains(u.Id)
-                                 select new { UserId = u.Id, DeptName = d.Name })
-                                 .ToDictionaryAsync(x => x.UserId, x => x.DeptName ?? "N/A");
-
         // 4. Map everything into the final DTO array with individual department names
         var items = dbItems.Select(i => new OperatorCartItemDto(
             i.AccessItemId,
@@ -65,7 +59,6 @@ public sealed class OperatorCartService(
             i.Reason,
             i.HodApproverId,
             i.AccessRequest.UserId,
-            userDeptMap.TryGetValue(i.AccessRequest.UserId, out var deptName) ? deptName : "N/A", // Injected department name here
             i.CreatedOn
         )).ToList();
 

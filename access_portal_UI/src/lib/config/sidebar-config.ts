@@ -1,6 +1,5 @@
 import type { UserRoleType } from "@/components/RoleGuard"
 import {
-  Building2,
   CheckSquare,
   FileText,
   FolderTree,
@@ -32,6 +31,35 @@ export const sidebarItems: SidebarGroup[] = [
         to: "/my-requests",
         icon: FileText,
         roles: [4], // UserRole.User
+      },
+    ],
+  },
+  {
+    title: "Admin",
+    items: [
+      {
+        label: "Dashboard",
+        to: "/dashboard",
+        icon: LayoutDashboard,
+        roles: [1], // UserRole.Admin
+      },
+      {
+        label: "Users",
+        to: "/users",
+        icon: Users,
+        roles: [1], // UserRole.Admin
+      },
+      {
+        label: "Folder Mapping",
+        to: "/folder-mapping",
+        icon: FolderTree,
+        roles: [1], // UserRole.Admin
+      },
+      {
+        label: "Audit Logs",
+        to: "/admin/audit-logs",
+        icon: FileText,
+        roles: [], // UserRole.Admin
       },
     ],
   },
@@ -80,41 +108,6 @@ export const sidebarItems: SidebarGroup[] = [
         to: "/operator/all-requests",
         icon: FileText,
         roles: [2], // UserRole.It / Operator
-      },
-    ],
-  },
-  {
-    title: "Admin",
-    items: [
-      {
-        label: "Dashboard",
-        to: "/dashboard",
-        icon: LayoutDashboard,
-        roles: [1], // UserRole.Admin
-      },
-      {
-        label: "Users",
-        to: "/users",
-        icon: Users,
-        roles: [1], // UserRole.Admin
-      },
-      {
-        label: "Departments",
-        to: "/departments",
-        icon: Building2,
-        roles: [1], // UserRole.Admin
-      },
-      {
-        label: "Folder Mapping",
-        to: "/folder-mapping",
-        icon: FolderTree,
-        roles: [1], // UserRole.Admin
-      },
-      {
-        label: "Audit Logs",
-        to: "/admin/audit-logs",
-        icon: FileText,
-        roles: [], // UserRole.Admin
       },
     ],
   },

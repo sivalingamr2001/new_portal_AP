@@ -36,16 +36,24 @@ export function AppSidebar() {
 
   const [hoveredItemTo, setHoveredItemTo] = React.useState<string | null>(null)
 
-  const visibleMenuGroups = React.useMemo(() => {
-    return sidebarItems
-      .map((group) => {
-        const filteredItems = group.items.filter((item) =>
-          item.roles.includes(activeRoleNumber)
-        )
-        return { ...group, items: filteredItems }
-      })
-      .filter((group) => group.items.length > 0)
-  }, [activeRoleNumber])
+const visibleMenuGroups = React.useMemo(() => {
+  // Ensure we always treat activeRoleNumber as an array safely
+  const userRolesList = Array.isArray(activeRoleNumber)
+    ? activeRoleNumber
+    : [activeRoleNumber];
+
+  return sidebarItems
+    .map((group) => {
+      const filteredItems = group.items.filter((item) =>
+        // Checks if AT LEAST ONE of the user's roles matches the item's allowed roles
+        item.roles.some((roleId) => userRolesList.includes(roleId))
+      )
+      return { ...group, items: filteredItems }
+    })
+    // Hide any section headers that end up completely empty
+    .filter((group) => group.items.length > 0)
+}, [activeRoleNumber])
+
 
   return (
     <TooltipProvider delayDuration={0}>

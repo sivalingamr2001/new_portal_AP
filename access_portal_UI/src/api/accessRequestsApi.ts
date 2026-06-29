@@ -2,7 +2,6 @@ import {
   ApiException,
   apiService,
   type PagedResult,
-  type PaginationParams,
 } from "./axiosClient"
 import type {
   AccessRequestDetailDto,
@@ -76,12 +75,18 @@ export const accessRequestsApi = {
   },
 
   getMyRequests: async (
-    params?: PaginationParams
+    employeeId: string
   ): Promise<PagedResult<AccessRequestSummaryDto>> => {
     try {
       const response = await apiService.get<
         PagedResult<AccessRequestSummaryDto>
-      >("/access-requests/my", { params })
+      >("/access-requests/my", {
+        params: {
+          identifier: employeeId,
+          page: 1,
+          pageSize: 20,
+        },
+      })
       return response.data
     } catch (error) {
       if (error instanceof ApiException) throw error

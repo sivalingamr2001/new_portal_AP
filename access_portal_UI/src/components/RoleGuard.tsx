@@ -18,11 +18,15 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
     return <Navigate to="/login" replace />
   }
 
-  const activeRole: any = roleStringToNumeric(currentUserRole)
+  // 1. This is now an array of numbers: e.g., [3, 1]
+  const activeRolesList = roleStringToNumeric(currentUserRole)
 
-  if (!allowedRoles.includes(activeRole)) {
+  // 2. Check if AT LEAST ONE of the user's roles matches the allowedRoles array
+  const hasAccess = allowedRoles.some((role) => activeRolesList.includes(role))
+
+  if (!hasAccess) {
     console.warn(
-      `User with role '${currentUserRole}' (${activeRole}) does not have access to allowed roles: ${allowedRoles.join(", ")}`
+      `User with roles '${JSON.stringify(currentUserRole)}' does not have access to allowed roles: ${allowedRoles.join(", ")}`
     )
     return <Navigate to="/unauthorized" replace />
   }

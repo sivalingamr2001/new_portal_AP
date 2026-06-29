@@ -52,7 +52,7 @@ const statusLabels: Record<RequestStatus, string> = {
   HodRejected: "HOD Rejected",
   ItRejected: "IT Rejected",
   Revoked: "Revoked",
-  Expired: "Expired", 
+  Expired: "Expired",
 }
 
 const accessTypeLabels: Record<AccessTypes, string> = {
@@ -229,9 +229,15 @@ function AccessItemCard({
   const [confirmAccessType, setConfirmAccessType] = useState<AccessTypes>(
     item.confirmAccessType ?? item.accessType
   )
-  const isAdmin = currentUserRole === "Admin"
-  const isHod = currentUserRole === "Hod" || isAdmin
-  const isOperator = currentUserRole === "Operator" || isAdmin
+  const isAdmin = Array.isArray(currentUserRole)
+    ? currentUserRole.includes("Admin")
+    : currentUserRole === "Admin";
+  const isHod = (Array.isArray(currentUserRole)
+    ? currentUserRole.includes("Hod")
+    : currentUserRole === "Hod") || isAdmin;
+  const isOperator = (Array.isArray(currentUserRole)
+    ? currentUserRole.includes("Operator")
+    : currentUserRole === "Operator") || isAdmin;
   const isUser = currentUserRole === "User"
   const canHodReview = isHod && item.status === "PendingWithHod"
   const canOperatorReview =
@@ -523,7 +529,7 @@ function ActionModal({
           </div>
         )}
 
-        
+
 
         <textarea
           rows={4}
