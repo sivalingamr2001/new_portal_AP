@@ -105,7 +105,7 @@ useEffect(() => {
       reason: "",
     },
   ])
-}, [controlledItems])
+}, [])
 
 useEffect(() => {
   let cancelled = false;

@@ -103,7 +103,7 @@ export function AppHeader() {
       if (!isMounted) return
 
       // 2. Resolve target Hub Base Endpoint URL safely
-      const hubBaseUrl = (import.meta.env.DEV ? import.meta.env.VITE_DEV_API_URL : '/access-portal/api')
+      const hubBaseUrl = (import.meta.env.DEV ? import.meta.env.VITE_BASE_API_URL : '/access-portal/api')
         .replace(/\/api\/?$/, "")
         .replace(/\/hubs\/notifications\/?$/, "")
 

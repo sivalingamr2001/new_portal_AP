@@ -94,12 +94,17 @@ export function FolderPathSheet({
     <>
       <Sheet open={open} onOpenChange={handleClose}>
         <SheetContent className="w-130 p-0 sm:max-w-130">
-          <SheetHeader className="border-b px-6 py-4">
-            <SheetTitle>Select Folder Path</SheetTitle>
+          <SheetHeader className="border-b bg-muted/30 px-6 py-4 space-y-3">
+            <div className="flex flex-col gap-1">
+              <SheetTitle className="text-lg font-semibold tracking-tight text-foreground">
+                Select Folder Path
+              </SheetTitle>
+            </div>
 
             {stack.length > 0 && (
-              <div className="mt-2 text-xs break-all text-muted-foreground">
-                {fullPath}
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-0.5 text-xs font-mono text-emerald-600 dark:text-emerald-400 break-all shadow-sm transition-all animate-in fade-in-50 duration-200">
+                <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                <span className="w-full select-all">{fullPath}</span>
               </div>
             )}
           </SheetHeader>
@@ -107,10 +112,16 @@ export function FolderPathSheet({
           <div className="flex h-full flex-col">
             <div className="space-y-3 border-b p-4">
               {stack.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={handleBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back
-                </Button>
+                <div className="flex justify-between items-center">
+                  <Button variant="ghost" size="sm" onClick={handleBack}>
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Back
+                  </Button>
+
+                  <Button variant="default" size="sm" onClick={handleSelectCurrent}>
+                    Select This Folder
+                  </Button>
+                </div>
               )}
 
               <div className="relative">
@@ -152,13 +163,6 @@ export function FolderPathSheet({
               )}
             </div>
 
-            {stack.length > 0 && (
-              <div className="border-t p-4">
-                <Button className="w-full" onClick={handleSelectCurrent}>
-                  Select This Folder
-                </Button>
-              </div>
-            )}
           </div>
         </SheetContent>
       </Sheet>

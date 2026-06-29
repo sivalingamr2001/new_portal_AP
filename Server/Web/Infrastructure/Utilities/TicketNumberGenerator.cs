@@ -4,9 +4,9 @@ using Web.Infrastructure.Data;
 namespace Web.Infrastructure.Utilities;
 
 /// <summary>
-/// Generates unique per-item ticket numbers sequentially per day.
-/// Format: REQ-YYYYMMDD-FFF (where FFF is a 3-digit padded sequence)
-/// Example: REQ-20260608-001, REQ-20260608-002
+/// Generates unique per-item ticket numbers sequentially per year.
+/// Format: REQ-YYYY-FFFF (where FFFF is a 4-digit padded sequence)
+/// Example: REQ-2026-0001, REQ-2026-0002
 /// Supports a batch offset to safely handle multi-item requests saved within a single database transaction.
 /// </summary>
 public static class TicketNumberGenerator
@@ -18,8 +18,8 @@ public static class TicketNumberGenerator
         await _semaphore.WaitAsync();
         try
         {
-            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
-            var prefix = $"REQ-{datePart}-";
+            var yearPart = DateTime.UtcNow.ToString("yyyy");
+            var prefix = $"REQ-{yearPart}-";
 
             var lastTicket = await db.AccessItems
                 .Where(i => i.TicketNumber != null && i.TicketNumber.StartsWith(prefix))
@@ -40,7 +40,7 @@ public static class TicketNumberGenerator
 
             nextSequence += batchOffset;
 
-            return $"{prefix}{nextSequence:D3}";
+            return $"{prefix}{nextSequence:D4}";
         }
         finally
         {
